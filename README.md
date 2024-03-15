@@ -9,7 +9,7 @@ A modification of the Japanese Super Mario Bros. 2 (also known as Super Mario Br
 - As is the case with the European release of Super Mario Bros., the one-block gaps present at the end of all water areas from that game are absent to prevent the player from easily getting stuck until time runs out.
 - As in Super Mario All-Stars, the player begins with five lives and receives five lives upon continuing from a Game Over. Additionally, the maximum number of lives has been capped to 128 to prevent an issue with overflowing the life count. The lives display has been modified to properly display the life count.
 - Luigi inherits his physics from Super Mario All-Stars, increasing his horizontal acceleration and deceleration and making his control feel less "slippery."
-- Luigi now has a distinct palette (lifted from Super Mario Maker 2) when acquiring the Fire Flower.
+- Luigi now has a distinct palette (lifted from Super Mario Deluxe).
 - Player physics and firework conditions from The Lost Levels apply to levels from both games but enemy speeds and hidden 1-UP requirements are taken from the source game. However, the hidden 1-UP from 1-1 of The Lost Levels is not tied to any coin requirements.
 
 Please note that there are two patch files present in this folder. Either one can be used to play Super Mario Bros. Definitive. smb-definitive_smb1.ips is to be patched onto a standard 40,976 byte Super Mario Bros. ROM, whereas smb-definitive_smb2j.ips is to be patched onto a standard 65,500 byte Super Mario Bros. 2 (Japan) ROM. For the SMB2J patch, note that you may need to change the file extension from ".fds" to ".nes" in order for this hack to operate correctly.
