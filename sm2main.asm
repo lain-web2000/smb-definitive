@@ -7,15 +7,16 @@
   .db $4E,$45,$53,$1A                           ;  magic signature
   .db 4                                         ;  PRG ROM size in 16384 byte units
   .db 0                                         ;  CHR
-  .db $93                                       ;  mirroring type and mapper number lower nibble
-  .db $40                                       ;  mapper number upper nibble
+  .db $43                                       ;  mirroring type and mapper number lower nibble
+  .db $00                                       ;  mapper number upper nibble
   .db $00,$00,$00,$00,$00,$00,$00,$00
 
 .org $8000
 .include "sound.asm"
 ;we just gonna stuff chr here ig
 sm2char1:
-.incbin "sm2char1.chr"
+.incbin "sm2char1_bg.chr"
+.incbin "sm2char1_spr.chr"
 sm2char2:
 .incbin "sm2char2.chr"
 sm2char3:
@@ -59,8 +60,6 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             jsr MoveAllSpritesOffscreen
             jsr InitializeNameTables
             inc DisableScreenFlag
-            lda #%00000010              ;enable IRQs with 16-bit counter
-            sta IRQ_ENABLE
             cli
             lda Mirror_PPU_CTRL
             ora #%10000000
@@ -92,20 +91,6 @@ NMIHandler:
    sta Mirror_PPU_CTRL       ;from interrupting this one
    sta PPU_CTRL
    sei
-   lda IRQUpdateFlag
-   beq SkipIRQ
-   lda #$00
-   sta IRQ_LATCH0
-   lda #$02
-   sta IRQ_LATCH1
-   lda #$09
-   sta IRQ_LATCH2
-   lda #$0e
-   sta IRQ_LATCH3
-   lda #%00000010
-   sta IRQ_ENABLE
-   inc IRQAckFlag            ;reset flag to wait for next IRQ
-SkipIRQ:
    lda Mirror_PPU_MASK
    and #%11100110            ;disable OAM and background display by default
    ldy DisableScreenFlag     ;if screen disabled, skip this
@@ -145,6 +130,14 @@ InitVRAMVars:
    lda Mirror_PPU_MASK
    sta PPU_MASK              ;dump PPU control register 2
    cli
+   lda IRQUpdateFlag
+   beq SkipIRQ
+   lda #31                   ;count 31 scanlines (plus the pre-render scanline)
+   sta MMC3_IRQLatch
+   sta MMC3_IRQReload
+   sta MMC3_IRQEnable
+   inc IRQAckFlag            ;reset flag to wait for next IRQ
+SkipIRQ:
    jsr RunSoundEngine        ;run subs that need to be run on every frame
    jsr ReadJoypads
    jsr PauseRoutine
@@ -1591,8 +1584,8 @@ JumpEngine:
 InitializeNameTables:
               lda PPU_STATUS            ;reset flip-flop
               lda Mirror_PPU_CTRL       ;load mirror of first ppu control reg
-              ora #%00010000            ;set sprites for first 4k and background for second 4k
-              and #%11110000            ;clear rest of lower nybble, leave higher alone
+              ora #%00001000            ;set background for first 4k and sprites for second 4k
+              and #%11101000            ;clear rest of lower nybble, leave higher alone
               jsr WritePPUReg1
               lda #$24                  ;set vram address to start of name table 1
               jsr WriteNTAddr
@@ -13689,8 +13682,9 @@ DiskScreenPalette:
 
 DiskScreen:
       lda #$00
-      sta Mirror_PPU_MASK
-      sta PPU_MASK
+      ;apparently MMC3 IRQ does not like this
+      ;sta Mirror_PPU_MASK
+      ;sta PPU_MASK
       sta IRQUpdateFlag
       inc DisableScreenFlag
       lda #$1b
@@ -14679,7 +14673,9 @@ CHR_PRGAddrTable:
 GraphicsLoader:
       tax                    ;store A in X register
       lda #SoundBank         ;load sound bank since that's
-      jsr SwitchPRGBank      ;where the CHR data is
+      jsr SwitchPRGBank0      ;where the CHR data is
+      lda #SoundBank+1         ;load sound bank since that's
+      jsr SwitchPRGBank1      ;where the CHR data is
       ldy #$00
 	sty PPU_MASK           ;turn off rendering for good measure
       txa                    ;transfer X back into A
@@ -14714,14 +14710,14 @@ LoadGraphicsLoop:
       jmp LoadMainBank       ;load main bank afterwards
 
 InitializeCHRRAM:
-      ldy #$00
+    ldy #$00
 	sty PPU_MASK           ;turn off rendering for good measure
 	sty PPU_ADDRESS        ;load destination address into PPU
 	sty PPU_ADDRESS
-      lda #<sm2char1
-      sta $00
-      lda #>sm2char1
-      sta $01
+    lda #<sm2char1
+    sta $00
+    lda #>sm2char1
+    sta $01
 	ldx #32                ;number of pages
 InitCHRLoop:
 	lda ($00),y            ;copy byte from ROM
@@ -14733,91 +14729,121 @@ InitCHRLoop:
 	bne InitCHRLoop        ;loop until all CHR data is stored
 
 LoadMainBank:
-        lda #MainBank        ;load main bank
-SwitchPRGBank:
-        sta PRGSelect
-        rts
+	lda #MainBank        ;load main bank
+	jsr SwitchPRGBank0
+	lda #MainBank+1        ;load main bank		
+SwitchPRGBank1:
+	pha
+	lda #%00000111
+	sta MMC3_BankSelect
+	pla
+	sta MMC3_BankData
+	rts
+SwitchPRGBank0:
+	pha
+	lda #%00000110
+	sta MMC3_BankSelect
+	pla
+	sta MMC3_BankData
+	rts
 
 RunSoundEngine:
-        lda #SoundBank        ;switch bank
-        jsr SwitchPRGBank
-        jsr SoundEngine       ;run relevant routine
-        jmp LoadMainBank      ;and return to main bank
+	lda #SoundBank        ;switch bank
+	jsr SwitchPRGBank0
+	lda #SoundBank+1        ;switch bank again :DDDDDDDD
+	jsr SwitchPRGBank1
+	jsr SoundEngine       ;run relevant routine
+	jmp LoadMainBank      ;and return to main bank
 
 RunLoadAreaPointer:
-        lda #LevelsBank       ;switch bank
-        jsr SwitchPRGBank
-        jsr LoadAreaPointer   ;run relevant routine
-        jmp LoadMainBank      ;and return to main bank
+	lda #LevelsBank       ;switch bank
+	jsr SwitchPRGBank0
+	lda #LevelsBank+1       ;switch bank again :DDDDDDDD
+	jsr SwitchPRGBank1
+	jsr LoadAreaPointer   ;run relevant routine
+	jmp LoadMainBank      ;and return to main bank
 
 RunGetAreaDataAddrs:
-        lda #LevelsBank       ;switch bank
-        jsr SwitchPRGBank
-        jsr GetAreaDataAddrs  ;run relevant routine
-        jmp LoadMainBank      ;and return to main bank
+	lda #LevelsBank       ;switch bank
+	jsr SwitchPRGBank0
+	lda #LevelsBank+1       ;switch bank again :DDDDDDDD
+	jsr SwitchPRGBank1
+	jsr GetAreaDataAddrs  ;run relevant routine
+	jmp LoadMainBank      ;and return to main bank
 
 RunGetAreaPointer:
-        lda #LevelsBank       ;switch bank
-        jsr SwitchPRGBank
-        jsr GetAreaPointer    ;run relevant routine
-        jmp LoadMainBank      ;and return to main bank
+	lda #LevelsBank       ;switch bank
+	jsr SwitchPRGBank0
+	lda #LevelsBank+1       ;switch bank again :DDDDDDDD
+	jsr SwitchPRGBank1
+	jsr GetAreaPointer    ;run relevant routine
+	jmp LoadMainBank      ;and return to main bank
 
 IRQHandler:
-            sei
-            php                      ;save regs
-            pha
-            txa
-            pha
-            tya
-            pha        
-            lda Mirror_PPU_CTRL
-            and #$f7                 ;mask out sprite address high reg of ctrl reg mirror
-            ora NameTableSelect      ;mask in whatever's set here
-            sta Mirror_PPU_CTRL      ;update the register and its mirror
-            sta PPU_CTRL
-            lda #%00000000           ;disable IRQ for the rest of the frame
-            sta IRQ_ENABLE
-            lda HorizontalScroll
-            sta PPU_SCROLL           ;set scroll regs for the screen under the status bar
-            lda VerticalScroll       ;to achieve the split screen effect
-            sta PPU_SCROLL
-            lda #$00
-            sta IRQAckFlag           ;indicate IRQ was acknowledged
-            pla
-            tay                      ;return regs, reenable IRQs and leave
-            pla
-            tax
-            pla
-            plp
-            cli
-            rti
+	sei
+	php                      ;save regs
+	pha
+	txa
+	pha
+	tya
+	pha        
+      ldy #$06                 ;delay for right part of scanline 31
+DelS: dey
+      bne DelS
+	lda Mirror_PPU_CTRL
+	and #$ef                 ;mask out sprite address high reg of ctrl reg mirror
+	ora NameTableSelect      ;mask in whatever's set here
+	sta Mirror_PPU_CTRL      ;update the register and its mirror
+	sta PPU_CTRL
+	lda #$00
+	sta MMC3_IRQDisable      ;disable IRQs for the rest of the frame
+	lda HorizontalScroll
+	sta PPU_SCROLL           ;set scroll regs for the screen under the status bar
+	lda VerticalScroll       ;to achieve the split screen effect
+	sta PPU_SCROLL
+	lda #$00
+	sta IRQAckFlag           ;indicate IRQ was acknowledged
+	pla
+	tay                      ;return regs, reenable IRQs and leave
+	pla
+	tax
+	pla
+	plp
+	cli
+	rti
 
 Reset:
-		sei                        ;replicate init code present in FDS BIOS
-		lda #$10
-		sta PPU_CTRL
-		cld
-		lda #$06
-		sta PPU_MASK
-		ldx #$02
+	sei                        ;replicate init code present in FDS BIOS
+	lda #$10
+	sta PPU_CTRL
+	cld
+	lda #$06
+	sta PPU_MASK
+	ldx #$02
 VBlank:
-		lda PPU_STATUS
-		bpl VBlank
-		dex
-		bne VBlank
-		stx JOYPAD_PORT1
-		stx SND_DELTA_REG
-		lda #$c0
-		sta JOYPAD_PORT2
-		lda #$0f
-		sta SND_MASTERCTRL_REG
-		ldx #$ff
-		txs
-            lda #SoundBank
-            jsr SwitchPRGBank
-            jsr InitializeCHRRAM        ;load CHR data
-            jsr CheckSaveData           ;check validity of save data
-            jmp Start                   ;now start the game!
+	lda PPU_STATUS
+	bpl VBlank
+	dex
+	bne VBlank
+	stx JOYPAD_PORT1
+	stx SND_DELTA_REG
+	lda #$c0
+	sta JOYPAD_PORT2
+	lda #$0f
+	sta SND_MASTERCTRL_REG
+	ldx #$ff
+	txs
+	lda #$00
+	sta MMC3_Mirroring ; vertical mirroring
+	lda #%10000000
+	sta MMC3_PRGRAMProtect ; enable PRG-RAM
+	lda #SoundBank
+	jsr SwitchPRGBank0
+	lda #SoundBank+1
+	jsr SwitchPRGBank1
+	jsr InitializeCHRRAM        ;load CHR data
+	jsr CheckSaveData           ;check validity of save data
+	jmp Start                   ;now start the game!
 
 ;-------------------------------------------------------------------------------------
 ;INTERRUPT VECTORS

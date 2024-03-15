@@ -26,13 +26,6 @@ JOYPAD_PORT           = $4016
 JOYPAD_PORT1          = $4016
 JOYPAD_PORT2          = $4017
 
-IRQ_LATCH0            = $8000
-IRQ_LATCH1            = $9000
-IRQ_LATCH2            = $a000
-IRQ_LATCH3            = $b000
-IRQ_ENABLE            = $c000
-IRQ_ACKNOWLEDGE       = $d000
-
 ; GAME SPECIFIC DEFINES
 
 ObjectOffset          = $08
@@ -680,11 +673,19 @@ VictoryMode           = 2
 GameOverMode          = 3
 
 SoundBank             = 0
-LevelsBank            = 1
-MainBank              = 2
-FixedBank             = 3
+LevelsBank            = 2
+MainBank              = 4
+FixedBank             = 6
 
-PRGSelect             = $f000
+MMC3_BankSelect		  = $8000
+MMC3_BankData		  = $8001
+MMC3_Mirroring		  = $a000
+MMC3_PRGRAMProtect    = $a001
 
-PrincessGfxOffset     = $0760
-TitleScreenGfxOffset  = $1f30
+MMC3_IRQLatch		  = $c000
+MMC3_IRQReload		  = $c001
+MMC3_IRQDisable		  = $e000
+MMC3_IRQEnable		  = $e001
+
+PrincessGfxOffset     = $1760
+TitleScreenGfxOffset  = $0f30
