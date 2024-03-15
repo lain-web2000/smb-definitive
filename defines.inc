@@ -687,5 +687,7 @@ MMC3_IRQReload		  = $c001
 MMC3_IRQDisable		  = $e000
 MMC3_IRQEnable		  = $e001
 
-PrincessGfxOffset     = $1760
-TitleScreenGfxOffset  = $0f30
+BG_MainBank           = 0
+Spr_MainBank          = 4
+BG_TitleBank          = 8
+Spr_EndingBank        = 12
