@@ -16,6 +16,7 @@ Please note that there are two patch files present in this folder. Either one ca
 
 # Credits:
 -Simplistic6502, who did the vast majority of programming work and created the assets used for the SMB Definitive title screen.
+
 -SeraphmIII, who created the SMB2J VRC3 codebase used for this project and designed the levels for SMB1's World 9.
 
 Special thanks to threecreepio, whose MMC5 conversion of SMB2J and disassembly of ANNSMB proved particularly useful for creating this ROM hack. This would not have been possible without his resources.
