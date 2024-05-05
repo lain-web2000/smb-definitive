@@ -872,7 +872,8 @@ GameOver:
   .db $18, $1f, $0e, $1b
   .db $21, $eb, $08, $0c, $18, $17, $1d, $12, $17, $1e, $0e ;"CONTINUE"
   .db $22, $0c, $47, $24
-  .db $22, $4b, $05, $1b, $0e, $1d, $1b, $22 ;"RETRY"
+  .db $22, $4b, $04, $1c, $0a, $1f, $0e ;"SAVE"
+  .db $22, $ab, $05, $1b, $0e, $1d, $1b, $22 ;"RETRY"
   .db $ff
 
 WarpZone:
@@ -2131,8 +2132,12 @@ SetupGameOver:
       sta ScreenRoutineTask
       sta IRQUpdateFlag
       sta ContinueMenuSelect ;set continue as default choice
-      lda #$02
-      sta EventMusicQueue    ;play game over music
+      lda #GameOverMusic     ;play normal game over by default
+      ldy GameOverMsgFlag    ;if not doing special game over, branch
+      beq StoreGameOverMus
+      lda #AltGameOverMusic  ;otherwise play alternate game over music
+StoreGameOverMus:
+      sta EventMusicQueue
       inc DisableScreenFlag
       inc OperMode_Task
       rts
@@ -4784,6 +4789,10 @@ WarpZoneObject:
       and Player_Y_HighPos   ;same bits set as in vertical high byte (why?)
       bne ExGTimer           ;if so, branch to leave
       sta ScrollLock         ;otherwise nullify scroll lock flag
+	  lda HardWorldFlag		 ;are we in smb2j levels?
+	  bne SkipIncBug		 ;if so, do not increment warpzonecontrol.
+	  inc WarpZoneControl	 ;hiiiiiiiiii im back :3
+SkipIncBug:
       jmp EraseEnemyObject   ;kill this object
 
 ;-------------------------------------------------------------------------------------
@@ -10770,7 +10779,9 @@ HandlePipeEntry:
           sta Player_SprAttrib      ;set background priority bit in player's attributes
           lda WarpZoneControl       ;check warp zone control
           beq ExPipeE               ;branch to leave if none found
-          and #%00001111            ;mask bits
+		  ldy HardWorldFlag			;are we in SMB1?
+		  beq SMB1WarpZoneHandler	;if so, use all stars warp-zone handler
+		  and #%00001111            ;mask bits
           asl
           asl                       ;multiply by four
           tax                       ;save as offset to warp zone numbers (starts at left pipe)
@@ -10798,6 +10809,37 @@ GetWNum:  lda WarpZoneNumbers,x
           inc FetchNewGameTimerFlag ;set flag to load new game timer
 ExPipeE:  rts                       ;leave!!!
 
+SMB1WarpZoneHandler:
+         cmp #$04
+         bcs CalculateWarpPipeOffset
+         ldx #$04
+         lda WorldNumber
+         beq RecalculateWarpPipeOffsetSave
+         inx
+		 ldy AreaType
+		 dey
+         bne RecalculateWarpPipeOffsetSave
+         inx
+
+RecalculateWarpPipeOffsetSave:
+         txa
+         sta WarpZoneControl
+
+CalculateWarpPipeOffset:
+         and #$03
+         asl
+         asl
+         tax
+
+         lda Player_X_Position
+         cmp #$60
+         bcc GetWNum
+         inx
+         cmp #$A0
+         bcc GetWNum
+         inx
+		 bne GetWNum	;why did we waste all this code for an unconditional branch? idk.
+		 
 ImpedePlayerMove:
        lda #$00                  ;initialize value here
        ldy Player_X_Speed        ;get player's horizontal speed
@@ -13688,7 +13730,7 @@ GameOverCursorData:
   .db $5b, $02, $48
 
 GameOverCursorY:
-  .db $77, $8f
+  .db $77, $8f, $a7
 
 GameOverMenu:
             lda #$00
@@ -13698,13 +13740,18 @@ GameOverMenu:
             bne ContinueOrRetry
             lda SavedJoypadBits
             and #Select_Button           ;if player pressed the select button
-            beq ChgSel                   ;then branch to select "continue" or "retry"
+            beq ChgSel                   ;then do not branch ahead
             ldx SelectTimer              ;if select timer not expired while
             bne ChgSel                   ;pressing select, skip this
             lsr
             sta SelectTimer              ;otherwise set the select timer
-            lda ContinueMenuSelect
-            eor #$01                     ;and toggle between the two choices
+            lda #Sfx_Fireball            ;play sound effect when moving cursor
+            sta Square1SoundQueue
+            inc ContinueMenuSelect       ;move cursor to the next menu option
+            lda ContinueMenuSelect       ;check if we're past the last option
+            cmp #$03
+            bcc ChgSel                   ;if not, branch ahead
+            lda #$00                     ;otherwise move cursor back to the top
             sta ContinueMenuSelect
 ChgSel:     ldy #$02
 ChgSelLoop: lda GameOverCursorData,y     ;set up cursor sprite tile, attribute
@@ -13719,8 +13766,17 @@ ChgSelLoop: lda GameOverCursorData,y     ;set up cursor sprite tile, attribute
 ContinueOrRetry:
   lda ContinueMenuSelect       ;if player selected "continue"
   beq Continue                 ;then branch to continue
+  cmp #$01
+  bne RetryGame                ;if not selected "save", don't save progress
+  lda WorldNumber              ;otherwise save world number and worlds completed
+  sta ContinueWorld
+  lda HardWorldFlag
+  sta SavedHardWorldFlag
+  lda CompletedWorlds
+  sta SavedCompletedWorlds
+RetryGame:
   lda #$00
-  sta CompletedWorlds          ;otherwise init completed worlds flags
+  sta CompletedWorlds          ;init completed worlds flags
   jmp TerminateGame            ;and end the game
 
 Continue:
@@ -13743,10 +13799,20 @@ GameMenuRoutine:
               and #Start_Button
               beq ChkSelect               ;if not, branch to check other buttons
               lda #$00
+			  sta WorldNumber
               sta CompletedWorlds
               sta DiskIOTask
               sta HardWorldFlag
-              jmp StartGame
+              lda SavedJoypadBits
+              and #A_Button               ;check if the player pressed A + start
+              beq StG                     ;if not, start the game as usual at world 1
+              lda ContinueWorld           ;otherwise load save data to start at previous world
+              sta WorldNumber
+              lda SavedHardWorldFlag
+              sta HardWorldFlag
+              lda SavedCompletedWorlds
+              sta CompletedWorlds
+StG:          jmp StartGame
 ChkSelect:    lda SavedJoypadBits
               cmp #Select_Button          ;branch if pressing select
               beq SelectLogic
@@ -13788,8 +13854,6 @@ StartGame:
               lda DemoTimer
               beq ResetTitle
               inc OperMode_Task
-              lda #$00
-              sta WorldNumber
               lda #$00
               sta LevelNumber
               lda #$00
@@ -14403,6 +14467,9 @@ GoToWorld9:
 EndTheGame:
     lda #$00
     sta CompletedWorlds      ;init completed worlds flag
+	sta ContinueWorld        ;reset saved progress
+    sta SavedHardWorldFlag
+    sta SavedCompletedWorlds
     lda #GameOverMode        ;set game over mode
     sta OperMode
     inc GameOverMsgFlag      ;increment flag for special message
@@ -14646,6 +14713,9 @@ SChkLp: lda SM2Header,x         ;check all seven bytes of the save data header
 InitializeSaveData:
         ldx #$00                ;init counter
         stx GamesBeatenCount    ;wipe number of games beaten
+		stx ContinueWorld       ;reset saved progress
+        stx SavedHardWorldFlag
+        stx SavedCompletedWorlds
 SaveLp: lda SM2Header,x         ;write save data header
         sta SaveDataHeader,x
         inx

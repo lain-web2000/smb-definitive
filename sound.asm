@@ -720,8 +720,8 @@ EndOfMusicData:
         bne NotTRO
         lda AreaMusicBuffer_Alt  ;load previously saved contents of primary buffer
         bne MusicLoopBack        ;and start playing the song again if there is one
-NotTRO: and #VictoryMusic        ;check for victory music (the only secondary that loops)
-        bne VictoryMLoopBack
+NotTRO: and #%00000110           ;check for victory music and game over music (the only secondaries that loops)
+        bne EventMLoopBack
         lda AreaMusicBuffer      ;check primary buffer for any music except pipe intro
         and #%01011111
         bne MusicLoopBack        ;if any area music except pipe intro, music loops
@@ -738,12 +738,17 @@ StopMusic:
 MusicLoopBack:
         jmp HandleAreaMusicLoopB
 
+EventMLoopBack:
+        and #VictoryMusic       ;if victory music, load next part of the song
+        bne VictoryMLoopBack
+        lda EventMusicBuffer    ;otherwise reload buffer and loop music
+        jmp LoadEventMusic
 VictoryMLoopBack:
-        inc PatternNumber   ;increment counter for next part of victory music
+        inc PatternNumber       ;increment counter for next part of victory music
         ldy PatternNumber
-        cpy #$3d            ;if counter reached a certain point, end song
+        cpy #$3d                ;if counter reached a certain point, end song
         beq StopMusic
-        jmp LoadHeader      ;otherwise play the next part of the song
+        jmp LoadHeader          ;otherwise play the next part of the song
 
 Squ2LengthHandler:
         jsr ProcessLengthData    ;store length of note
@@ -766,15 +771,15 @@ SkipFqL1: lda Squ2_NoteLenBuffer     ;save length in square 2 note counter
 MiscSqu2MusicTasks:
            lda Square2SoundBuffer     ;is there a sound playing on square 2?
            bne HandleSquare1Music
-           lda EventMusicBuffer       ;check for death music or d4 set on secondary buffer
-           and #%10010001             ;note that regs for death music or d4 are loaded by default
+           lda EventMusicBuffer       ;check for death music set on secondary buffer
+           and #%10000001             ;note that regs for death music are loaded by default
            bne HandleSquare1Music
            ldy Squ2_EnvelopeDataCtrl  ;check for contents saved from LoadControlRegs
            beq NoDecEnv1
            dec Squ2_EnvelopeDataCtrl  ;decrement unless already zero
 NoDecEnv1: jsr LoadEnvelopeData       ;do a load of envelope data to replace default
            sta SND_SQUARE2_REG        ;based on offset set by first load unless playing
-           ldx #$7f                   ;death music or d4 set on secondary buffer
+           ldx #$7f                   ;death music set on secondary buffer
            stx SND_SQUARE2_REG+1
 
 HandleSquare1Music:
@@ -811,8 +816,8 @@ SkipCtrlL: sta Squ1_EnvelopeDataCtrl  ;save envelope offset
 MiscSqu1MusicTasks:
               lda Square1SoundBuffer     ;is there a sound playing on square 1?
               bne HandleTriangleMusic
-              lda EventMusicBuffer       ;check for death music or d4 set on secondary buffer
-              and #%10010001
+              lda EventMusicBuffer       ;check for death music set on secondary buffer
+              and #%10000001
               bne DeathMAltReg
               ldy Squ1_EnvelopeDataCtrl  ;check saved envelope offset
               beq NoDecEnv2
@@ -825,6 +830,9 @@ DeathMAltReg: lda AltRegContentFlag      ;check for alternate control reg data
 DoAltLoad:    sta SND_SQUARE1_REG+1      ;if nonzero, and let's move on
 
 HandleTriangleMusic:
+        lda EventMusicBuffer      ;do not play triangle channel if game over music
+        and #GameOverMusic
+        bne HandleNoiseMusic
         lda MusicOffset_Triangle
         dec Tri_NoteLenCounter    ;decrement triangle note length
         bne HandleNoiseMusic      ;is it time for more data?
@@ -847,13 +855,13 @@ TriNoteHandler:
           ldx Tri_NoteLenBuffer   ;save length in triangle note counter
           stx Tri_NoteLenCounter
           lda EventMusicBuffer
-          and #%01101110          ;check for death music or d4 set on secondary buffer
-          bne NotDOrD4            ;if playing any other secondary, skip primary buffer check
+          and #%01111110          ;check for death music set on secondary buffer
+          bne NotDeath            ;if playing any other secondary, skip primary buffer check
           lda AreaMusicBuffer     ;check primary buffer for water or castle level music
           and #%00001010
-          beq HandleNoiseMusic    ;if playing any other primary, or death or d4, go on to noise routine
-NotDOrD4: txa                     ;if playing water or castle music or any secondary
-          cmp #$12                ;besides death music or d4 set, check length of note
+          beq HandleNoiseMusic    ;if playing any other primary, or death, go on to noise routine
+NotDeath: txa                     ;if playing water or castle music or any secondary
+          cmp #$12                ;besides death music set, check length of note
           bcs LongN
           lda EventMusicBuffer    ;check for victory music if not playing a long note
           cmp #VictoryMusic
@@ -865,9 +873,9 @@ NotVictoryMusic:
           beq MediN
           lda #$0f                ;load value $0f if playing the win castle music and playing a short
           bne LoadTriCtrlReg      ;note, load value $1f if playing water or castle level music or any
-MediN:    lda #$1f                ;secondary besides death and d4 except win castle or win castle and playing
+MediN:    lda #$1f                ;secondary besides death except win castle or win castle and playing
           bne LoadTriCtrlReg      ;a short note, and load value $ff if playing a long note on water, castle
-LongN:    lda #$ff                ;or any secondary (including win castle) except death and d4
+LongN:    lda #$ff                ;or any secondary (including win castle) except death
 
 LoadTriCtrlReg:           
         sta SND_TRIANGLE_REG      ;save final contents of A into control reg for triangle
@@ -998,7 +1006,7 @@ MusicHeaderData:
   .db GameOverMusHdr-MHD
   .db VictoryPart1AHdr-MHD
   .db WinCastleMusHdr-MHD
-  .db GameOverMusHdr-MHD
+  .db AltGameOverHdr-MHD
   .db EndOfLevelMusHdr-MHD
   .db TimeRunningOutHdr-MHD
   .db SilenceHdr-MHD
@@ -1048,7 +1056,8 @@ VictoryPart2AHdr:      .db $30, <VictoryM_P2AData, >VictoryM_P2AData, $29, $1c, 
 VictoryPart2CHdr:      .db $30, <VictoryM_P2CData, >VictoryM_P2CData, $31, $20, $42
 VictoryPart2DHdr:      .db $38, <VictoryM_P2DData, >VictoryM_P2DData, $06, $04, $1b
 VictoryPart2BHdr:      .db $38, <VictoryM_P2BData, >VictoryM_P2BData, $20, $10, $65
-GameOverMusHdr:        .db $18, <GameOverMusData, >GameOverMusData, $1e, $14
+GameOverMusHdr:        .db $00, <GameOverMusData, >GameOverMusData, $00, $00
+AltGameOverHdr:        .db $18, <AltGameOverData, >AltGameOverData, $1e, $14
 WaterMusHdr:           .db $08, <WaterMusData, >WaterMusData, $a0, $70, $68
 WinCastleMusHdr:       .db $08, <EndOfCastleMusData, >EndOfCastleMusData, $4c, $24
 GroundLevelPart1Hdr:   .db $18, <GroundM_P1Data, >GroundM_P1Data, $2d, $1c, $b8
@@ -1231,6 +1240,9 @@ CastleMusData:
       .db $26, $1c, $1a, $1c
 
 GameOverMusData:
+      .db $82, $34, $2a, $38, $2a, $3a, $2a, $40, $2a, $00
+
+AltGameOverData:
       .db $82, $2c, $04, $04, $22, $04, $04, $84, $1c, $87
       .db $26, $2a, $26, $84, $24, $28, $24, $80, $22, $00
 
