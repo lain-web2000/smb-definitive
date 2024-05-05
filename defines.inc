@@ -513,6 +513,9 @@ LeavesYPosCopy        = $621c
 
 SaveDataHeader        = $6000
 GamesBeatenCount      = $6007
+ContinueWorld         = $6008
+SavedHardWorldFlag    = $6009
+SavedCompletedWorlds  = $600a
 
 ;sound related defines
 Squ2_NoteLenBuffer    = $07b3
