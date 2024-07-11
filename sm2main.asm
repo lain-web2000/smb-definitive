@@ -2132,7 +2132,7 @@ SetupGameOver:
       sta ScreenRoutineTask
       sta IRQUpdateFlag
       sta ContinueMenuSelect ;set continue as default choice
-      lda #GameOverMusic     ;play normal game over by default
+      lda #AltGameOverMusic     ;play normal game over by default
       ldy GameOverMsgFlag    ;if not doing special game over, branch
       beq StoreGameOverMus
       lda #AltGameOverMusic  ;otherwise play alternate game over music
