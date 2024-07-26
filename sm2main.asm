@@ -13665,6 +13665,8 @@ GameModeDiskRoutines:
       .dw LoadWindWorlds5ThruD
 
 LoadWindWorlds5ThruD:
+	  lda #Spr_MainBank+1
+	  jsr SwitchSPR_CHR1       ;overwrite princess graphics with door again
       lda HardWorldFlag     ;if in SMB1 levels
       beq ResetDiskIOTask   ;then leave without loading anything
       lda WorldNumber       ;if in 2J worlds 1-4
@@ -14451,8 +14453,6 @@ BackToNormal:
     lda #$00
     sta DiskIOTask           ;erase task numbers
     sta OperMode_Task
-    lda #Spr_MainBank+1
-    jsr SwitchSPR_CHR1       ;overwrite princess graphics with door again
     lda WorldNumber          ;if in world D, branch to end the game
     cmp #WorldD
     beq EndTheGame
