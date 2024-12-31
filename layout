@@ -1,0 +1,23 @@
+MEMORY
+{
+	INES:      start =     0, size =    $10, fill=yes, fillval=$00, type = rw;
+	SOUNDPRG:  start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
+	LEVELPRG:  start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
+	SM2MAIN:   start = $8000, size =  $8000, fill=yes, fillval=$FF, type = ro;
+	SM2CHAR1:  start =     0, size =  $2C00, fill=yes, fillval=$FF, type = ro;
+	TITLEBG:  start =     0, size =  $400, fill=yes, fillval=$FF, type = ro;
+	ENDSPR:  start =     0, size =  $800, fill=yes, fillval=$FF, type = ro;
+	PAD:  start =     0, size =  $800, fill=yes, fillval=$FF, type = ro;
+}
+
+SEGMENTS
+{
+	INES:       load = INES,  type = ro;
+	SOUNDPRG:   load = SOUNDPRG, type = ro;
+	LEVELPRG:   load = LEVELPRG, type = ro;
+	SM2MAIN:    load = SM2MAIN, type = ro;
+	SM2CHAR1:   load = SM2CHAR1, type = ro;
+	TITLEBG:   load = TITLEBG, type = ro;
+	ENDSPR:   load = ENDSPR, type = ro;
+	PAD:   load = PAD, type = ro;
+}

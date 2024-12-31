@@ -85,6 +85,7 @@ FrenzyEnemyTimer      = $078f
 BowserFireBreathTimer = $0790
 StompTimer            = $0791
 AirBubbleTimer        = $0792
+WaterAnimTimer		  = $0793
 ScrollIntervalTimer   = $0795
 EnemyIntervalTimer    = $0796
 BrickCoinTimer        = $079d
@@ -690,7 +691,12 @@ MMC3_IRQReload		  = $c001
 MMC3_IRQDisable		  = $e000
 MMC3_IRQEnable		  = $e001
 
+WaterAnimCurrentBank  = $013a
+
 BG_MainBank           = 0
 Spr_MainBank          = 4
-BG_TitleBank          = 8
+WaterF1          	  = 8
+WaterF3          	  = 9
+WaterF4          	  = 10
+BG_TitleBank		  = 11
 Spr_EndingBank        = 12
