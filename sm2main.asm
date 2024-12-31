@@ -9890,6 +9890,7 @@ ExInjColRoutines:
 
 KillPlayer:
       stx Player_X_Speed   ;halt player's horizontal movement by initializing speed
+	  stx WindFlag         ;disable wind
       inx
       stx EventMusicQueue  ;set event music queue to death music
       lda #$fc
