@@ -13,7 +13,7 @@ A modification of the Japanese Super Mario Bros. 2 (also known as Super Mario Br
 - Player physics, firework conditions, and hidden 1-UP coin requirements from The Lost Levels apply to levels from both games but enemy speeds are taken from the source game.
 
 # Credits:
--Simplistic6502, who did the vast majority of programming work and created the assets used for the SMB Definitive title screen.
--web2000, who created the SMB2J VRC3 codebase initially used for this project, designed the levels for SMB1's World 9, and is responsible for the majority of post-release updates.
+- Simplistic6502, who did the vast majority of programming work and created the assets used for the SMB Definitive title screen.
+- web2000, who created the SMB2J VRC3 codebase initially used for this project, designed the levels for SMB1's World 9, and is responsible for the majority of post-release updates.
 
 Special thanks to threecreepio, whose MMC5 conversion of SMB2J and disassembly of ANNSMB proved particularly useful for creating this ROM hack. This would not have been possible without his resources.
