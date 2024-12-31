@@ -14686,9 +14686,9 @@ ThanksForPlayingMsg:
     .byte $28, $1c, $12, $16, $19, $15, $12, $1c, $1d, $12, $0c, $06, $05
     .byte $00, $02
 
-    ;"-SERAPHMIII"
-    .byte $22, $a9, $0b
-    .byte $28, $1c, $0e, $1b, $0a, $19, $11, $16, $12, $12, $12
+    ;"-WEB2000"
+    .byte $22, $a9, $08
+    .byte $28, $20, $0e, $0b, $02, $00, $00, $00
 
     ;"SPECIAL THANKS:"
     .byte $22, $e6, $0f
