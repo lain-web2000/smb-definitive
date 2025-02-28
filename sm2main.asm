@@ -8726,6 +8726,7 @@ CopyFToR: tya                      ;move bowser's rear object position value to 
           pla
           sta ObjectOffset         ;get original enemy object offset
           tax
+		  jsr OffscreenBoundsCheck
           lda #$00                 ;nullify bowser's front/rear graphics flag
           sta BowserGfxFlag
 ExBGfxH:  rts                      ;leave!
@@ -8738,8 +8739,8 @@ ProcessBowserHalf:
       lda #$0a
       sta Enemy_BoundBoxCtrl,x  ;set bounding box size control
       jsr GetEnemyBoundBox      ;get bounding box coordinates
-      jsr PlayerEnemyCollision  ;do player-to-enemy collision detection
-	  jmp OffscreenBoundsCheck  ;check if bowser half went offscreen
+      jmp PlayerEnemyCollision  ;do player-to-enemy collision detection
+
 
 ;-------------------------------------------------------------------------------------
 ;$00 - used to hold movement force and tile number
