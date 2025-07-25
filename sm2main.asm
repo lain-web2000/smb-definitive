@@ -6200,7 +6200,7 @@ MultiLoopCount:
 
 AreaDataOfsLoopback:
       .byte $12, $36, $0e, $0e, $0e, $32, $32, $32, $0a, $26, $40
-      .byte $0e, $0e, $0e, $32, $32, $32
+      .byte $12, $36
 
 ;SMB2J loops
 LoopCmdWorldNumberJ:
