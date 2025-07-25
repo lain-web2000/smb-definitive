@@ -85,14 +85,15 @@ FrenzyEnemyTimer      = $078f
 BowserFireBreathTimer = $0790
 StompTimer            = $0791
 AirBubbleTimer        = $0792
-WaterAnimTimer		  = $0793
-ScrollIntervalTimer   = $0795
-EnemyIntervalTimer    = $0796
-BrickCoinTimer        = $079d
-InjuryTimer           = $079e
+ScreenTimer           = $0793
+BrickCoinTimer        = $0794
+WorldEndTimer		  = $0795
+InjuryTimer           = $0796
+
+EnemyIntervalTimer    = $0797
 StarInvincibleTimer   = $079f
-ScreenTimer           = $07a0
-WorldEndTimer         = $07a1
+SpecialTimer          = $07a0
+EndGameTimer	      = $07a1
 DemoTimer             = $07a2
 GameOverMsgFlag       = $07f5
 

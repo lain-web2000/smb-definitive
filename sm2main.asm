@@ -145,7 +145,7 @@ SkipIRQ:
    dec TimerControl          ;otherwise count this timer down
    bne IncFrameCntr                 
 CheckIntervalTC:
-   ldx #$14                  ;set offset to decrement only frame timers
+   ldx #$16                  ;set offset to decrement only frame timers
    dec IntervalTimerControl  ;if interval timer control not expired, branch
    bpl DecrTheTimers         ;to skip and thus decrement only frame timers
    lda #$14
@@ -460,14 +460,14 @@ IncMsgCounter: lda MsgFractional
                sta MsgCounter
                cmp #$06                 ;check message counter one more time
 SetEndTimer:   bcc ExitMsgs             ;if not reached 6 yet, branch to leave
-               lda #$08
+               lda #$94
                sta WorldEndTimer        ;otherwise set world end timer
 IncModeTask_A: inc OperMode_Task        ;move onto next task in mode
 ExitMsgs:      rts                 
 
 EndCastleAward:
    lda WorldEndTimer      ;if world end timer has not yet reached a certain point
-   cmp #$06               ;then go ahead and skip all of this
+   cmp #$6a               ;then go ahead and skip all of this
    bcs ExEWA
    lda GameTimerDisplay   ;if game timer points not all awarded, skip this part
    ora GameTimerDisplay+1
@@ -477,7 +477,7 @@ EndCastleAward:
 SetWorldEndTimer:
    lda #$30
    sta SelectTimer        ;set select timer (used for world 8 ending only)
-   lda #$06
+   lda #$7E
    sta WorldEndTimer      ;another short delay, then on to the next task
    inc OperMode_Task
 ExEWA:
@@ -821,6 +821,14 @@ DisplayIntermediate:
 PlayerInter:   jsr DrawPlayer_Intermediate  ;put player in appropriate place for
                lda #$01                     ;lives display, then output lives display to buffer
 OutputInter:   jsr OtherInter
+			   lda #$c5                    ;reseed RNG for the next level
+			   sta PseudoRandomBitReg
+			   lda #$00
+			   ldx #$05
+:        	   sta PseudoRandomBitReg+1,x
+			   dex
+			   bpl :-
+			   sta IntervalTimerControl	 	;clear framerule counter
                lda GameOverMsgFlag          ;if special message flag not set, do next task
                beq IncSubtask
                inc DisableScreenFlag        ;disable screen output
@@ -1013,7 +1021,7 @@ ResetSpritesAndScreenTimer:
          jsr MoveAllSpritesOffscreen ;otherwise reset sprites now
 
 ResetScreenTimer:
-         lda #$07                    ;reset timer again
+         lda #$93                    ;reset timer again
          sta ScreenTimer
          inc ScreenRoutineTask       ;move onto next task
 NoReset: rts
@@ -2147,7 +2155,7 @@ RunGameOver:
        lda GameOverMsgFlag   ;if message flag set, branch to end the game
        bne WDEnd
        jmp GameOverMenu      ;otherwise run game over menu
-WDEnd: lda ScreenTimer
+WDEnd: lda SpecialTimer
        bne ExRGO
 
 TerminateGame:
@@ -2155,7 +2163,7 @@ TerminateGame:
        sta EventMusicQueue
        lda #$00
        sta OperMode_Task     ;reset to attract mode and leave
-       sta ScreenTimer
+       sta SpecialTimer
        sta OperMode
        sta GameOverMsgFlag   ;reset game over message flag
 ExRGO: rts
@@ -3620,22 +3628,8 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr FlagpoleRoutine        ;process the flagpole
               jsr RunGameTimer           ;count down the game timer
               jsr ColorRotation          ;cycle one of the background colors
-              lda FileListNumber
-              beq NoWind                 ;if in SMB1 levels or 2J worlds 1-4, skip ahead
               jsr SimulateWind           ;otherwise, simulate wind where needed
-NoWind:       lda WaterAnimTimer		 
-			  bne NoWAnim
-			  ldy AreaType
-			  lda WaterAnimIntervals,y
-			  sta WaterAnimTimer
-			  inc WaterAnimCurrentBank
-			  lda WaterAnimCurrentBank
-			  and #$03
-			  sta WaterAnimCurrentBank
-			  tay
-			  lda WaterAnimBanks,y
-			  jsr SwitchBG_CHR1
-NoWAnim:      lda Player_Y_HighPos
+              lda Player_Y_HighPos
               cmp #$02                   ;if player is below the screen, don't bother with the music
               bpl NoChgMus
               lda StarInvincibleTimer    ;if star mario invincibility timer at zero,
@@ -3672,7 +3666,7 @@ UpdScrollVar: lda VRAM_Buffer_AddrCtrl
               sta ScrollThirtyTwo        ;and store
               lda #$00                   ;reset vram buffer offset used in conjunction with
               sta VRAM_Buffer2_Offset    ;level graphics buffer in second VRAM buffer
-RunParser:    jmp AreaParserTaskHandler  ;update the name table with more level graphics
+RunParser:    jsr AreaParserTaskHandler  ;update the name table with more level graphics
 ExitEng:      rts                        ;and after all that, we're finally done!
 
 ScrollHandler:
@@ -3719,7 +3713,6 @@ ScrollScreen:
               sta NameTableSelect        ;save as name table select for later use
               jsr GetScreenPosition
               lda #$08
-              sta ScrollIntervalTimer    ;set scroll timer (residual, not used elsewhere)
               jmp ChkPOffscr             ;skip this part
 InitScrlAmt:  lda #$00
               sta ScrollAmount           ;initialize value here
@@ -6191,19 +6184,19 @@ ExecGameLoopbackJ:
 ;SMB1 loops
 LoopCmdWorldNumber:
       .byte $03, $03, $06, $06, $06, $06, $06, $06, $07, $07, $07
-      .byte $08, $08, $08, $08, $08, $08
+      .byte $08, $08
 
 LoopCmdPageNumber:
       .byte $05, $09, $04, $05, $06, $08, $09, $0a, $06, $0b, $10
-      .byte $04, $05, $06, $08, $09, $0a
+      .byte $05, $09
 
 LoopCmdYPosition:
       .byte $40, $b0, $b0, $80, $40, $40, $80, $40, $f0, $f0, $f0
-      .byte $b0, $40, $40, $b0, $40, $80
+      .byte $b0, $40
 
 MultiLoopCount:
       .byte $01, $01, $03, $03, $03, $03, $03, $03, $01, $01, $01
-      .byte $03, $03, $03, $03, $03, $03
+      .byte $01, $01
 
 AreaDataOfsLoopback:
       .byte $12, $36, $0e, $0e, $0e, $32, $32, $32, $0a, $26, $40
@@ -8985,8 +8978,8 @@ DSFLoop: lda Enemy_Rel_YPos         ;get relative vertical coordinate
 
 DrawFlagSetTimer:
       jsr DrawStarFlag          ;do sub to draw star flag
-      lda #$06
-      sta EnemyIntervalTimer,x  ;set interval timer here
+      lda #$69
+      sta WorldEndTimer  		;set interval timer here
 
 IncrementSFTask2:
       inc StarFlagTaskControl   ;move onto next task
@@ -8994,7 +8987,7 @@ IncrementSFTask2:
 
 DelayToAreaEnd:
       jsr DrawStarFlag          ;do sub to draw star flag
-      lda EnemyIntervalTimer,x  ;if interval timer set in previous task
+      lda WorldEndTimer  		;if interval timer set in previous task
       bne StarFlagExit2         ;not yet expired, branch to leave
       lda EventMusicBuffer      ;if event music buffer empty,
       beq IncrementSFTask2      ;branch to increment task
@@ -13696,11 +13689,11 @@ VMDelay:
 
 StartVMDelay:
       lda #$10           ;start world end delay
-      sta WorldEndTimer
+      sta EndGameTimer
       bne VMDelay
 
 ContinueVMDelay:
-      lda WorldEndTimer  ;wait for delay to end, then move on
+      lda EndGameTimer  ;wait for delay to end, then move on
       beq VMDelay
       rts
 
@@ -14263,7 +14256,7 @@ DemoResetOrGameOver:
        cmp #GameOverMode
        bne GoToDemoReset
        lda #$20
-       sta ScreenTimer
+       sta SpecialTimer
        lda #$1e                  ;set VRAM pointer to print special game over message
        sta VRAM_Buffer_AddrCtrl
        jmp NextOperTask          ;move on to next task
@@ -14339,7 +14332,7 @@ IncVMC:  lda MsgFractional
          rts
 
 EndVictoryMessages:
-        lda #$0c                   ;set interval timer, then move onto next task
+        lda #$FC                   ;set interval timer, then move onto next task
         sta WorldEndTimer
 ExAEL:  inc OperMode_Task
 
