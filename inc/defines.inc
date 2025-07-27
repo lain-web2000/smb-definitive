@@ -501,6 +501,7 @@ FireworksCounter      = $06d7
 ExplosionGfxCounter   = $58
 ExplosionTimerCounter = $a0
 
+
 ;sound related defines
 Squ2_NoteLenBuffer    = $07b3
 Squ2_NoteLenCounter   = $07b4
@@ -682,6 +683,7 @@ MMC3_IRQDisable		  = $e000
 MMC3_IRQEnable		  = $e001
 
 WaterAnimCurrentBank  = $013a
+WaterAnimTimer		  = $0788
 
 BG_MainBank           = 0
 Spr_MainBank          = 4

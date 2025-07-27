@@ -1,4 +1,5 @@
-.include "defines.inc"
+.include "inc/defines.inc"
+.include "inc/wram.inc"
 
 ;-------------------------------------------------------------------------------------
 ;"INESHDR"
@@ -39,7 +40,7 @@ WBootCheck: lda TopScoreDisplay,x       ;first checkpoint, check each score digi
             cmp #$a5                    ;another location has a specific value
             bne ColdBoot   
             ldy #WarmBootOffset         ;if passed both, load warm boot pointer
-ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y  
+ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             sta SND_DELTA_REG+1
             sta OperMode                ;now manually reset some other stuff
             sta DiskIOTask
@@ -56,6 +57,7 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             jsr InitializeNameTables
             inc DisableScreenFlag
             cli
+			jsr PatchLuigiPhys
             lda Mirror_PPU_CTRL
             ora #%10000000
             jsr WritePPUReg1
@@ -690,9 +692,9 @@ BackgroundColors:
 
 PlayerColors:
       .byte $22, $16, $27, $18 ;mario's normal colors
-      .byte $22, $1A, $27, $18 ;luigi's normal colors
+      .byte $22, $30, $27, $19 ;luigi's normal colors
       .byte $22, $37, $27, $16 ;mario's colors after grabbing fire flower
-      .byte $22, $30, $27, $19 ;luigi's colors after grabbing fire flower
+      .byte $22, $29, $27, $16 ;luigi's colors after grabbing fire flower	
 
 GetBackgroundColor:
            ldy BackgroundColorCtrl   ;check background color control
@@ -1483,7 +1485,7 @@ WaterPaletteData:
   .byte $0f, $30, $12, $0f
   .byte $0f, $27, $12, $0f
   .byte $22, $16, $27, $18
-  .byte $0f, $10, $30, $27
+  .byte $0f, $1a, $30, $27
   .byte $0f, $16, $30, $27
   .byte $0f, $0f, $30, $10
   .byte $00
@@ -3629,7 +3631,19 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr RunGameTimer           ;count down the game timer
               jsr ColorRotation          ;cycle one of the background colors
               jsr SimulateWind           ;otherwise, simulate wind where needed
-              lda Player_Y_HighPos
+NoWind:       lda WaterAnimTimer		 
+			  bne NoWAnim
+			  ldy AreaType
+			  lda WaterAnimIntervals,y
+			  sta WaterAnimTimer
+			  inc WaterAnimCurrentBank
+			  lda WaterAnimCurrentBank
+			  and #$03
+			  sta WaterAnimCurrentBank
+			  tay
+			  lda WaterAnimBanks,y
+			  jsr SwitchBG_CHR1
+NoWAnim:      lda Player_Y_HighPos
               cmp #$02                   ;if player is below the screen, don't bother with the music
               bpl NoChgMus
               lda StarInvincibleTimer    ;if star mario invincibility timer at zero,
@@ -4312,9 +4326,12 @@ LuigiJumpMForceData:
 LuigiFallMForceData:
       .byte $42, $42, $3e, $5d, $5d, $0a, $09
 
-FrictionData:
+MarioFrictionData:
       .byte $e4, $98, $d0
 
+LuigiFrictionData_FDS:
+      .byte $b4, $68, $a0
+	  
 PlayerYSpdData:
       .byte $fc, $fc, $fc, $fb, $fb, $fe, $ff
 
@@ -4480,18 +4497,25 @@ GetXPhy:   lda MaxLeftXSpdData,y      ;get maximum speed to the left
            ldy #$03                   ;otherwise set Y to 3
 GetXPhy2:  lda MaxRightXSpdData,y     ;get maximum speed to the right
            sta MaximumRightSpeed
-           ldy $00                    ;get other value in memory
-           lda FrictionData,y         ;get value using value in memory as offset
-           sta FrictionAdderLow
            lda #$00
            sta FrictionAdderHigh      ;init something here
-           lda SelectedPlayer         ;if we're playing as luigi, don't bother with this bit
-           bne ExitPhy
+           ldy $00                    ;get other value in memory
+           lda SelectedPlayer         ;check selected player
+           beq MarioXPhy              ;if mario, branch
+           lda OperMode               ;get primary mode of operation
+           cmp #VictoryMode
+           beq MarioXPhy              ;if victory mode, branch
+           lda LuigiFrictionData,y    ;get value using value in memory as offset
+           sta FrictionAdderLow       ;then leave
+           rts
+MarioXPhy:
+           lda MarioFrictionData,y    ;get value using value in memory as offset
+           sta FrictionAdderLow
            lda PlayerFacingDir
            cmp Player_MovingDir       ;check facing direction against moving direction
            beq ExitPhy                ;if the same, branch to leave
            asl FrictionAdderLow       ;otherwise multiply friction by 2
-           rol FrictionAdderHigh      ;then leave (or just leave, if code was modified earlier)
+           rol FrictionAdderHigh      ;then leave
 ExitPhy:   rts
 
 ;-------------------------------------------------------------------------------------
@@ -13797,6 +13821,29 @@ ISCont: sta ScoreAndCoinDisplay,y   ;reset score
 
 ;-------------------------------------------------------------------------------------
 
+; 00 = FDS, 01 = SNES
+
+PatchLuigiPhys:
+	lda LuigiPhysics
+	beq PatchPhysics_FDS
+	ldx #$02
+PatchPhysics_SNES:
+	lda MarioFrictionData,x
+	sta LuigiFrictionData,x
+	dex
+	bpl PatchPhysics_SNES
+	rts
+PatchPhysics_FDS:
+	ldx #$02
+FDSLoop:
+	lda LuigiFrictionData_FDS,x
+	sta LuigiFrictionData,x
+	dex
+	bpl FDSLoop
+	rts		   
+	
+;-------------------------------------------------------------------------------------
+		   
 GameMenuRoutine:
               lda SavedJoypadBits         ;check to see if the player pressed start
               and #Start_Button
@@ -13997,6 +14044,31 @@ PrimaryGameSetup:
       lda #$04
       sta NumberofLives           ;give each player five lives
       jmp SecondaryGameSetup
+
+;-------------------------------------------------------------------------------------
+
+PlayerPaletteData:
+  .byte $22, $16, $27, $18 ;MARIO
+  .byte $22, $30, $27, $19 ;LUIGI (FDS) + FIRE (DX)
+  .byte $22, $1a, $27, $18 ;LUIGI (DX)
+
+PlayerNameOffsets:
+  .byte $04, $09                       ;note that offsets point to last byte
+
+PatchPlayerNamePal:
+           ldy SelectedPlayer        ;get offset based on selected player
+           lda PlayerNameOffsets,y
+           pha
+           iny
+           sty $00                   ;save player + 1 temporarily (mario = 1, luigi = 2)
+           tay
+           ldx #$03
+PalPatch:  lda PlayerPaletteData,y   ;overwrite palette with the appropriate one
+           sta PlayerColors,x
+           dey
+           dex
+           bpl PalPatch
+           rts
 
 ;-------------------------------------------------------------------------------------
 

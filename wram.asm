@@ -24,6 +24,9 @@ DifficultyFlag:
 LuigiPalette:
 	.byte $00
 
+LuigiPhysics:
+	.byte $00
+	
 BGTileset:
 	.byte $00
 	
@@ -31,14 +34,11 @@ LeavesXPosCopy:
 	.res $0c, $00
 LeavesYPosCopy:
 	.res $0c, $00
-	
-LuigiJumpMForceData:
-      .byte $18, $18, $18, $22, $22, $0d, $04
 
-LuigiFallMForceData:
-      .byte $42, $42, $3e, $5d, $5d, $0a, $09
+LuigiFrictionData:
+	.byte $b4, $68, $a0
 	  
-PlayerColors:
+WRAM_PlayerColors:
       .byte $22, $16, $27, $18 ;player's normal colors, may be overwritten
       .byte $22, $37, $27, $16 ;player's colors after grabbing fire flower, may be overwritten
 	  
