@@ -29,7 +29,16 @@ LuigiPhysics:
 	
 BGTileset:
 	.byte $00
-	
+
+SpinyEggBehavior:
+	.byte $00
+
+WarpZoneScroll:
+	.byte $00
+
+CurrentGame:
+	.byte $00
+
 LeavesXPosCopy:
 	.res $0c, $00
 LeavesYPosCopy:

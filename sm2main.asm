@@ -488,17 +488,27 @@ ExEWA:
 EndWorld1Thru7:
            lda WorldEndTimer         ;skip this until world end timer expires
            bne EndExit
-NextWorld: lda #$00
+NextWorld: lda #$01
+           sta OperMode              ;go back to game mode
+           lsr
            sta AreaNumber            ;reset area/level numbers to start the next world
            sta LevelNumber
            sta OperMode_Task
            lda WorldNumber
            clc
            adc #$01                  ;add one to world number
+           ldy CurrentGame           ;check current game
+           beq NextWorld_Complete    ;if playing complete, branch ahead
+           cpy #$01                  ;if not playing SMB1, branch ahead to simply
+           bne StoreWNum             ;store the world number
+NextWorld_SMB1:
+           and #%00000111            ;otherwise keep world number between 1-8
+           beq ChkHardM              ;and enable hard mode if we need to
+NextWorld_Complete:
            cmp #WorldA               ;are we going into world A?
            bcc StoreWNum             ;no, update world number accordingly
            ldy HardWorldFlag         ;are we in SMB1 levels mode?
-           bne ChkHardM              ;no, it's fine to go to the next world
+           bne StoreWNum             ;no, it's fine to go to the next world
            inc HardWorldFlag         ;otherwise we're going into 2J levels
            lda #World1               ;continue the game at world 1 of SMB2J
            beq StoreWNum
@@ -508,8 +518,6 @@ ChkHardM:  ldy PrimaryHardMode       ;have we already set primary hard mode?
 StoreWNum: sta WorldNumber           ;update the world number
            jsr RunLoadAreaPointer    ;get pointer for the next area
            inc FetchNewGameTimerFlag ;and get a new game timer
-           lda #$01
-           sta OperMode              ;and oh yeah, go back to game mode also
 EndExit:   rts
 
 ;-------------------------------------------------------------------------------------
@@ -4156,8 +4164,9 @@ RdyNextA: lda StarFlagTaskControl
           lda LevelNumber
           cmp #$03                  ;check to see if we have yet reached level -4
           bne NextArea              ;and skip this last part here if not
-          lda HardWorldFlag         ;playing SMB2J levels?
-          bne ChkF10C               ;yes, only need to check if player got 10 coins in third area
+          lda CurrentGame           ;playing SMB2J or complete?
+          lsr
+          bcc ChkF10C               ;yes, only need to check if player got 10 coins in third area
           ldy WorldNumber           ;get world number as offset
           lda CoinTallyFor1Ups      ;check third area coin tally for bonus 1-ups
           cmp Hidden1UpCoinAmts,y   ;against minimum value, if player has collected
@@ -8937,16 +8946,29 @@ RunStarFlagObj:
       .word DelayToAreaEnd
 
 GameTimerFireworks:
-         lda GameTimerDisplay+2 ;check to see if last digit of timer matches
-         cmp CoinDisplay+1      ;the last digit in the coin tally
+         lda GameTimerDisplay+2 ;retrieve last digit of timer
+         ldy CurrentGame        ;if playing SMB1, use that game's logic
+         cpy #$01
+         beq ClassicFireworks   ;otherwise stick with 2J style fireworks
+         cmp CoinDisplay+1      ;does timer digit match the last digit in the coin tally?
          bne NoFWks             ;if not, skip the fireworks
          and #$01
          beq EvenDgs            ;if so, check to see if they are both odd or even
-         ldy #$03
+OddDgs:  ldy #$03
          lda #$03               ;if they are both odd, set state and counter
          bne SetFWC             ;for 3 fireworks to go off
+ClassicFireworks:
+         cmp #$01
+         beq OneFwk             ;if last digit of game timer set to 1, skip ahead
+         cmp #$03
+         beq OddDgs             ;if last digit of game timer set to 3, skip ahead
+         cmp #$06
+         bne NoFWks             ;if last digit of game timer set to 6, skip ahead
 EvenDgs: ldy #$00               ;if they are both even, set state and counter
          lda #$06               ;for 6 fireworks to go off
+         bne SetFWC
+OneFwk:  ldy #$05               ;last digit of timer was 1, set star flag state
+         lda #$01               ;and set counter for 1 firework to go off
          bne SetFWC
 NoFWks:  ldy #$00
          lda #$ff               ;otherwise set value for no fireworks
@@ -9977,8 +9999,9 @@ EnemyStompedPts:
       sta Enemy_State,x          ;set d5 in enemy state
       jsr InitVStf               ;nullify vertical speed, physics-related thing,
       sta Enemy_X_Speed,x        ;and horizontal speed
-      lda HardWorldFlag          ;if playing SMB2J stages, branch ahead to set speed
-      bne SetBounce
+      lda CurrentGame            ;if not playing SMB1, branch ahead to set speed
+      lsr
+      bcc SetBounce
       lda #$fd                   ;set player's vertical speed, to give bounce
       sta Player_Y_Speed
       rts
@@ -9986,7 +10009,6 @@ EnemyStompedPts:
 ChkForDemoteKoopa:
       cmp #$09                   ;branch elsewhere if enemy object < $09
       bcc HandleStompedShellE
-      jsr SetBounce
       and #%00000001             ;demote koopa paratroopas to ordinary troopas
       sta Enemy_ID,x
       lda #$00                   ;return enemy to normal state
@@ -9997,7 +10019,7 @@ ChkForDemoteKoopa:
       jsr EnemyFacePlayer        ;turn enemy around if necessary
       lda DemotedKoopaXSpdData,y
       sta Enemy_X_Speed,x        ;set appropriate moving speed based on direction
-      rts
+      jmp SetBounce
 
 RevivalRateData:
       .byte $10, $0b
@@ -10015,9 +10037,10 @@ HandleStompedShellE:
        lda RevivalRateData,y      ;load timer setting according to flag
        sta EnemyIntervalTimer,x   ;set as enemy timer to revive stomped enemy
 SetBounce:
-       ldy #$fc                   ;set a bounce rate for SMB1 stages
-       lda HardWorldFlag          ;if playing SMB2J stages, don't take the branch
-       beq BnceL
+       ldy #$fc                   ;set a bounce rate for SMB1
+       lda CurrentGame            ;if playing SMB1, store this bounce rate
+       lsr
+       bcs BnceL
        ldy #$fa                   ;set a regular bounce rate for all other enemies
        lda Enemy_ID,x
        cmp #RedParatroopa         ;set a higher bounce rate for red paratroopas
@@ -10722,6 +10745,9 @@ ChkFlagpoleYPosLoop:
        dex                       ;otherwise decrement offset to use 
        bne ChkFlagpoleYPosLoop   ;do this until all data is checked (use last one if all checked)
 MtchF: stx FlagpoleScore         ;store offset here to be used later
+       lda CurrentGame           ;don't run this logic if playing SMB1, since
+       lsr                       ;SMB1 has a different firework system and doesn't
+       bcs RunFR                 ;allow you to earn an extra life at the pole
        lda CoinDisplay
        cmp CoinDisplay+1         ;check to see if coin tally digits are the same
        bne RunFR                 ;if not, branch to use flagpole score data as-is
@@ -14554,11 +14580,14 @@ BackToNormal:
     lda WorldNumber          ;if in world D, branch to end the game
     cmp #WorldD
     beq EndTheGame
+    lda CurrentGame          ;if playing SMB1, don't bother with world 9
+    lsr
+    bcs GoToNextWorld
     lda CompletedWorlds      ;if completed all worlds without skipping over any
     cmp #$ff                 ;then branch elsewhere (note warping backwards may
-    beq GoToWorld9           ;allow player to complete skipped worlds)
+    beq GoToNextWorld        ;allow player to complete skipped worlds)
     inc WorldNumber          ;otherwise skip over world 9
-GoToWorld9:
+GoToNextWorld:
     lda #$00
     sta CompletedWorlds      ;init completed worlds flag
     jmp NextWorld            ;run the next world
