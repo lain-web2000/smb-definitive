@@ -86,11 +86,11 @@ BowserFireBreathTimer = $0790
 StompTimer            = $0791
 AirBubbleTimer        = $0792
 ScreenTimer           = $0793
-BrickCoinTimer        = $0794
-WorldEndTimer		  = $0795
-InjuryTimer           = $0796
+WorldEndTimer         = $0794
 
-EnemyIntervalTimer    = $0797
+EnemyIntervalTimer    = $0796
+BrickCoinTimer        = $079d
+InjuryTimer           = $079e
 StarInvincibleTimer   = $079f
 SpecialTimer          = $07a0
 EndGameTimer	      = $07a1
@@ -577,9 +577,9 @@ Sfx_BrickShatter      = %00000001
 ;music constants
 Silence               = %10000000
 
-StarPowerMusic        = %01000000
+SettingsMusic         = %01000000
 PipeIntroMusic        = %00100000
-CloudMusic            = %00010000
+Star_CloudMusic       = %00010000
 CastleMusic           = %00001000
 UndergroundMusic      = %00000100
 WaterMusic            = %00000010

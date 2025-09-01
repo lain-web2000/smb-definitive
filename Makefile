@@ -8,7 +8,7 @@ INCS = inc/wram.inc
 build: smb-definitive.nes
 
 %.o: %.asm
-	$(AS) --create-dep "$@.dep" -g --debug-info $< -o $@
+	$(AS) --create-dep "$@.dep" --listing $@.lst -g --debug-info $< -o $@
 
 inc/wram.inc: wram.asm wram.map
 	python scripts/genram.py wram.map inc/wram.inc

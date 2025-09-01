@@ -18,3 +18,5 @@ LuigiFrictionData = $6028
 WRAM_PlayerColors = $602B
 AreaDataCopy = $6033
 EnemyDataCopy = $6133
+SpinyEggBehavior = $6233
+WarpZoneScroll = $6234

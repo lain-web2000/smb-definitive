@@ -57,7 +57,7 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             jsr InitializeNameTables
             inc DisableScreenFlag
             cli
-			jsr PatchLuigiPhys
+            jsr PatchLuigiPhys
             lda Mirror_PPU_CTRL
             ora #%10000000
             jsr WritePPUReg1
@@ -147,7 +147,7 @@ SkipIRQ:
    dec TimerControl          ;otherwise count this timer down
    bne IncFrameCntr                 
 CheckIntervalTC:
-   ldx #$16                  ;set offset to decrement only frame timers
+   ldx #$14                  ;set offset to decrement only frame timers
    dec IntervalTimerControl  ;if interval timer control not expired, branch
    bpl DecrTheTimers         ;to skip and thus decrement only frame timers
    lda #$14
@@ -1957,7 +1957,7 @@ SkipByte:     dey
 
 MusicSelectData:
       .byte WaterMusic, GroundMusic, UndergroundMusic, CastleMusic
-      .byte CloudMusic, PipeIntroMusic
+      .byte Star_CloudMusic, PipeIntroMusic
 
 GetAreaMusic:
              lda OperMode           ;if in attract mode, leave
@@ -4125,6 +4125,9 @@ NoFPObj:     inc GameEngineSubroutine ;increment to next routine (this may
 
 ;-------------------------------------------------------------------------------------
 
+Hidden1UpCoinAmts:
+      .byte $15, $23, $16, $1b, $17, $18, $23, $00, $00
+
 PlayerEndLevel:
           lda #$01                  ;force player to walk to the right
           jsr AutoControlPlayer
@@ -4153,10 +4156,17 @@ RdyNextA: lda StarFlagTaskControl
           lda LevelNumber
           cmp #$03                  ;check to see if we have yet reached level -4
           bne NextArea              ;and skip this last part here if not
-		  lda CoinTallyFor1Ups      ;check third area coin tally for bonus 1-ups
-          cmp #$0a                  ;against minimum value, if player has not collected
+          lda HardWorldFlag         ;playing SMB2J levels?
+          bne ChkF10C               ;yes, only need to check if player got 10 coins in third area
+          ldy WorldNumber           ;get world number as offset
+          lda CoinTallyFor1Ups      ;check third area coin tally for bonus 1-ups
+          cmp Hidden1UpCoinAmts,y   ;against minimum value, if player has collected
+          bcs Set1UpF               ;at least this number of coins, set flag
+          bcc NextArea              ;otherwise leave flag clear and branch
+ChkF10C:  lda CoinTallyFor1Ups      ;check third area coin tally for bonus 1-ups
+          cmp #10                   ;against minimum value, if player has not collected
           bcc NextArea              ;at least this number of coins, leave flag clear
-          inc Hidden1UpFlag         ;otherwise set hidden 1-up box control flag
+Set1UpF:  inc Hidden1UpFlag         ;otherwise set hidden 1-up box control flag
 NextArea: inc AreaNumber            ;increment area number used for address loader
           lda LevelNumber           ;go to next world if past level 4 of current world
           cmp #$04
@@ -4807,13 +4817,21 @@ ExGTimer:  rts                        ;leave
 WarpZoneObject:
       lda ScrollLock         ;check for scroll lock flag
       beq ExGTimer           ;branch if not set to leave
-      lda Player_Y_Position  ;check to see if player's vertical coordinate has
-      and Player_Y_HighPos   ;same bits set as in vertical high byte (why?)
+      lda Player_Y_HighPos   ;check to see if we are in the status bar region
+      ldy WarpZoneScroll     ;should we recreate the scroll lock bug?
+      beq WarpZoneBug        ;branch ahead if so
+      cmp #$01               ;otherwise see if we meet the criteria for scrolling
+      bmi UnlockScreen       ;at the status bar region or above, unlock screen
+      bne ExGTimer           ;if we're below the screen, branch to leave
+      lda Player_Y_Position  ;otherwise see if we're at Y position 0 (standing on ceiling)
+WarpZoneBug:
+      and Player_Y_Position  ;check to see if player's vertical coordinate has same bits
       bne ExGTimer           ;if so, branch to leave
+UnlockScreen:
       sta ScrollLock         ;otherwise nullify scroll lock flag
-	  lda HardWorldFlag		 ;are we in smb2j levels?
-	  bne SkipIncBug		 ;if so, do not increment warpzonecontrol.
-	  inc WarpZoneControl	 ;hiiiiiiiiii im back :3
+      lda HardWorldFlag      ;are we in smb2j levels?
+      bne SkipIncBug         ;if so, do not increment warpzonecontrol.
+      inc WarpZoneControl    ;hiiiiiiiiii im back :3
 SkipIncBug:
       jmp EraseEnemyObject   ;kill this object
 
@@ -6760,6 +6778,8 @@ CreateSpiny:
           sec
           sbc #$08
           sta Enemy_Y_Position,x
+          lda SpinyEggBehavior       ;if replicating original behavior, branch ahead
+          beq SetSpSpd               ;so that horizontal speed is set to zero
           lda PseudoRandomBitReg,x   ;get 2 LSB of LSFR and save to Y
           and #%00000011
           tay
@@ -6785,14 +6805,14 @@ DifLoop:  lda PRDiffAdjustData,y     ;get three values and save them
           eor #%11111111             ;otherwise get two's compliment of Y
           tay
           iny
-UsePosv:  tya                        ;put value from A in Y back to A (they will be lost anyway)
-SetSpSpd: jsr SmallBBox              ;set bounding box control, init attributes, lose contents of A
-          ldy #$02                   ;(putting this call elsewhere will preserve A)
-          sta Enemy_X_Speed,x        ;set horizontal speed to zero because previous contents
-          cmp #$00                   ;of A were lost...branch here will never be taken for
-          bmi SpinyRte               ;the same reason
+UsePosv:  tya                        ;put value from A in Y back to A
+SetSpSpd: ldy #$02                   ;set moving direction to the left by default
+          sta Enemy_X_Speed,x        ;set horizontal speed (zero if bugged behavior enabled,
+          cmp #$00                   ;in which case this branch here will never be taken)
+          bmi SpinyRte               ;if spiny egg is set to be thrown left, branch
           dey
 SpinyRte: sty Enemy_MovingDir,x      ;set moving direction to the right
+          jsr SmallBBox              ;set bounding box control, init attributes
           lda #$fd
           sta Enemy_Y_Speed,x        ;set vertical speed to move upwards
           lda #$01
@@ -9726,7 +9746,7 @@ Safe: lda #$06
       beq SetFor1Up           ;if 1-up mushroom, branch
       lda #$23                ;otherwise set star mario invincibility
       sta StarInvincibleTimer ;timer, and load the star mario music
-      lda #StarPowerMusic     ;into the area music queue, then leave
+      lda #Star_CloudMusic    ;into the area music queue, then leave
       sta AreaMusicQueue
       rts
 
@@ -9957,7 +9977,11 @@ EnemyStompedPts:
       sta Enemy_State,x          ;set d5 in enemy state
       jsr InitVStf               ;nullify vertical speed, physics-related thing,
       sta Enemy_X_Speed,x        ;and horizontal speed
-      jmp SetBounce
+      lda HardWorldFlag          ;if playing SMB2J stages, branch ahead to set speed
+      bne SetBounce
+      lda #$fd                   ;set player's vertical speed, to give bounce
+      sta Player_Y_Speed
+      rts
 
 ChkForDemoteKoopa:
       cmp #$09                   ;branch elsewhere if enemy object < $09
@@ -9991,6 +10015,9 @@ HandleStompedShellE:
        lda RevivalRateData,y      ;load timer setting according to flag
        sta EnemyIntervalTimer,x   ;set as enemy timer to revive stomped enemy
 SetBounce:
+       ldy #$fc                   ;set a bounce rate for SMB1 stages
+       lda HardWorldFlag          ;if playing SMB2J stages, don't take the branch
+       beq BnceL
        ldy #$fa                   ;set a regular bounce rate for all other enemies
        lda Enemy_ID,x
        cmp #RedParatroopa         ;set a higher bounce rate for red paratroopas
@@ -10804,9 +10831,9 @@ HandlePipeEntry:
           sta Player_SprAttrib      ;set background priority bit in player's attributes
           lda WarpZoneControl       ;check warp zone control
           beq ExPipeE               ;branch to leave if none found
-		  ldy HardWorldFlag			;are we in SMB1?
-		  beq SMB1WarpZoneHandler	;if so, use all stars warp-zone handler
-		  and #%00001111            ;mask bits
+          ldy HardWorldFlag         ;are we in SMB1?
+          beq SMB1WarpZoneHandler	;if so, use all stars warp-zone handler
+          and #%00001111            ;mask bits
           asl
           asl                       ;multiply by four
           tax                       ;save as offset to warp zone numbers (starts at left pipe)
@@ -10841,8 +10868,8 @@ SMB1WarpZoneHandler:
          lda WorldNumber
          beq RecalculateWarpPipeOffsetSave
          inx
-		 ldy AreaType
-		 dey
+         ldy AreaType
+         dey
          bne RecalculateWarpPipeOffsetSave
          inx
 
@@ -10863,7 +10890,7 @@ CalculateWarpPipeOffset:
          cmp #$A0
          bcc GetWNum
          inx
-		 bne GetWNum	;why did we waste all this code for an unconditional branch? idk.
+         bne GetWNum	;why did we waste all this code for an unconditional branch? idk.
 		 
 ImpedePlayerMove:
        lda #$00                  ;initialize value here
@@ -13849,7 +13876,7 @@ GameMenuRoutine:
               and #Start_Button
               beq ChkSelect               ;if not, branch to check other buttons
               lda #$00
-			  sta WorldNumber
+              sta WorldNumber
               sta CompletedWorlds
               sta DiskIOTask
               sta HardWorldFlag
@@ -14538,7 +14565,7 @@ GoToWorld9:
 EndTheGame:
     lda #$00
     sta CompletedWorlds      ;init completed worlds flag
-	sta ContinueWorld        ;reset saved progress
+    sta ContinueWorld        ;reset saved progress
     sta SavedHardWorldFlag
     sta SavedCompletedWorlds
     lda #GameOverMode        ;set game over mode
@@ -14784,7 +14811,7 @@ SChkLp: lda SM2Header,x         ;check all seven bytes of the save data header
 InitializeSaveData:
         ldx #$00                ;init counter
         stx GamesBeatenCount    ;wipe number of games beaten
-		stx ContinueWorld       ;reset saved progress
+        stx ContinueWorld       ;reset saved progress
         stx SavedHardWorldFlag
         stx SavedCompletedWorlds
 SaveLp: lda SM2Header,x         ;write save data header
@@ -14961,7 +14988,7 @@ VBlank:
 	sta MMC3_PRGRAMProtect ; enable PRG-RAM
 	jsr LoadMainBank            ;switch PRG banks
 	jsr InitializeBG_CHR        ;init CHR banks
-    jsr InitializeSPR_CHR
+      jsr InitializeSPR_CHR
 	jsr CheckSaveData           ;check validity of save data
 	jmp Start                   ;now start the game!
 
@@ -14979,9 +15006,9 @@ VBlank:
 .segment "SM2CHAR1"
         .incbin "sm2char1_bg.chr"
         .incbin "sm2char1_spr.chr"
-		.incbin "sm2char1_wf1.chr"
-		.incbin "sm2char1_wf3.chr"
-		.incbin "sm2char1_wf4.chr"
+        .incbin "sm2char1_wf1.chr"
+        .incbin "sm2char1_wf3.chr"
+        .incbin "sm2char1_wf4.chr"
 .segment "TITLEBG"
         .incbin "title_bg.chr"
 .segment "ENDSPR"

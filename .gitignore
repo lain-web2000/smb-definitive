@@ -2,3 +2,5 @@
 *.dep
 *.o
 *.dbg
+*.lst
+*.map

@@ -791,11 +791,14 @@ FetchSqu1MusicData:
         inc MusicOffset_Square1
         lda (MusicData),y
         bne Squ1NoteHandler        ;if nonzero, then skip this part
+        lda AltRegContentFlag      ;hack for Vs. SMB name entry music
+        eor #$94
+        sta AltRegContentFlag
+        beq FetchSqu1MusicData
         lda #$83
         sta SND_SQUARE1_REG        ;store some data into control regs for square 1
         lda #$94                   ;and fetch another byte of data, used to give
         sta SND_SQUARE1_REG+1      ;death music its unique sound
-        sta AltRegContentFlag
         bne FetchSqu1MusicData     ;unconditional branch
 
 Squ1NoteHandler:
@@ -1012,7 +1015,7 @@ MusicHeaderData:
   .byte CastleMusHdr-MHD
   .byte Star_CloudHdr-MHD
   .byte GroundLevelLeadInHdr-MHD
-  .byte Star_CloudHdr-MHD
+  .byte SettingsMusHdr-MHD
   .byte SilenceHdr-MHD
 
   .byte GroundLevelLeadInHdr-MHD  ;ground level music layout
@@ -1038,6 +1041,7 @@ MusicHeaderData:
 ;1 byte - square 1 data offset
 ;1 byte - noise data offset (not used by secondary music)
   
+SettingsMusHdr:        .byte $18, <SettingsMusData, >SettingsMusData, $3c, $17, $52
 TimeRunningOutHdr:     .byte $08, <TimeRunOutMusData, >TimeRunOutMusData, $27, $18
 Star_CloudHdr:         .byte $20, <Star_CloudMData, >Star_CloudMData, $2e, $1a, $40
 EndOfLevelMusHdr:      .byte $20, <WinLevelMusData, >WinLevelMusData, $3d, $21
@@ -1092,6 +1096,26 @@ DeathMusHdr:           .byte $18, <DeathMusData, >DeathMusData, $1e, $0f, $2d
 
 ;all music data is organized into sections (unless otherwise stated):
 ;square 2, square 1, triangle, noise
+
+SettingsMusData:
+      .byte $85, $1c, $14, $84, $0c, $14
+      .byte $86, $04, $04, $80, $04
+      .byte $85, $18, $14, $84, $12, $0c
+      .byte $86, $04, $04, $80, $04
+      .byte $00
+
+      .byte $6d, $63, $1d, $27
+      .byte $00, $44, $62, $62, $62, $62, $62, $23, $44, $54, $54, $54, $54, $54, $55, $8c, $0d, $07
+      .byte $00, $6b, $67, $23, $1d
+      .byte $00, $03, $03, $80, $01, $03, $82, $03, $80, $80
+      
+      .byte $85, $22, $1c, $84, $14, $1e
+      .byte $86, $04, $04, $80, $04
+      .byte $85, $22, $1e, $84, $1c, $14
+      .byte $86, $04, $04, $80, $04
+
+      .byte $21, $d0, $c4, $d0, $31, $d0, $c4, $d0
+      .byte $00
 
 Star_CloudMData:
       .byte $84, $2c, $2c, $2c, $82, $04, $2c, $04, $85, $2c, $84, $2c, $2c
@@ -1442,7 +1466,7 @@ EndOfCastleMusicEnvData:
       .byte $98, $99, $9a, $9b
 
 AreaMusicEnvData:
-      .byte $90, $94, $94, $95, $95, $96, $97, $98
+      .byte $90, $94, $94, $95, $95, $96, $97, $97, $98
 
 WaterEventMusEnvData:
       .byte $90, $91, $92, $92, $93, $93, $93, $94
