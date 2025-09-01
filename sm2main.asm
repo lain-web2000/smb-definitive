@@ -6,11 +6,16 @@
 .segment "INES"
 
   .byte $4E,$45,$53,$1A                           ;  magic signature
-  .byte 4                                         ;  PRG ROM size in 16384 byte units
-  .byte 2                                         ;  CHR
+  .byte 5                                         ;  PRG ROM size in 16384 byte units
+  .byte 0                                         ;  CHR
   .byte $43                                       ;  mirroring type and mapper number lower nibble
   .byte $00                                       ;  mapper number upper nibble
   .byte $00,$00,$00,$00,$00,$00,$00,$00
+
+.segment "CHRBANK"
+.org $8000
+.include "chrram.asm"
+.res $c000 - *, $ff
 
 .segment "SOUNDPRG"
 .org $8000
@@ -21,6 +26,8 @@
 .org $8000
 .include "levels.asm"
 .res $c000 - *, $ff
+
+.segment "PAD"
 
 .segment "SM2MAIN"
 .org $8000
@@ -3650,7 +3657,7 @@ NoWind:       lda WaterAnimTimer
 			  sta WaterAnimCurrentBank
 			  tay
 			  lda WaterAnimBanks,y
-			  jsr SwitchBG_CHR1
+			  ;jsr SwitchBG_CHR1
 NoWAnim:      lda Player_Y_HighPos
               cmp #$02                   ;if player is below the screen, don't bother with the music
               bpl NoChgMus
@@ -13716,8 +13723,8 @@ StartTheGame:
          sta DiskIOTask
          sta OperMode_Task
          sta DemoTimer
-         lda #BG_MainBank+3
-         jmp SwitchBG_CHR3         ;replace title screen gfx data
+         lda #$02
+         jmp GraphicsLoader        ;replace title screen gfx data
 
 AttractModeDiskRoutines:
       lda DiskIOTask
@@ -13731,8 +13738,8 @@ InitWorldPos:
            sta FileListNumber    ;reset filelist number
            sta WorldNumber       ;reset world number
            sta HardWorldFlag     ;force player to start at SMB1 levels
-           lda #BG_TitleBank   ;load title screen graphics data
-           jsr SwitchBG_CHR3
+           lda #$03              ;load title screen graphics data
+           jsr GraphicsLoader
            jmp ResetDiskIOTask   ;end disk subroutines
 
 GameModeDiskRoutines:
@@ -13744,7 +13751,7 @@ GameModeDiskRoutines:
 
 LoadWindWorlds5ThruD:
 	  lda #Spr_MainBank+1
-	  jsr SwitchSPR_CHR0       ;overwrite princess graphics with door again
+	  ;jsr SwitchSPR_CHR0       ;overwrite princess graphics with door again
       lda HardWorldFlag     ;if in SMB1 levels
       beq ResetDiskIOTask   ;then leave without loading anything
       lda WorldNumber       ;if in 2J worlds 1-4
@@ -13782,8 +13789,8 @@ VictoryModeDiskRoutines:
       .word LoadEnding
 
 LoadEnding:
-        lda #Spr_EndingBank
-        jsr SwitchSPR_CHR0       ;load princess graphics
+        lda #$01
+        jsr GraphicsLoader       ;load princess graphics
         jsr InitializeNameTables
         jsr ResetDiskIOTask      ;end disk subroutines
         sta ScreenRoutineTask    ;init screen routine task
@@ -14577,6 +14584,7 @@ BackToNormal:
     lda #$00
     sta DiskIOTask           ;erase task numbers
     sta OperMode_Task
+    jsr GraphicsLoader       ;overwrite princess graphics with door again
     lda WorldNumber          ;if in world D, branch to end the game
     cmp #WorldD
     beq EndTheGame
@@ -14850,62 +14858,94 @@ SaveLp: lda SM2Header,x         ;write save data header
         bcc SaveLp              ;if not, loop back
         rts                     ;otherwise we have reset save data, leave
 
-InitializeSPR_CHR:
-      lda #Spr_MainBank
-      jsr SwitchSPR_CHR0
-      lda #Spr_MainBank+2
-SwitchSPR_CHR1:
-	pha
-	lda #%10000001
-	sta MMC3_BankSelect
-	pla
-	sta MMC3_BankData
-	rts
-SwitchSPR_CHR0:
-	pha
-	lda #%10000000
-	sta MMC3_BankSelect
-	pla
-	sta MMC3_BankData
-	rts
+InitCHRBanks:
+		ldx #$00		;Set up for MMC3 registers.
+		lda #$01		;Bit 0 is ignored for 2K modes so this is good.
+@chrloop1:				;A12 inversion bit = 0 so $0000 to $0FFF = 2K banks
+		stx $8000		;Select CHR address to set up bank number.
+		sta $8001		;Switch to that CHR bank.
+		inx				;Increment bank select number.
+		asl				;Multiply by 2 since we are dealing with 2K banks.
+		cmp #$04	    ;Have we reached CHR bank 4?
+		bne @chrloop1	;If not, initialise next CHR bank.
+		tay				;We need to transfer to Y since we want to increment by 1 now.
+@chrloop2:				;A12 inversion bit = 0 so $1000 to $1FFF = 1K banks
+		stx $8000		;Select CHR address to set up bank number.
+		sty $8001		;Switch to that CHR bank.
+		inx				;Increment bank select number.
+		iny				;Increment CHR bank number.
+		cpy #$08		;Have we initialised CHR bank 7?
+		bne @chrloop2	;If not, initialise next CHR bank.
+		rts
 
-InitializeBG_CHR:
-      lda #BG_MainBank
-      jsr SwitchBG_CHR0
-      lda #BG_MainBank+1
-      jsr SwitchBG_CHR1
-      lda #BG_MainBank+2
-      jsr SwitchBG_CHR2
-      lda #BG_MainBank+3
-SwitchBG_CHR3:
-	pha
-	lda #%10000101
-	sta MMC3_BankSelect
-	pla
-	sta MMC3_BankData
-	rts
-SwitchBG_CHR2:
-	pha
-	lda #%10000100
-	sta MMC3_BankSelect
-	pla
-	sta MMC3_BankData
-	rts
-SwitchBG_CHR1:
-	pha
-	lda #%10000011
-	sta MMC3_BankSelect
-	pla
-	sta MMC3_BankData
-	rts
-SwitchBG_CHR0:
-	pha
-	lda #%10000010
-	sta MMC3_BankSelect
-	pla
-	sta MMC3_BankData
-	rts
+CHR_PPUAddrTable:
+      .word PrincessGfxOffset, TitleScreenGfxOffset
 
+CHR_SizeTable:
+      .byte 64, 192
+
+CHR_PRGAddrTable:
+      .word sm2char1+PrincessGfxOffset, sm2char2
+      .word sm2char1+TitleScreenGfxOffset, sm2char3
+
+GraphicsLoader:
+      tax                    ;store A in X register
+      lda #CHRBank         ;load sound bank since that's
+      jsr SwitchPRGBank0      ;where the CHR data is
+      lda #CHRBank+1         ;load sound bank since that's
+      jsr SwitchPRGBank1      ;where the CHR data is
+      ldy #$00
+	sty PPU_MASK           ;turn off rendering for good measure
+      txa                    ;transfer X back into A
+      and #%11111110         ;mask out d0
+      tay                    ;move new offset into Y
+      iny                    ;start with high byte
+      lda CHR_PPUAddrTable,y
+	sta PPU_ADDRESS        ;load destination address into PPU
+      dey                    ;now do low byte
+      lda CHR_PPUAddrTable,y
+	sta PPU_ADDRESS
+      txa                    ;transfer X into A again
+      lsr                    ;move d1 to d0 for correct offset
+      tay                    ;transfer A into Y as offset
+      lda CHR_SizeTable,y    ;get appropiate size for CHR data
+      sta $02
+      txa                    ;transfer X into A one last time
+      asl                    ;multiply by 2 for correct offset
+      tax                    ;move back into X for new offset
+      lda CHR_PRGAddrTable,x ;load ROM address for graphics data
+      sta $00
+      inx                    ;now the high byte
+      lda CHR_PRGAddrTable,x
+      sta $01
+      ldy #$00               ;reset Y and load graphics data
+LoadGraphicsLoop:
+	lda ($00),y            ;copy byte from ROM
+	sta PPU_DATA           ;store to PPU
+	iny
+    cpy $02
+	bcc LoadGraphicsLoop   ;loop until all CHR data is finished
+    jmp LoadMainBank       ;load main bank afterwards
+
+InitializeCHRRAM:
+    ldy #$00
+	sty PPU_MASK           ;turn off rendering for good measure
+	sty PPU_ADDRESS        ;load destination address into PPU
+	sty PPU_ADDRESS
+    lda #<sm2char1
+    sta $00
+    lda #>sm2char1
+    sta $01
+	ldx #32                ;number of pages
+InitCHRLoop:
+	lda ($00),y            ;copy byte from ROM
+	sta PPU_DATA           ;store to PPU
+	iny
+	bne InitCHRLoop        ;loop until page is finished
+	inc $01                ;increment for next page
+	dex
+	bne InitCHRLoop        ;loop until all CHR data is stored
+	
 LoadMainBank:
 	lda #MainBank        ;load main bank
 	jsr SwitchPRGBank0
@@ -15012,12 +15052,16 @@ VBlank:
 	ldx #$ff
 	txs
 	lda #$00
-	sta MMC3_Mirroring ; vertical mirroring
+	sta MMC3_Mirroring 			; vertical mirroring
 	lda #%10000000
-	sta MMC3_PRGRAMProtect ; enable PRG-RAM
-	jsr LoadMainBank            ;switch PRG banks
-	jsr InitializeBG_CHR        ;init CHR banks
-      jsr InitializeSPR_CHR
+	sta MMC3_PRGRAMProtect 		; enable PRG-RAM
+	jsr InitCHRBanks
+	lda #CHRBank
+	jsr SwitchPRGBank0
+	lda #CHRBank+1
+	jsr SwitchPRGBank1
+	jsr InitializeCHRRAM        ;load CHR data
+	jsr LoadMainBank      		;switch PRG banks
 	jsr CheckSaveData           ;check validity of save data
 	jmp Start                   ;now start the game!
 
@@ -15030,16 +15074,3 @@ VBlank:
         .word NMIHandler
         .word Reset
         .word IRQHandler
-
-;"CHR"
-.segment "SM2CHAR1"
-        .incbin "sm2char1_bg.chr"
-        .incbin "sm2char1_spr.chr"
-        .incbin "sm2char1_wf1.chr"
-        .incbin "sm2char1_wf3.chr"
-        .incbin "sm2char1_wf4.chr"
-.segment "TITLEBG"
-        .incbin "title_bg.chr"
-.segment "ENDSPR"
-        .incbin "ending_spr.chr"
-.segment "PAD"

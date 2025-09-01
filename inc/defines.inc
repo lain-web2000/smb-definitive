@@ -667,10 +667,11 @@ GameMode              = 1
 VictoryMode           = 2
 GameOverMode          = 3
 
-SoundBank             = 0
-LevelsBank            = 2
-MainBank              = 4
-FixedBank             = 6
+CHRBank               = 0
+SoundBank             = 2
+LevelsBank            = 4
+MainBank              = 6
+FixedBank             = 14
 
 MMC3_BankSelect		  = $8000
 MMC3_BankData		  = $8001
@@ -684,6 +685,9 @@ MMC3_IRQEnable		  = $e001
 
 WaterAnimCurrentBank  = $013a
 WaterAnimTimer		  = $0788
+
+PrincessGfxOffset     = $1760
+TitleScreenGfxOffset  = $0f30
 
 BG_MainBank           = 0
 Spr_MainBank          = 4
