@@ -1471,8 +1471,8 @@ Palette1_MTiles:
   .byte $aa, $ac, $ab, $ad ;solid block (water level, green rock)
   .byte $50, $52, $51, $53 ;cracked rock terrain
   .byte $24, $3a, $24, $3a ;half brick (not used)
-  .byte $86, $8a, $87, $8b ;water pipe top
-  .byte $8e, $91, $8f, $92 ;water pipe bottom
+  .byte $7e, $82, $7f, $83 ;water pipe top
+  .byte $86, $89, $87, $8a ;water pipe bottom
   .byte $24, $2f, $24, $3d ;flag ball (residual object)
 
 Palette2_MTiles:
@@ -8847,7 +8847,7 @@ SFlmX:   sta $00                     ;store value here
 SetGfxF: jsr RelativeEnemyPosition   ;get new relative coordinates
          lda Enemy_State,x           ;if bowser's flame not in normal state,
          bne ExFl                    ;branch to leave
-         lda #$51                    ;otherwise, continue
+         lda #$72                    ;otherwise, continue
          sta $00                     ;write first tile number
          ldy #$02                    ;load attributes without vertical flip by default
          lda FrameCounter
@@ -12180,46 +12180,46 @@ PUpOfs: jmp SprObjectOffscrChk     ;jump to check to see if power-up is offscree
 ;tiles arranged in top left, right, middle left, right, bottom left, right order
 ;most enemies use more than one frame, thus have more than 6 tiles
 EnemyGraphicsTable:
-      .byte $ff, $ff, $aa, $ab, $ac, $ad ;buzzy beetle
-      .byte $ff, $ff, $ae, $af, $b0, $b1
-      .byte $ff, $a5, $a6, $a7, $a8, $a9 ;koopa troopa
-      .byte $ff, $a0, $a1, $a2, $a3, $a4
-      .byte $69, $a5, $6a, $a7, $a8, $a9 ;koopa paratroopa
-      .byte $6b, $a0, $6c, $a2, $a3, $a4
-      .byte $ff, $ff, $96, $97, $98, $99 ;spiny
-      .byte $ff, $ff, $9a, $9b, $9c, $9d
-      .byte $ff, $ff, $8f, $8e, $8e, $8f ;spiny egg
-      .byte $ff, $ff, $95, $94, $94, $95
-      .byte $ff, $ff, $dc, $dc, $df, $df ;bloober
-      .byte $dc, $dc, $dd, $dd, $de, $de
-      .byte $ff, $ff, $b2, $b3, $b4, $b5 ;cheep-cheep
-      .byte $ff, $ff, $b6, $b3, $b7, $b5
-      .byte $ff, $ff, $70, $71, $72, $73 ;goomba
-      .byte $ff, $ff, $6e, $6e, $6f, $6f ;koopa shell (upside-down)
-      .byte $ff, $ff, $6d, $6d, $6f, $6f
-      .byte $ff, $ff, $6f, $6f, $6e, $6e ;koopa shell
-      .byte $ff, $ff, $6f, $6f, $6d, $6d
-      .byte $ff, $ff, $f4, $f4, $f5, $f5 ;buzzy beetle shell (upside-down)
-      .byte $ff, $ff, $f4, $f4, $f5, $f5
-      .byte $ff, $ff, $f5, $f5, $f4, $f4 ;buzzy beetle
-      .byte $ff, $ff, $f5, $f5, $f4, $f4
-      .byte $ff, $ff, $ff, $ff, $ef, $ef ;defeated goomba
-      .byte $b9, $b8, $bb, $ba, $bc, $bc ;lakitu
-      .byte $ff, $ff, $bd, $bd, $bc, $bc
-      .byte $76, $79, $77, $77, $78, $78 ;princess/door to princess's room
-      .byte $cd, $cd, $ce, $ce, $cf, $cf ;mushroom retainer
-      .byte $7d, $7c, $d1, $8c, $d3, $d2 ;hammer bro
-      .byte $7d, $7c, $89, $88, $8b, $8a
-      .byte $d5, $d4, $e3, $e2, $d3, $d2
-      .byte $d5, $d4, $e3, $e2, $8b, $8a
-      .byte $e5, $e5, $e6, $e6, $eb, $eb ;piranha plant
-      .byte $ec, $ec, $ed, $ed, $eb, $eb
-      .byte $ff, $ff, $d0, $d0, $d7, $d7 ;podoboo
-      .byte $bf, $be, $c1, $c0, $c2, $ff ;bowser front
-      .byte $c4, $c3, $c6, $c5, $c8, $c7 ;bowser rear
-      .byte $bf, $be, $ca, $c9, $c2, $ff ;front frame 2
-      .byte $c4, $c3, $c6, $c5, $cc, $cb ;rear frame 2
-      .byte $ff, $ff, $e8, $e7, $ea, $e9 ;bullet bill
+      .byte $ff, $ff, $c8, $c9, $ca, $cb ;buzzy beetle
+      .byte $ff, $ff, $cc, $cd, $ce, $cf
+      .byte $ff, $9a, $9b, $9c, $9d, $9e ;koopa troopa
+      .byte $ff, $a1, $a2, $a3, $a4, $a5
+      .byte $98, $9a, $99, $9c, $9d, $9e ;koopa paratroopa
+      .byte $9f, $a1, $a0, $a3, $a4, $a5
+      .byte $ff, $ff, $c0, $c1, $c2, $c3 ;spiny
+      .byte $ff, $ff, $c4, $c5, $c6, $c7
+      .byte $ff, $ff, $bd, $bc, $bc, $bd ;spiny egg
+      .byte $ff, $ff, $bf, $be, $be, $bf
+      .byte $ff, $ff, $f2, $f2, $f5, $f5 ;blooper
+      .byte $f2, $f2, $f3, $f3, $f4, $f4
+      .byte $ff, $ff, $d2, $d3, $d4, $d5 ;cheep-cheep
+      .byte $ff, $ff, $d6, $d3, $d7, $d5
+      .byte $ff, $ff, $a9, $aa, $ab, $ac ;goomba
+      .byte $ff, $ff, $a7, $a7, $a8, $a8 ;koopa shell (upside-down)
+      .byte $ff, $ff, $a6, $a6, $a8, $a8
+      .byte $ff, $ff, $a8, $a8, $a7, $a7 ;koopa shell
+      .byte $ff, $ff, $a8, $a8, $a6, $a6
+      .byte $ff, $ff, $d1, $d1, $d0, $d0 ;buzzy beetle shell (upside-down)
+      .byte $ff, $ff, $d1, $d1, $d0, $d0
+      .byte $ff, $ff, $d0, $d0, $d1, $d1 ;buzzy beetle shell
+      .byte $ff, $ff, $d0, $d0, $d1, $d1
+      .byte $ff, $ff, $ff, $ff, $ad, $ad ;defeated goomba
+      .byte $d8, $d9, $da, $db, $dc, $dc ;lakitu
+      .byte $ff, $ff, $dd, $dd, $dc, $dc
+      .byte $09, $0a, $0b, $0c, $0d, $0d ;princess/door to princess's room
+      .byte $ed, $ed, $ee, $ee, $ef, $ef ;mushroom retainer
+      .byte $ae, $af, $b0, $b1, $b2, $b3 ;hammer bro
+      .byte $ae, $af, $b4, $b5, $b6, $b7
+      .byte $b8, $b9, $ba, $bb, $b2, $b3
+      .byte $b8, $b9, $ba, $bb, $b6, $b7
+      .byte $f6, $f6, $f7, $f7, $f8, $f8 ;piranha plant
+      .byte $f9, $f9, $fa, $fa, $f8, $f8
+      .byte $ff, $ff, $f0, $f0, $f1, $f1 ;podoboo
+      .byte $de, $df, $e0, $e1, $e2, $ff ;bowser front
+      .byte $e3, $e4, $e5, $e6, $e7, $e8 ;bowser rear
+      .byte $de, $df, $e9, $ea, $e2, $ff ;front frame 2
+      .byte $e3, $e4, $e5, $e6, $eb, $ec ;rear frame 2
+      .byte $ff, $ff, $fb, $fc, $fd, $fe ;bullet bill
       .byte $96, $96, $97, $97, $96, $96 ;jumpspring
       .byte $95, $95, $95, $95, $ff, $ff
       .byte $94, $94, $ff, $ff, $ff, $ff
