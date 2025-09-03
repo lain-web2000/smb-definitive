@@ -6,11 +6,19 @@
 .segment "INES"
 
   .byte $4E,$45,$53,$1A                           ;  magic signature
-  .byte 5                                         ;  PRG ROM size in 16384 byte units
+  .byte 8                                         ;  PRG ROM size in 16384 byte units
   .byte 0                                         ;  CHR
   .byte $43                                       ;  mirroring type and mapper number lower nibble
   .byte $00                                       ;  mapper number upper nibble
   .byte $00,$00,$00,$00,$00,$00,$00,$00
+
+.segment "UNUSEDPRG"
+.org $8000
+.res $c000 - *, $ff
+.org $8000
+.res $c000 - *, $ff
+.org $8000
+.res $c000 - *, $ff
 
 .segment "CHRBANK"
 .org $8000
@@ -533,17 +541,17 @@ EndExit:   rts
 ;that appear when you defeat enemies
 FloateyNumTileData:
       .byte $ff, $ff ;dummy
-      .byte $f6, $fb ; "100"
-      .byte $f7, $fb ; "200"
-      .byte $f8, $fb ; "400"
-      .byte $f9, $fb ; "500"
-      .byte $fa, $fb ; "800"
-      .byte $f6, $50 ; "1000"
-      .byte $f7, $50 ; "2000"
-      .byte $f8, $50 ; "4000"
-      .byte $f9, $50 ; "5000"
-      .byte $fa, $50 ; "8000"
-      .byte $fd, $fe ; "1-UP"
+      .byte $6c, $71 ; "100"
+      .byte $6d, $71 ; "200"
+      .byte $6e, $71 ; "400"
+      .byte $6f, $71 ; "500"
+      .byte $70, $71 ; "800"
+      .byte $6c, $6b ; "1000"
+      .byte $6d, $6b ; "2000"
+      .byte $6e, $6b ; "4000"
+      .byte $6f, $6b ; "5000"
+      .byte $70, $6b ; "8000"
+      .byte $00, $01 ; "1-UP"
 
 ;high nybble is digit number, low nybble is number to
 ;add to the digit of the player's score
@@ -786,9 +794,9 @@ WriteBottomStatusLine:
       sta VRAM_Buffer1+3,x
       lda HardWorldFlag
       beq PutD
-      lda #$9f                   ;put star instead of dash if playing 2J levels
+      lda #$29                   ;put star instead of dash if playing 2J levels
       bne PutS
-PutD: lda #$28                   ;next the dash
+PutD: lda #$25                   ;next the dash
 PutS: sta VRAM_Buffer1+4,x
       ldy LevelNumber            ;next the level number
       iny                        ;increment for proper number display
@@ -878,16 +886,16 @@ TopStatusBarLine:
   .byte $20, $43, $05, $16, $0a, $1b, $12, $18 ;"MARIO"
   .byte $20, $52, $0b, $20, $18, $1b, $15, $0d ;"WORLD  TIME"
   .byte $24, $24, $1d, $12, $16, $0e
-  .byte $20, $68, $05, $00, $24, $24, $2e, $29 ;score trailing digit and coin display
+  .byte $20, $68, $05, $00, $24, $24, $5f, $26 ;score trailing digit and coin display
   .byte $23, $c0, $7f, $aa ;attribute table data, clears name table 0 to palette 2
   .byte $23, $c2, $01, $ea ;attribute table data, used for coin icon in status bar
   .byte $ff ;end of data block
 
 WorldLivesDisplay:
   .byte $21, $cd, $07, $24, $24 ;cross with spaces used on
-  .byte $29, $24, $24, $24, $24 ;lives display
+  .byte $26, $24, $24, $24, $24 ;lives display
   .byte $21, $4b, $09, $20, $18 ;"WORLD  - " used on lives display
-  .byte $1b, $15, $0d, $24, $24, $28, $24
+  .byte $1b, $15, $0d, $24, $24, $25, $24
   .byte $22, $0c, $47, $24 ;possibly used to clear time up
   .byte $ff
 
@@ -908,7 +916,7 @@ WarpZone:
   .byte $25, $84, $15
   .byte $20, $0e, $15, $0c, $18, $16, $0e, $24, $1d, $18 ; "WELCOME TO WARP ZONE!"
   .byte $24, $20, $0a, $1b, $19, $24, $23, $18, $17, $0e
-  .byte $2b
+  .byte $27
   .byte $26, $25, $01, $24         ; placeholder for left pipe
   .byte $26, $2d, $01, $24         ; placeholder for middle pipe
   .byte $26, $35, $01, $24         ; placeholder for right pipe
@@ -989,7 +997,7 @@ PutOnes:       sta VRAM_Buffer1+9        ;write ones digit of lives to screen
                sta VRAM_Buffer1+19
                lda HardWorldFlag
                beq PutLevelNum
-               lda #$9f                  ;put star instead of dash if playing 2J levels
+               lda #$29                  ;put star instead of dash if playing 2J levels
                sta VRAM_Buffer1+20
 PutLevelNum:   ldy LevelNumber
                iny
@@ -1258,11 +1266,11 @@ ExitColorRot: rts                      ;leave
 ;$06, $07 - block buffer address low/high
 
 BlockGfxData:
-       .byte $45, $45, $47, $47
-       .byte $47, $47, $47, $47
-       .byte $57, $58, $59, $5a
+       .byte $39, $39, $3a, $3a
+       .byte $3a, $3a, $3a, $3a
+       .byte $6f, $70, $71, $72
        .byte $24, $24, $24, $24
-       .byte $26, $26, $26, $26
+       .byte $5d, $5d, $5d, $5d
 
 RemoveCoin_Axe:
               ldy #$41                 ;set low byte so offset points to second vram buffer
@@ -1377,119 +1385,119 @@ MetatileGraphics_High:
 Palette0_MTiles:
   .byte $24, $24, $24, $24 ;blank
   .byte $27, $27, $27, $27 ;black metatile
-  .byte $24, $24, $24, $35 ;bush left
-  .byte $36, $25, $37, $25 ;bush middle
-  .byte $24, $38, $24, $24 ;bush right
-  .byte $24, $30, $30, $26 ;mountain left
-  .byte $26, $26, $34, $26 ;mountain left bottom/middle center
-  .byte $24, $31, $24, $32 ;mountain middle top
-  .byte $33, $26, $24, $33 ;mountain right
-  .byte $34, $26, $26, $26 ;mountain right bottom
-  .byte $26, $26, $26, $26 ;mountain middle bottom
-  .byte $24, $c0, $24, $c0 ;bridge guardrail
-  .byte $24, $7f, $7f, $24 ;chain
-  .byte $b8, $ba, $b9, $bb ;tall tree top, top half
-  .byte $b8, $bc, $b9, $bd ;short tree top
-  .byte $ba, $bc, $bb, $bd ;tall tree top, bottom half
-  .byte $60, $64, $61, $65 ;warp pipe end left, points up
-  .byte $62, $66, $63, $67 ;warp pipe end right, points up
-  .byte $60, $64, $61, $65 ;decoration pipe end left, points up
-  .byte $62, $66, $63, $67 ;decoration pipe end right, points up
-  .byte $68, $68, $69, $69 ;pipe shaft left
-  .byte $26, $26, $6a, $6a ;pipe shaft right
-  .byte $4b, $4c, $4d, $4e ;tree ledge left edge
-  .byte $4d, $4f, $4d, $4f ;tree ledge middle
-  .byte $4d, $4e, $50, $51 ;tree ledge right edge
-  .byte $f5, $fa, $f3, $f4 ;mushroom left edge
-  .byte $f6, $fb, $f7, $fc ;mushroom middle
-  .byte $f8, $fd, $f9, $fe ;mushroom right edge
-  .byte $86, $8a, $87, $8b ;sideways pipe end top
-  .byte $88, $8c, $88, $8c ;sideways pipe shaft top
-  .byte $89, $8d, $69, $69 ;sideways pipe joint top
-  .byte $8e, $91, $8f, $92 ;sideways pipe end bottom
-  .byte $26, $93, $26, $93 ;sideways pipe shaft bottom
-  .byte $90, $94, $69, $69 ;sideways pipe joint bottom
-  .byte $a4, $e9, $ea, $eb ;seaplant
+  .byte $24, $24, $24, $31 ;bush left
+  .byte $32, $5c, $33, $5c ;bush middle
+  .byte $24, $34, $24, $24 ;bush right
+  .byte $24, $2c, $2c, $5d ;mountain left
+  .byte $5d, $5d, $30, $5d ;mountain left bottom/middle center
+  .byte $24, $2d, $24, $2e ;mountain middle top
+  .byte $2f, $5d, $24, $2f ;mountain right
+  .byte $30, $5d, $5d, $5d ;mountain right bottom
+  .byte $5d, $5d, $5d, $5d ;mountain middle bottom
+  .byte $24, $5a, $24, $5a ;bridge guardrail
+  .byte $24, $a9, $a9, $24 ;chain
+  .byte $54, $56, $55, $57 ;tall tree top, top half
+  .byte $54, $58, $55, $59 ;short tree top
+  .byte $56, $58, $57, $59 ;tall tree top, bottom half
+  .byte $73, $77, $74, $78 ;warp pipe end left, points up
+  .byte $75, $79, $76, $7a ;warp pipe end right, points up
+  .byte $73, $77, $74, $78 ;decoration pipe end left, points up
+  .byte $75, $79, $76, $7a ;decoration pipe end right, points up
+  .byte $7b, $7b, $7c, $7c ;pipe shaft left
+  .byte $5d, $5d, $7d, $7d ;pipe shaft right
+  .byte $41, $43, $9b, $44 ;tree ledge left edge
+  .byte $9b, $45, $9b, $45 ;tree ledge middle
+  .byte $9b, $44, $42, $46 ;tree ledge right edge
+  .byte $8d, $93, $8e, $94 ;mushroom left edge
+  .byte $8f, $95, $90, $96 ;mushroom middle
+  .byte $91, $97, $92, $98 ;mushroom right edge
+  .byte $7e, $82, $7f, $83 ;sideways pipe end top
+  .byte $80, $84, $80, $84 ;sideways pipe shaft top
+  .byte $81, $85, $7c, $7c ;sideways pipe joint top
+  .byte $86, $89, $87, $8a ;sideways pipe end bottom
+  .byte $5d, $8b, $5d, $8b ;sideways pipe shaft bottom
+  .byte $88, $8c, $7c, $7c ;sideways pipe joint bottom
+  .byte $ae, $b0, $af, $b1 ;seaplant
   .byte $24, $24, $24, $24 ;blank, used on bricks or blocks that are hit
-  .byte $24, $2f, $24, $3d ;flagpole ball
-  .byte $a2, $a2, $a3, $a3 ;flagpole shaft
+  .byte $24, $61, $24, $62 ;flagpole ball
+  .byte $68, $68, $69, $69 ;flagpole shaft
   .byte $24, $24, $24, $24 ;blank, used in conjunction with vines
 
 Palette1_MTiles:
-  .byte $a2, $a2, $a3, $a3 ;vertical rope
-  .byte $99, $24, $99, $24 ;horizontal rope
-  .byte $24, $a2, $3e, $3f ;left pulley
-  .byte $5b, $5c, $24, $a3 ;right pulley
+  .byte $68, $68, $69, $69 ;vertical rope
+  .byte $64, $24, $64, $24 ;horizontal rope
+  .byte $24, $68, $63, $66 ;left pulley
+  .byte $65, $67, $24, $69 ;right pulley
   .byte $24, $24, $24, $24 ;blank used for balance rope
-  .byte $9d, $47, $9e, $47 ;castle top
-  .byte $47, $47, $27, $27 ;castle window left
-  .byte $47, $47, $47, $47 ;castle brick wall
-  .byte $27, $27, $47, $47 ;castle window right
-  .byte $a9, $47, $aa, $47 ;castle top w/ brick
-  .byte $9b, $27, $9c, $27 ;entrance top
-  .byte $27, $27, $27, $27 ;entrance bottom
-  .byte $52, $52, $52, $52 ;green ledge stump
-  .byte $80, $a0, $81, $a1 ;fence
-  .byte $be, $be, $bf, $bf ;tree trunk
-  .byte $75, $ba, $76, $bb ;mushroom stump top
-  .byte $ba, $ba, $bb, $bb ;mushroom stump bottom
-  .byte $45, $47, $45, $47 ;breakable brick w/ line 
-  .byte $47, $47, $47, $47 ;breakable brick 
-  .byte $45, $47, $45, $47 ;breakable brick (not used)
-  .byte $45, $47, $45, $47 ;brick with line (power-up)
-  .byte $45, $47, $45, $47 ;brick with line (poison shroom)
-  .byte $45, $47, $45, $47 ;brick with line (vine)
-  .byte $45, $47, $45, $47 ;brick with line (star)
-  .byte $45, $47, $45, $47 ;brick with line (coins)
-  .byte $45, $47, $45, $47 ;brick with line (1-up)
-  .byte $47, $47, $47, $47 ;brick (power-up)
-  .byte $47, $47, $47, $47 ;brick (poison shroom)
-  .byte $47, $47, $47, $47 ;brick (vine)
-  .byte $47, $47, $47, $47 ;brick (star)
-  .byte $47, $47, $47, $47 ;brick (coins)
-  .byte $47, $47, $47, $47 ;brick (1-up)
+  .byte $3d, $3a, $3e, $3a ;castle top
+  .byte $3a, $3a, $5e, $5e ;castle window left
+  .byte $3a, $3a, $3a, $3a ;castle brick wall
+  .byte $5e, $5e, $3a, $3a ;castle window right
+  .byte $3f, $3a, $40, $3a ;castle top w/ brick
+  .byte $3b, $5e, $3c, $5e ;entrance top
+  .byte $5e, $5e, $5e, $5e ;entrance bottom
+  .byte $47, $47, $47, $47 ;green ledge stump
+  .byte $4c, $4e, $4d, $4f ;fence
+  .byte $c2, $c2, $c3, $c3 ;tree trunk
+  .byte $4a, $56, $4b, $57 ;mushroom stump top
+  .byte $56, $56, $57, $57 ;mushroom stump bottom
+  .byte $39, $3a, $39, $3a ;breakable brick w/ line 
+  .byte $3a, $3a, $3a, $3a ;breakable brick 
+  .byte $39, $3a, $39, $3a ;breakable brick (not used)
+  .byte $39, $3a, $39, $3a ;brick with line (power-up)
+  .byte $39, $3a, $39, $3a ;brick with line (poison shroom)
+  .byte $39, $3a, $39, $3a ;brick with line (vine)
+  .byte $39, $3a, $39, $3a ;brick with line (star)
+  .byte $39, $3a, $39, $3a ;brick with line (coins)
+  .byte $39, $3a, $39, $3a ;brick with line (1-up)
+  .byte $3a, $3a, $3a, $3a ;brick (power-up)
+  .byte $3a, $3a, $3a, $3a ;brick (poison shroom)
+  .byte $3a, $3a, $3a, $3a ;brick (vine)
+  .byte $3a, $3a, $3a, $3a ;brick (star)
+  .byte $3a, $3a, $3a, $3a ;brick (coins)
+  .byte $3a, $3a, $3a, $3a ;brick (1-up)
   .byte $24, $24, $24, $24 ;hidden block (1 coin)
   .byte $24, $24, $24, $24 ;hidden block (1-up)
   .byte $24, $24, $24, $24 ;hidden block (poison shroom)
   .byte $24, $24, $24, $24 ;hidden block (power-up)
-  .byte $ab, $ac, $ad, $ae ;solid block (3-d block)
-  .byte $5d, $5e, $5d, $5e ;solid block (white wall)
-  .byte $c1, $24, $c1, $24 ;bridge
-  .byte $c6, $c8, $c7, $c9 ;bullet bill cannon barrel
-  .byte $ca, $cc, $cb, $cd ;bullet bill cannon top
-  .byte $2a, $2a, $40, $40 ;bullet bill cannon bottom
+  .byte $ba, $bc, $bb, $bd ;solid block (3-d block)
+  .byte $48, $49, $48, $49 ;solid block (white wall)
+  .byte $5b, $24, $5b, $24 ;bridge
+  .byte $c4, $c6, $c5, $c7 ;bullet bill cannon barrel
+  .byte $c8, $ca, $c9, $cb ;bullet bill cannon top
+  .byte $cc, $cc, $cd, $cd ;bullet bill cannon bottom
   .byte $24, $24, $24, $24 ;blank used for jumpspring
-  .byte $24, $47, $24, $47 ;half brick used for jumpspring
-  .byte $82, $83, $84, $85 ;solid block (water level, green rock)
-  .byte $b4, $b6, $b5, $b7 ;cracked rock terrain
-  .byte $24, $47, $24, $47 ;half brick (not used)
+  .byte $24, $3a, $24, $3a ;half brick used for jumpspring
+  .byte $aa, $ac, $ab, $ad ;solid block (water level, green rock)
+  .byte $50, $52, $51, $53 ;cracked rock terrain
+  .byte $24, $3a, $24, $3a ;half brick (not used)
   .byte $86, $8a, $87, $8b ;water pipe top
   .byte $8e, $91, $8f, $92 ;water pipe bottom
   .byte $24, $2f, $24, $3d ;flag ball (residual object)
 
 Palette2_MTiles:
-  .byte $24, $24, $24, $35 ;cloud left
-  .byte $36, $25, $37, $25 ;cloud middle
-  .byte $24, $38, $24, $24 ;cloud right
-  .byte $24, $24, $39, $24 ;cloud bottom left
-  .byte $3a, $24, $3b, $24 ;cloud bottom middle
-  .byte $3c, $24, $24, $24 ;cloud bottom right
-  .byte $41, $26, $41, $26 ;water/lava top
-  .byte $26, $26, $26, $26 ;water/lava
-  .byte $b0, $b1, $b2, $b3 ;cloud level terrain
-  .byte $77, $79, $77, $79 ;bowser's bridge
-  .byte $6b, $70, $2c, $2d ;cloud ledge left edge
-  .byte $6c, $71, $6d, $72 ;cloud ledge middle
-  .byte $6e, $73, $6f, $74 ;cloud ledge right edge
+  .byte $24, $24, $24, $31 ;cloud left
+  .byte $32, $5c, $33, $5c ;cloud middle
+  .byte $24, $34, $24, $24 ;cloud right
+  .byte $24, $24, $35, $24 ;cloud bottom left
+  .byte $36, $24, $37, $24 ;cloud bottom middle
+  .byte $38, $24, $24, $24 ;cloud bottom right
+  .byte $6a, $5d, $6a, $5d ;water/lava top
+  .byte $5d, $5d, $5d, $5d ;water/lava
+  .byte $be, $c0, $bf, $c1 ;cloud level terrain
+  .byte $a3, $a4, $a3, $a4 ;bowser's bridge
+  .byte $99, $9d, $9a, $9e ;cloud ledge left edge
+  .byte $9b, $9f, $9b, $a0 ;cloud ledge middle
+  .byte $9b, $a1, $9c, $a2 ;cloud ledge right edge
 
 Palette3_MTiles:
-  .byte $53, $55, $54, $56 ;question block (coin)
-  .byte $53, $55, $54, $56 ;question block (power-up)
-  .byte $53, $55, $54, $56 ;question block (poison shroom)
-  .byte $a5, $a7, $a6, $a8 ;coin
-  .byte $c2, $c4, $c3, $c5 ;underwater coin
-  .byte $57, $59, $58, $5a ;empty block
-  .byte $7b, $7d, $7c, $7e ;axe
+  .byte $6b, $6d, $6c, $6e ;question block (coin)
+  .byte $6b, $6d, $6c, $6e ;question block (power-up)
+  .byte $6b, $6d, $6c, $6e ;question block (poison shroom)
+  .byte $b2, $b4, $b3, $b5 ;coin
+  .byte $b6, $b8, $b7, $b9 ;underwater coin
+  .byte $6f, $71, $70, $72 ;empty block
+  .byte $a5, $a7, $a6, $a8 ;axe
 
 ;------------------------------------------------------------------------------------
 
@@ -1564,13 +1572,13 @@ BowserPaletteData:
 MarioThankYouMsg:
   .byte $25, $48, $10
   .byte $1d, $11, $0a, $17, $14, $24, $22, $18
-  .byte $1e, $24, $16, $0a, $1b, $12, $18, $2b
+  .byte $1e, $24, $16, $0a, $1b, $12, $18, $27
   .byte $00
 
 LuigiThankYouMsg:
   .byte $25, $48, $10
   .byte $1d, $11, $0a, $17, $14, $24, $22, $18
-  .byte $1e, $24, $15, $1e, $12, $10, $12, $2b
+  .byte $1e, $24, $15, $1e, $12, $10, $12, $27
   .byte $00
 
 MushroomRetainerMsg:
@@ -1580,7 +1588,7 @@ MushroomRetainerMsg:
   .byte $24, $12, $1c, $24, $12, $17
   .byte $26, $05, $0f
   .byte $0a, $17, $18, $1d, $11, $0e, $1b, $24
-  .byte $0c, $0a, $1c, $1d, $15, $0e, $2b
+  .byte $0c, $0a, $1c, $1d, $15, $0e, $27
   .byte $00
 
 ;------------------------------------------------------------------------------------
@@ -8936,7 +8944,7 @@ StarFlagXPosAdder:
       .byte $00, $08, $00, $08
 
 StarFlagTileData:
-      .byte $54, $55, $56, $57
+      .byte $75, $76, $77, $78
 
 RunStarFlagObj:
       lda #$00                 ;initialize enemy frenzy buffer
@@ -9277,9 +9285,9 @@ DrawEraseRope:
          sta VRAM_Buffer1+2,x
          lda Enemy_Y_Speed,y         ;if platform moving upwards, branch 
          bmi EraseR1                 ;to do something else
-         lda #$a2
+         lda #$68
          sta VRAM_Buffer1+3,x        ;otherwise put tile numbers for left
-         lda #$a3                    ;and right sides of rope in vram buffer
+         lda #$69                    ;and right sides of rope in vram buffer
          sta VRAM_Buffer1+4,x
          jmp OtherRope               ;jump to skip this part
 EraseR1: lda #$24                    ;put blank tiles in vram buffer
@@ -9300,9 +9308,9 @@ OtherRope:
          sta VRAM_Buffer1+7,x        ;set length again for 2 bytes
          pla                         ;pull first copy of vertical speed from stack
          bpl EraseR2                 ;if moving upwards (note inversion earlier), skip this
-         lda #$a2
+         lda #$68
          sta VRAM_Buffer1+8,x        ;otherwise put tile numbers for left
-         lda #$a3                    ;and right sides of rope in vram
+         lda #$69                    ;and right sides of rope in vram
          sta VRAM_Buffer1+9,x        ;transfer buffer
          jmp EndRp                   ;jump to skip this part
 EraseR2: lda #$24                    ;put blank tiles in vram buffer
@@ -9957,7 +9965,7 @@ ExInjColRoutines:
 
 KillPlayer:
       stx Player_X_Speed   ;halt player's horizontal movement by initializing speed
-	  stx WindFlag         ;disable wind
+      stx WindFlag         ;disable wind
       inx
       stx EventMusicQueue  ;set event music queue to death music
       lda #$fc
@@ -11745,7 +11753,7 @@ DrawVine:
          sta Sprite_Attributes+12,y
          sta Sprite_Attributes+20,y
          ldx #$05                   ;set tiles for six sprites
-VineTL:  lda #$e1                   ;set tile number for sprite
+VineTL:  lda #$93                   ;set tile number for sprite
          sta Sprite_Tilenumber,y
          iny                        ;move offset to next sprite data
          iny
@@ -11756,7 +11764,7 @@ VineTL:  lda #$e1                   ;set tile number for sprite
          ldy $02                    ;get original offset
          lda $00                    ;get offset to vine adding data
          bne SkpVTop                ;if offset not zero, skip this part
-         lda #$e0
+         lda #$92
          sta Sprite_Tilenumber,y    ;set other tile number for top of vine
 SkpVTop: ldx #$00                   ;start with the first sprite again
 ChkFTop: lda VineStart_Y_Position   ;get original starting vertical coordinate
@@ -11805,10 +11813,10 @@ SecondSprYPos:
       .byte $08, $00, $08, $00
 
 FirstSprTilenum:
-      .byte $80, $82, $81, $83
+      .byte $88, $8a, $89, $8b
 
 SecondSprTilenum:
-      .byte $81, $83, $80, $82
+      .byte $89, $8b, $88, $8a
 
 HammerSprAttrib:
       .byte $03, $03, $c3, $c3
@@ -11867,12 +11875,12 @@ NoHOffscr:  rts                         ;leave
 ;$05 - used as X coordinate for floatey number
 
 FlagpoleScoreNumTiles:
-      .byte $f9, $50
-      .byte $f7, $50
-      .byte $fa, $fb
-      .byte $f8, $fb
-      .byte $f6, $fb
-      .byte $fd, $fe
+      .byte $6f, $6b ; "5000"
+      .byte $6d, $6b ; "2000"
+      .byte $70, $71 ; "800"
+      .byte $6e, $71 ; "400"
+      .byte $6c, $71 ; "100"
+      .byte $00, $01 ; "1-UP"
 
 FlagpoleGfxHandler:
       ldy Enemy_SprDataOffset,x      ;get sprite data offset for flagpole flag
@@ -11897,10 +11905,10 @@ FlagpoleGfxHandler:
       sta Sprite_Attributes,y        ;set attribute bytes for all three sprites
       sta Sprite_Attributes+4,y
       sta Sprite_Attributes+8,y
-      lda #$7e
+      lda #$86
       sta Sprite_Tilenumber,y        ;put triangle shaped tile
       sta Sprite_Tilenumber+8,y      ;into first and third sprites
-      lda #$7f
+      lda #$87
       sta Sprite_Tilenumber+4,y      ;put skull tile into second sprite
       lda FlagpoleCollisionYPos      ;get vertical coordinate at time of collision
       beq ChkFlagOffscreen           ;if zero, branch ahead
@@ -11971,10 +11979,10 @@ SetLast2Platform:
       ldy Enemy_SprDataOffset,x   ;get OAM data offset
       sta Sprite_Y_Position+16,y  ;store vertical coordinate or offscreen
       sta Sprite_Y_Position+20,y  ;coordinate into last two sprites as Y coordinate
-      lda #$5b                    ;load default tile for platform (mushroom)
+      lda #$04                    ;load default tile for platform (mushroom)
       ldx CloudTypeOverride
       beq SetPlatformTilenum      ;if cloud level override flag not set, use
-      lda #$75                    ;otherwise load other tile for platform (puff)
+      lda #$83                    ;otherwise load other tile for platform (puff)
 
 SetPlatformTilenum:
         ldx ObjectOffset            ;get enemy object buffer offset
@@ -12044,14 +12052,14 @@ NotRsNum: lda Misc_Y_Position,x     ;get vertical coordinate
           lda #$02
           sta Sprite_Attributes,y   ;store attribute byte in both sprites
           sta Sprite_Attributes+4,y
-          lda #$f7
+          lda #$6d
           sta Sprite_Tilenumber,y   ;put tile numbers into both sprites
-          lda #$fb                  ;that resemble "200"
+          lda #$71                  ;that resemble "200"
           sta Sprite_Tilenumber+4,y
           jmp ExJCGfx               ;then jump to leave (why not an rts here instead?)
 
 JumpingCoinTiles:
-      .byte $60, $61, $62, $63
+      .byte $79, $7a, $7b, $7c
 
 JCoinGfxHandler:
          ldy Misc_SprDataOffset,x    ;get coin/floatey number's OAM data offset
@@ -12091,11 +12099,11 @@ ExJCGfx: rts                         ;leave
 
 ;tiles arranged in top left, right, bottom left, right order
 PowerUpGfxTable:
-      .byte $d8, $da, $db, $ff ;regular mushroom
-      .byte $d6, $d6, $d9, $d9 ;fire flower
-      .byte $8d, $8d, $e4, $e4 ;star
-      .byte $d8, $da, $db, $ff ;1-up mushroom
-      .byte $d8, $da, $db, $ff ;poison mushroom
+      .byte $05, $06, $07, $08 ;regular mushroom
+      .byte $90, $90, $91, $91 ;fire flower
+      .byte $8e, $8e, $8f, $8f ;star
+      .byte $05, $06, $07, $08 ;1-up mushroom
+      .byte $05, $06, $07, $08 ;poison mushroom
 
 PowerUpAttributes:
       .byte $02, $01, $02, $01, $03
@@ -12172,32 +12180,32 @@ PUpOfs: jmp SprObjectOffscrChk     ;jump to check to see if power-up is offscree
 ;tiles arranged in top left, right, middle left, right, bottom left, right order
 ;most enemies use more than one frame, thus have more than 6 tiles
 EnemyGraphicsTable:
-      .byte $fc, $fc, $aa, $ab, $ac, $ad ;buzzy beetle
-      .byte $fc, $fc, $ae, $af, $b0, $b1
-      .byte $fc, $a5, $a6, $a7, $a8, $a9 ;koopa troopa
-      .byte $fc, $a0, $a1, $a2, $a3, $a4
+      .byte $ff, $ff, $aa, $ab, $ac, $ad ;buzzy beetle
+      .byte $ff, $ff, $ae, $af, $b0, $b1
+      .byte $ff, $a5, $a6, $a7, $a8, $a9 ;koopa troopa
+      .byte $ff, $a0, $a1, $a2, $a3, $a4
       .byte $69, $a5, $6a, $a7, $a8, $a9 ;koopa paratroopa
       .byte $6b, $a0, $6c, $a2, $a3, $a4
-      .byte $fc, $fc, $96, $97, $98, $99 ;spiny
-      .byte $fc, $fc, $9a, $9b, $9c, $9d
-      .byte $fc, $fc, $8f, $8e, $8e, $8f ;spiny egg
-      .byte $fc, $fc, $95, $94, $94, $95
-      .byte $fc, $fc, $dc, $dc, $df, $df ;bloober
+      .byte $ff, $ff, $96, $97, $98, $99 ;spiny
+      .byte $ff, $ff, $9a, $9b, $9c, $9d
+      .byte $ff, $ff, $8f, $8e, $8e, $8f ;spiny egg
+      .byte $ff, $ff, $95, $94, $94, $95
+      .byte $ff, $ff, $dc, $dc, $df, $df ;bloober
       .byte $dc, $dc, $dd, $dd, $de, $de
-      .byte $fc, $fc, $b2, $b3, $b4, $b5 ;cheep-cheep
-      .byte $fc, $fc, $b6, $b3, $b7, $b5
-      .byte $fc, $fc, $70, $71, $72, $73 ;goomba
-      .byte $fc, $fc, $6e, $6e, $6f, $6f ;koopa shell (upside-down)
-      .byte $fc, $fc, $6d, $6d, $6f, $6f
-      .byte $fc, $fc, $6f, $6f, $6e, $6e ;koopa shell
-      .byte $fc, $fc, $6f, $6f, $6d, $6d
-      .byte $fc, $fc, $f4, $f4, $f5, $f5 ;buzzy beetle shell (upside-down)
-      .byte $fc, $fc, $f4, $f4, $f5, $f5
-      .byte $fc, $fc, $f5, $f5, $f4, $f4 ;buzzy beetle
-      .byte $fc, $fc, $f5, $f5, $f4, $f4
-      .byte $fc, $fc, $fc, $fc, $ef, $ef ;defeated goomba
+      .byte $ff, $ff, $b2, $b3, $b4, $b5 ;cheep-cheep
+      .byte $ff, $ff, $b6, $b3, $b7, $b5
+      .byte $ff, $ff, $70, $71, $72, $73 ;goomba
+      .byte $ff, $ff, $6e, $6e, $6f, $6f ;koopa shell (upside-down)
+      .byte $ff, $ff, $6d, $6d, $6f, $6f
+      .byte $ff, $ff, $6f, $6f, $6e, $6e ;koopa shell
+      .byte $ff, $ff, $6f, $6f, $6d, $6d
+      .byte $ff, $ff, $f4, $f4, $f5, $f5 ;buzzy beetle shell (upside-down)
+      .byte $ff, $ff, $f4, $f4, $f5, $f5
+      .byte $ff, $ff, $f5, $f5, $f4, $f4 ;buzzy beetle
+      .byte $ff, $ff, $f5, $f5, $f4, $f4
+      .byte $ff, $ff, $ff, $ff, $ef, $ef ;defeated goomba
       .byte $b9, $b8, $bb, $ba, $bc, $bc ;lakitu
-      .byte $fc, $fc, $bd, $bd, $bc, $bc
+      .byte $ff, $ff, $bd, $bd, $bc, $bc
       .byte $76, $79, $77, $77, $78, $78 ;princess/door to princess's room
       .byte $cd, $cd, $ce, $ce, $cf, $cf ;mushroom retainer
       .byte $7d, $7c, $d1, $8c, $d3, $d2 ;hammer bro
@@ -12206,15 +12214,15 @@ EnemyGraphicsTable:
       .byte $d5, $d4, $e3, $e2, $8b, $8a
       .byte $e5, $e5, $e6, $e6, $eb, $eb ;piranha plant
       .byte $ec, $ec, $ed, $ed, $eb, $eb
-      .byte $fc, $fc, $d0, $d0, $d7, $d7 ;podoboo
-      .byte $bf, $be, $c1, $c0, $c2, $fc ;bowser front
+      .byte $ff, $ff, $d0, $d0, $d7, $d7 ;podoboo
+      .byte $bf, $be, $c1, $c0, $c2, $ff ;bowser front
       .byte $c4, $c3, $c6, $c5, $c8, $c7 ;bowser rear
-      .byte $bf, $be, $ca, $c9, $c2, $fc ;front frame 2
+      .byte $bf, $be, $ca, $c9, $c2, $ff ;front frame 2
       .byte $c4, $c3, $c6, $c5, $cc, $cb ;rear frame 2
-      .byte $fc, $fc, $e8, $e7, $ea, $e9 ;bullet bill
-      .byte $f2, $f2, $f3, $f3, $f2, $f2 ;jumpspring
-      .byte $f1, $f1, $f1, $f1, $fc, $fc
-      .byte $f0, $f0, $fc, $fc, $fc, $fc
+      .byte $ff, $ff, $e8, $e7, $ea, $e9 ;bullet bill
+      .byte $96, $96, $97, $97, $96, $96 ;jumpspring
+      .byte $95, $95, $95, $95, $ff, $ff
+      .byte $94, $94, $ff, $ff, $ff, $ff
 
 EnemyGfxTableOffsets:
       .byte $0c, $0c, $00, $0c, $c0, $a8, $54, $3c
@@ -12748,7 +12756,7 @@ MoveESprColOffscreen:
 ;$05 - relative X position
 
 DefaultBlockObjTiles:
-      .byte $85, $85, $86, $86             ;brick w/ line (these are sprite tiles, not BG!)
+      .byte $02, $02, $03, $03             ;brick w/ line (these are sprite tiles, not BG!)
 
 DrawBlock:
            lda Block_Rel_YPos            ;get relative vertical coordinate of block object
@@ -12772,13 +12780,13 @@ DBlkLoop:  lda DefaultBlockObjTiles,x    ;get left tile number
            lda AreaType
            cmp #$01                      ;check for ground level type area
            beq ChkRep                    ;if found, branch to next part
-           lda #$86
+           lda #$03
            sta Sprite_Tilenumber,y       ;otherwise remove brick tiles with lines
            sta Sprite_Tilenumber+4,y     ;and replace then with lineless brick tiles
 ChkRep:    lda Block_Metatile,x          ;check replacement metatile
            cmp #$c5                      ;if not used block metatile, then
            bne BlkOffscr                 ;branch ahead to use current graphics
-           lda #$87                      ;set A for used block tile
+           lda #$8d                      ;set A for used block tile
            iny                           ;increment Y to write to tile bytes
            jsr DumpFourSpr               ;do sub to dump into all four sprites
            dey                           ;return Y to original offset
@@ -12816,15 +12824,9 @@ ExDBlk: rts
 ;$00 - used to hold palette bits for attribute byte or relative X position
 
 DrawBrickChunks:
-         lda #$02                   ;set palette bits here
+         lda #$03                   ;set palette bits
          sta $00
-         lda #$75                   ;set tile number for ball (something residual, likely)
-         ldy GameEngineSubroutine
-         cpy #$05                   ;if end-of-level routine running,
-         beq DChunks                ;use palette and tile number assigned
-         lda #$03                   ;otherwise set different palette bits
-         sta $00
-         lda #$84                   ;and set tile number for brick chunks
+         lda #$8c                   ;and set tile number for brick chunks
 DChunks: ldy Block_SprDataOffset,x  ;get OAM data offset
          iny                        ;increment to start with tile bytes in OAM
          jsr DumpFourSpr            ;do sub to dump tile number into all four sprites
@@ -12895,7 +12897,8 @@ DrawFirebar:
        lsr
        pha                      ;save result to stack
        and #$01                 ;mask out all but last bit
-       eor #$64                 ;set either tile $64 or $65 as fireball tile
+       clc
+       adc #$7d                 ;set either tile $7d or $7e as fireball tile
        sta Sprite_Tilenumber,y  ;thus tile changes every four frames
        pla                      ;get from stack
        lsr                      ;divide by four again
@@ -12909,7 +12912,7 @@ FireA: sta Sprite_Attributes,y  ;store attribute byte and leave
 ;-------------------------------------------------------------------------------------
 
 ExplosionTiles:
-      .byte $68, $67, $66
+      .byte $81, $80, $7f
 
 DrawExplosion_Fireball:
       ldy Alt_SprDataOffset,x  ;get OAM data offset of alternate sort for fireball's explosion
@@ -12964,7 +12967,7 @@ KillFireBall:
 
 DrawSmallPlatform:
        ldy Enemy_SprDataOffset,x   ;get OAM data offset
-       lda #$5b                    ;load tile number for small platforms
+       lda #$04                    ;load tile number for small platforms
        iny                         ;increment offset for tile numbers
        jsr DumpSixSpr              ;dump tile number into all six sprites
        iny                         ;increment offset for attributes
@@ -13037,7 +13040,7 @@ DrawBubble:
         sta Sprite_X_Position,y     ;store as X coordinate here
         lda Bubble_Rel_YPos         ;get relative vertical coordinate
         sta Sprite_Y_Position,y     ;store as Y coordinate here
-        lda #$74
+        lda #$82
         sta Sprite_Tilenumber,y     ;put air bubble tile into OAM data
         lda #$02
         sta Sprite_Attributes,y     ;set attribute byte
@@ -13054,39 +13057,39 @@ PlayerGfxTblOffsets:
 
 PlayerGraphicsTable:
 ;big player table
-      .byte $00, $01, $02, $03, $04, $05, $06, $07 ;walking frame 1
-      .byte $08, $09, $0a, $0b, $0c, $0d, $0e, $0f ;        frame 2
-      .byte $10, $11, $12, $13, $14, $15, $16, $17 ;        frame 3
-      .byte $18, $19, $1a, $1b, $1c, $1d, $1e, $1f ;skidding
-      .byte $20, $21, $22, $23, $24, $25, $26, $27 ;jumping
-      .byte $08, $09, $28, $29, $2a, $2b, $2c, $2d ;swimming frame 1
-      .byte $08, $09, $0a, $0b, $0c, $30, $2c, $2d ;         frame 2
-      .byte $08, $09, $0a, $0b, $2e, $2f, $2c, $2d ;         frame 3
-      .byte $08, $09, $28, $29, $2a, $2b, $5c, $5d ;climbing frame 1
-      .byte $08, $09, $0a, $0b, $0c, $0d, $5e, $5f ;         frame 2
-      .byte $fc, $fc, $08, $09, $58, $59, $5a, $5a ;crouching
-      .byte $08, $09, $28, $29, $2a, $2b, $0e, $0f ;fireball throwing
+      .byte $0e, $0f, $10, $11, $12, $13, $14, $15 ;walking frame 1
+      .byte $16, $17, $18, $19, $1a, $1b, $1c, $1d ;        frame 2
+      .byte $1e, $1f, $20, $21, $22, $23, $24, $25 ;        frame 3
+      .byte $26, $27, $28, $29, $2a, $2b, $2c, $2d ;skidding
+      .byte $2e, $2f, $30, $31, $32, $33, $34, $35 ;jumping
+      .byte $16, $17, $36, $37, $38, $39, $3a, $3b ;swimming frame 1
+      .byte $16, $17, $18, $19, $1a, $3e, $3a, $3b ;         frame 2
+      .byte $16, $17, $18, $19, $3c, $3d, $3a, $3b ;         frame 3
+      .byte $16, $17, $36, $37, $38, $39, $47, $48 ;climbing frame 1
+      .byte $16, $17, $18, $19, $1a, $1b, $49, $4a ;         frame 2
+      .byte $ff, $ff, $16, $17, $44, $45, $46, $46 ;crouching
+      .byte $16, $17, $36, $37, $38, $39, $1c, $1d ;fireball throwing
 
 ;small player table
-      .byte $fc, $fc, $fc, $fc, $32, $33, $34, $35 ;walking frame 1
-      .byte $fc, $fc, $fc, $fc, $36, $37, $38, $39 ;        frame 2
-      .byte $fc, $fc, $fc, $fc, $3a, $37, $3b, $3c ;        frame 3
-      .byte $fc, $fc, $fc, $fc, $3d, $3e, $3f, $40 ;skidding
-      .byte $fc, $fc, $fc, $fc, $32, $41, $42, $43 ;jumping
-      .byte $fc, $fc, $fc, $fc, $32, $33, $44, $45 ;swimming frame 1
-      .byte $fc, $fc, $fc, $fc, $32, $33, $44, $47 ;         frame 2
-      .byte $fc, $fc, $fc, $fc, $32, $33, $48, $49 ;         frame 3
-      .byte $fc, $fc, $fc, $fc, $32, $33, $90, $91 ;climbing frame 1
-      .byte $fc, $fc, $fc, $fc, $3a, $37, $92, $93 ;         frame 2
-      .byte $fc, $fc, $fc, $fc, $9e, $9e, $9f, $9f ;killed
+      .byte $ff, $ff, $ff, $ff, $4b, $4c, $4d, $4e ;walking frame 1
+      .byte $ff, $ff, $ff, $ff, $4f, $50, $51, $52 ;        frame 2
+      .byte $ff, $ff, $ff, $ff, $53, $50, $54, $55 ;        frame 3
+      .byte $ff, $ff, $ff, $ff, $56, $57, $58, $59 ;skidding
+      .byte $ff, $ff, $ff, $ff, $4b, $5a, $5b, $5c ;jumping
+      .byte $ff, $ff, $ff, $ff, $4b, $4c, $5d, $5e ;swimming frame 1
+      .byte $ff, $ff, $ff, $ff, $4b, $4c, $5d, $60 ;         frame 2
+      .byte $ff, $ff, $ff, $ff, $4b, $4c, $61, $62 ;         frame 3
+      .byte $ff, $ff, $ff, $ff, $4b, $4c, $65, $66 ;climbing frame 1
+      .byte $ff, $ff, $ff, $ff, $53, $50, $67, $68 ;         frame 2
+      .byte $ff, $ff, $ff, $ff, $69, $69, $6a, $6a ;killed
 
 ;used by both player sizes
-      .byte $fc, $fc, $fc, $fc, $3a, $37, $4f, $4f ;small player standing
-      .byte $fc, $fc, $00, $01, $4c, $4d, $4e, $4e ;intermediate grow frame
-      .byte $00, $01, $4c, $4d, $4a, $4a, $4b, $4b ;big player standing
+      .byte $ff, $ff, $ff, $ff, $53, $50, $64, $64 ;small player standing
+      .byte $ff, $ff, $0e, $0f, $40, $41, $63, $63 ;intermediate grow frame
+      .byte $0e, $0f, $40, $41, $42, $42, $43, $43 ;big player standing
 
 SwimKickTileNum:
-      .byte $31, $46
+      .byte $3f, $5f
 
 PlayerGfxHandler:
         lda InjuryTimer             ;if player's injured invincibility timer
@@ -13723,8 +13726,9 @@ StartTheGame:
          sta DiskIOTask
          sta OperMode_Task
          sta DemoTimer
-         lda #$02
-         jmp GraphicsLoader        ;replace title screen gfx data
+         rts
+         ;lda #$02
+         ;jmp GraphicsLoader        ;replace title screen gfx data
 
 AttractModeDiskRoutines:
       lda DiskIOTask
@@ -13738,8 +13742,8 @@ InitWorldPos:
            sta FileListNumber    ;reset filelist number
            sta WorldNumber       ;reset world number
            sta HardWorldFlag     ;force player to start at SMB1 levels
-           lda #$03              ;load title screen graphics data
-           jsr GraphicsLoader
+           ;lda #$03              ;load title screen graphics data
+           ;jsr GraphicsLoader
            jmp ResetDiskIOTask   ;end disk subroutines
 
 GameModeDiskRoutines:
@@ -13789,8 +13793,8 @@ VictoryModeDiskRoutines:
       .word LoadEnding
 
 LoadEnding:
-        lda #$01
-        jsr GraphicsLoader       ;load princess graphics
+        ;lda #$01
+        ;jsr GraphicsLoader       ;load princess graphics
         jsr InitializeNameTables
         jsr ResetDiskIOTask      ;end disk subroutines
         sta ScreenRoutineTask    ;init screen routine task
@@ -13814,7 +13818,7 @@ DiskScreen:
       rts
 
 GameOverCursorData:
-  .byte $5b, $02, $48
+  .byte $04, $02, $48
 
 GameOverCursorY:
   .byte $77, $8f, $a7
@@ -13976,7 +13980,7 @@ InitScore:    sta ScoreAndCoinDisplay,x   ;clear player score and coin display
 ExitMenu:     rts
 
 MenuCursorTemplate:
-      .byte $06, $22, $6b, $83, $ce, $24, $24, $00
+      .byte $06, $22, $6b, $83, $60, $24, $24, $00
 
 DrawMenuCursor:
               ldy #$07                  ;read eight bytes to be read by transfer routine
@@ -13989,7 +13993,7 @@ CursorDataRead:
               beq ExitCursor            ;if set to mario game, we're done
               lda #$24                  ;otherwise, load blank tile in mario game position
               sta VRAM_Buffer1+3
-              lda #$ce                  ;then load shroom icon tile in luigi game position
+              lda #$60                  ;then load shroom icon tile in luigi game position
               sta VRAM_Buffer1+5
 ExitCursor:   rts
 
@@ -14028,7 +14032,7 @@ TScrClear:   sta VRAM_Buffer1-1,x
              dex
              bne TScrClear
              jsr DrawMenuCursor         ;draw player select cursor
-             jsr DrawTitleScreenStars
+             ;jsr DrawTitleScreenStars
              inc ScreenRoutineTask      ;move onto next task
              rts
 
@@ -14036,41 +14040,41 @@ TScrClear:   sta VRAM_Buffer1-1,x
 ;$00 - used to store low byte of VRAM address
 ;$01 - used to store number of title screen stars drawn per line
 
-DrawTitleScreenStars:
-            lda #$d1                 ;set the VRAM address for the first line of stars
-            sta $00
-            lda GamesBeatenCount     ;have we beaten the game at least once?
-            beq NoStars              ;if not, we don't need to be here
-            cmp #$0a                 ;do we have more than 9 stars?
-            bcc DrawLine             ;if not, draw the first line as-is
-            lda #$09                 ;otherwise, we need 9 stars for the first line
-            jsr DrawLine
-            lda #$f1                 ;now set the VRAM address for the second line
-            sta $00
-            lda GamesBeatenCount     ;get the correct number of stars to draw for the second line
-            sec
-            sbc #$09
-            cmp #$0a                 ;do we have somehow have more than 18 stars total?
-            bcc DrawLine             ;if not, draw the second line normally
-            lda #$09                 ;if we do, force the second line to only have 9 stars
-DrawLine:   ora #%01000000           ;add bit to indicate repeated tile
-            sta $01                  ;and store in temp variable
-            ldx VRAM_Buffer1_Offset
-            lda #$20                 ;write proper address for title screen stars
-            sta VRAM_Buffer1,x
-            lda $00
-            sta VRAM_Buffer1+1,x
-            lda $01                  ;write how many stars to draw for this line
-            sta VRAM_Buffer1+2,x
-            lda #$f1
-            sta VRAM_Buffer1+3,x
-            lda #$00                 ;put null terminator at the end
-            sta VRAM_Buffer1+4,x
-            txa                      ;move the buffer offset up by four bytes
-            clc
-            adc #$04
-            sta VRAM_Buffer1_Offset
-NoStars:    rts                      ;now we're done!
+;DrawTitleScreenStars:
+;            lda #$d1                 ;set the VRAM address for the first line of stars
+;            sta $00
+;            lda GamesBeatenCount     ;have we beaten the game at least once?
+;            beq NoStars              ;if not, we don't need to be here
+;            cmp #$0a                 ;do we have more than 9 stars?
+;            bcc DrawLine             ;if not, draw the first line as-is
+;            lda #$09                 ;otherwise, we need 9 stars for the first line
+;            jsr DrawLine
+;            lda #$29                 ;now set the VRAM address for the second line
+;            sta $00
+;            lda GamesBeatenCount     ;get the correct number of stars to draw for the second line
+;            sec
+;            sbc #$09
+;            cmp #$0a                 ;do we have somehow have more than 18 stars total?
+;            bcc DrawLine             ;if not, draw the second line normally
+;            lda #$09                 ;if we do, force the second line to only have 9 stars
+;DrawLine:   ora #%01000000           ;add bit to indicate repeated tile
+;            sta $01                  ;and store in temp variable
+;            ldx VRAM_Buffer1_Offset
+;            lda #$20                 ;write proper address for title screen stars
+;            sta VRAM_Buffer1,x
+;            lda $00
+;            sta VRAM_Buffer1+1,x
+;            lda $01                  ;write how many stars to draw for this line
+;            sta VRAM_Buffer1+2,x
+;            lda #$29
+;            sta VRAM_Buffer1+3,x
+;            lda #$00                 ;put null terminator at the end
+;            sta VRAM_Buffer1+4,x
+;            txa                      ;move the buffer offset up by four bytes
+;            clc
+;            adc #$04
+;            sta VRAM_Buffer1_Offset
+;NoStars:    rts                      ;now we're done!
 
 ;-------------------------------------------------------------------------------------
 
@@ -14133,49 +14137,6 @@ PalPatch:  lda PlayerPaletteData,y   ;overwrite palette with the appropriate one
 ;-------------------------------------------------------------------------------------
 
 TitleScreenGfxData:
-       ;.byte $20, $84, $01, $44
-       ;.byte $20, $85, $57, $48
-       ;.byte $20, $9c, $01, $49
-       ;.byte $20, $a4, $c9, $46
-       ;.byte $20, $a5, $57, $26
-       ;.byte $20, $bc, $c9, $4a
-       ;.byte $20, $a5, $0a, $d0, $d1, $d8, $d8, $de, $d1, $d0, $da, $de, $d1
-       ;.byte $20, $c5, $17, $d2, $d3, $db, $db, $db, $d9, $db, $dc, $db, $df
-       ;.byte $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26
-       ;.byte $20, $e5, $17, $d4, $d5, $d4, $d9, $db, $e2, $d4, $da, $db, $e0
-       ;.byte $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26, $26
-       ;.byte $21, $05, $57, $26
-       ;.byte $21, $05, $0a, $d6, $d7, $d6, $d7, $e1, $26, $d6, $dd, $e1, $e1
-       ;.byte $21, $25, $17, $d0, $e8, $d1, $d0, $d1, $de, $d1, $d8, $d0, $d1
-       ;.byte $26, $de, $d1, $de, $d1, $d0, $d1, $d0, $d1, $26, $26, $d0, $d1
-       ;.byte $21, $45, $17, $db, $42, $42, $db, $42, $db, $42, $db, $db, $42
-       ;.byte $26, $db, $42, $db, $42, $db, $42, $db, $42, $26, $26, $db, $42
-       ;.byte $21, $65, $46, $db
-       ;.byte $21, $6b, $11, $df, $db, $db, $db, $26, $db, $df, $db, $df, $db
-       ;.byte $db, $e4, $e5, $26, $26, $ec, $ed
-       ;.byte $21, $85, $17, $db, $db, $db, $de, $43, $db, $e0, $db, $db, $db
-       ;.byte $26, $db, $e3, $db, $e0, $db, $db, $e6, $e3, $26, $26, $ee, $ef
-       ;.byte $21, $a5, $17, $db, $db, $db, $db, $42, $db, $db, $db, $d4, $d9
-       ;.byte $26, $db, $d9, $db, $db, $d4, $d9, $d4, $d9, $e7, $26, $de, $da
-       ;.byte $21, $c4, $19, $5f, $95, $95, $95, $95, $95, $95, $95, $95, $97
-       ;.byte $98, $78, $95, $96, $95, $95, $97, $98, $97, $98, $95, $78, $95
-       ;.byte $f0, $7a
-       ;.byte $21, $ef, $0e, $cf, $01, $09, $08, $06, $24, $17, $12, $17, $1d
-       ;.byte $0e, $17, $0d, $18
-       ;.byte $22, $4d, $0a, $16, $0a, $1b, $12, $18, $24, $10, $0a, $16, $0e
-       ;.byte $22, $8d, $0a, $15, $1e, $12, $10, $12, $24, $10, $0a, $16, $0e
-       ;.byte $22, $eb, $04, $1d, $18, $19, $28
-       ;.byte $22, $f5, $01, $00
-       ;.byte $23, $c9, $47, $55
-       ;.byte $23, $d1, $47, $55
-       ;.byte $23, $d9, $47, $55
-       ;.byte $23, $cc, $43, $f5
-       ;.byte $23, $d6, $01, $dd
-       ;.byte $23, $de, $01, $5d
-       ;.byte $23, $e2, $04, $55, $aa, $aa, $aa
-       ;.byte $23, $ea, $04, $95, $aa, $aa, $2a
-       ;.byte $00, $ff, $ff
-
        .incbin "titlescreen.bin"
 
 ;-------------------------------------------------------------------------------------------------
@@ -14308,8 +14269,8 @@ LeavesXPos:
         .byte $a0, $a0, $d0, $d0, $d0, $60
 
 LeavesTile:
-        .byte $7b, $7b, $7b, $7b, $7a, $7a
-        .byte $7b, $7b, $7b, $7a, $7b, $7a
+        .byte $85, $85, $85, $85, $84, $84
+        .byte $85, $85, $85, $84, $85, $84
 
 SimulateWind:
           lda WindFlag             ;if no wind, branch to leave
@@ -14584,7 +14545,7 @@ BackToNormal:
     lda #$00
     sta DiskIOTask           ;erase task numbers
     sta OperMode_Task
-    jsr GraphicsLoader       ;overwrite princess graphics with door again
+    ;jsr GraphicsLoader       ;overwrite princess graphics with door again
     lda WorldNumber          ;if in world D, branch to end the game
     cmp #WorldD
     beq EndTheGame
@@ -14705,14 +14666,14 @@ FinalRoomPalette:
 MarioThankYouMsgFinal:
     .byte $20, $e8, $10
     .byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
-    .byte $16, $0a, $1b, $12, $18, $2b
+    .byte $16, $0a, $1b, $12, $18, $27
     .byte $23, $c8, $48, $05
     .byte $00
 
 LuigiThankYouMsgFinal:
     .byte $20, $e8, $10
     .byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
-    .byte $15, $1e, $12, $10, $12, $2b
+    .byte $15, $1e, $12, $10, $12, $27
     .byte $23, $c8, $48, $05
     .byte $00
 
@@ -14760,7 +14721,7 @@ OfALongFriendshipMsg:
 
 PointsAddedMsg:
     .byte $22, $88, $10
-    .byte $01, $00, $00, $00, $00, $00, $24, $19, $1d, $1c, $af, $0a, $0d
+    .byte $01, $00, $00, $00, $00, $00, $24, $19, $1d, $1c, $28, $0a, $0d
     .byte $0d, $0e, $0d
 
     .byte $23, $e8, $48, $ff
@@ -14769,7 +14730,7 @@ PointsAddedMsg:
 ForEachPlayerLeftMsg:
     .byte $22, $a6, $15
     .byte $0f, $18, $1b, $24, $0e, $0a, $0c, $11, $24, $19, $15, $0a, $22
-    .byte $0e, $1b, $24, $15, $0e, $0f, $1d, $af
+    .byte $0e, $1b, $24, $15, $0e, $0f, $1d, $28
     .byte $00
 
 PrincessPeachsRoom:
@@ -14789,12 +14750,12 @@ FantasyWorld9Msg:
     .byte $17, $1d, $0a, $1c, $22, $24, $20, $18, $1b, $15, $0d
 
     .byte $22, $66, $13
-    .byte $15, $0e, $1d, $f2, $1c, $24, $1d, $1b, $22, $24, $76, $09, $24
+    .byte $15, $0e, $1d, $2a, $1c, $24, $1d, $1b, $22, $24, $76, $09, $24
     .byte $20, $18, $1b, $15, $0d, $75
 
     .byte $22, $a9, $0e
     .byte $20, $12, $1d, $11, $24, $18, $17, $0e, $24, $10, $0a, $16, $0e
-    .byte $af
+    .byte $28
     .byte $00
 
 ThanksForPlayingMsg:
@@ -14805,7 +14766,7 @@ ThanksForPlayingMsg:
     ;"THANKS FOR PLAYING!"
     .byte $21, $e6, $13
     .byte $1d, $11, $0a, $17, $14, $1c, $24, $0f, $18, $1b, $24, $19, $15
-    .byte $0a, $22, $12, $17, $10, $2b
+    .byte $0a, $22, $12, $17, $10, $27
 
     ;"DEVELOPED BY:"
     .byte $22, $26, $0d
@@ -14813,12 +14774,12 @@ ThanksForPlayingMsg:
 
     ;"-SIMPLISTIC6502"
     .byte $22, $69, $0f
-    .byte $28, $1c, $12, $16, $19, $15, $12, $1c, $1d, $12, $0c, $06, $05
+    .byte $25, $1c, $12, $16, $19, $15, $12, $1c, $1d, $12, $0c, $06, $05
     .byte $00, $02
 
     ;"-WEB2000"
     .byte $22, $a9, $08
-    .byte $28, $20, $0e, $0b, $02, $00, $00, $00
+    .byte $25, $20, $0e, $0b, $02, $00, $00, $00
 
     ;"SPECIAL THANKS:"
     .byte $22, $e6, $0f
@@ -14827,7 +14788,7 @@ ThanksForPlayingMsg:
 
     ;"-THREECREEPIO"
     .byte $23, $29, $0d
-    .byte $28, $1d, $11, $1b, $0e, $0e, $0c, $1b, $0e, $0e, $19, $12, $18
+    .byte $25, $1d, $11, $1b, $0e, $0e, $0c, $1b, $0e, $0e, $19, $12, $18
     .byte $00
 
 ;-------------------------------------------------------------------------------------
@@ -14878,63 +14839,63 @@ InitCHRBanks:
 		bne @chrloop2	;If not, initialise next CHR bank.
 		rts
 
-CHR_PPUAddrTable:
-      .word PrincessGfxOffset, TitleScreenGfxOffset
-
-CHR_SizeTable:
-      .byte 64, 192
-
-CHR_PRGAddrTable:
-      .word sm2char1+PrincessGfxOffset, sm2char2
-      .word sm2char1+TitleScreenGfxOffset, sm2char3
-
-GraphicsLoader:
-      tax                    ;store A in X register
-      lda #CHRBank         ;load sound bank since that's
-      jsr SwitchPRGBank0      ;where the CHR data is
-      lda #CHRBank+1         ;load sound bank since that's
-      jsr SwitchPRGBank1      ;where the CHR data is
-      ldy #$00
-	sty PPU_MASK           ;turn off rendering for good measure
-      txa                    ;transfer X back into A
-      and #%11111110         ;mask out d0
-      tay                    ;move new offset into Y
-      iny                    ;start with high byte
-      lda CHR_PPUAddrTable,y
-	sta PPU_ADDRESS        ;load destination address into PPU
-      dey                    ;now do low byte
-      lda CHR_PPUAddrTable,y
-	sta PPU_ADDRESS
-      txa                    ;transfer X into A again
-      lsr                    ;move d1 to d0 for correct offset
-      tay                    ;transfer A into Y as offset
-      lda CHR_SizeTable,y    ;get appropiate size for CHR data
-      sta $02
-      txa                    ;transfer X into A one last time
-      asl                    ;multiply by 2 for correct offset
-      tax                    ;move back into X for new offset
-      lda CHR_PRGAddrTable,x ;load ROM address for graphics data
-      sta $00
-      inx                    ;now the high byte
-      lda CHR_PRGAddrTable,x
-      sta $01
-      ldy #$00               ;reset Y and load graphics data
+;CHR_PPUAddrTable:
+;      .word PrincessGfxOffset, TitleScreenGfxOffset
+;
+;CHR_SizeTable:
+;      .byte 64, 192
+;
+;CHR_PRGAddrTable:
+;      .word sm2char1+PrincessGfxOffset, sm2char2
+;      .word sm2char1+TitleScreenGfxOffset, sm2char3
+;
+;GraphicsLoader:
+;      tax                    ;store A in X register
+;      lda #CHRBank         ;load sound bank since that's
+;      jsr SwitchPRGBank0      ;where the CHR data is
+;      lda #CHRBank+1         ;load sound bank since that's
+;      jsr SwitchPRGBank1      ;where the CHR data is
+;      ldy #$00
+;	sty PPU_MASK           ;turn off rendering for good measure
+;      txa                    ;transfer X back into A
+;      and #%11111110         ;mask out d0
+;      tay                    ;move new offset into Y
+;      iny                    ;start with high byte
+;      lda CHR_PPUAddrTable,y
+;	sta PPU_ADDRESS        ;load destination address into PPU
+;      dey                    ;now do low byte
+;      lda CHR_PPUAddrTable,y
+;	sta PPU_ADDRESS
+;      txa                    ;transfer X into A again
+;      lsr                    ;move d1 to d0 for correct offset
+;      tay                    ;transfer A into Y as offset
+;      lda CHR_SizeTable,y    ;get appropiate size for CHR data
+;      sta $02
+;      txa                    ;transfer X into A one last time
+;      asl                    ;multiply by 2 for correct offset
+;      tax                    ;move back into X for new offset
+;      lda CHR_PRGAddrTable,x ;load ROM address for graphics data
+;      sta $00
+;      inx                    ;now the high byte
+;      lda CHR_PRGAddrTable,x
+;      sta $01
+;      ldy #$00               ;reset Y and load graphics data
 LoadGraphicsLoop:
-	lda ($00),y            ;copy byte from ROM
-	sta PPU_DATA           ;store to PPU
-	iny
-    cpy $02
-	bcc LoadGraphicsLoop   ;loop until all CHR data is finished
-    jmp LoadMainBank       ;load main bank afterwards
+;	lda ($00),y            ;copy byte from ROM
+;	sta PPU_DATA           ;store to PPU
+;	iny
+;    cpy $02
+;	bcc LoadGraphicsLoop   ;loop until all CHR data is finished
+;    jmp LoadMainBank       ;load main bank afterwards
 
 InitializeCHRRAM:
     ldy #$00
 	sty PPU_MASK           ;turn off rendering for good measure
 	sty PPU_ADDRESS        ;load destination address into PPU
 	sty PPU_ADDRESS
-    lda #<sm2char1
+    lda #<font_smb1
     sta $00
-    lda #>sm2char1
+    lda #>font_smb1
     sta $01
 	ldx #32                ;number of pages
 InitCHRLoop:

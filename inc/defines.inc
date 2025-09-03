@@ -667,10 +667,10 @@ GameMode              = 1
 VictoryMode           = 2
 GameOverMode          = 3
 
-CHRBank               = 0
-SoundBank             = 2
-LevelsBank            = 4
-MainBank              = 6
+CHRBank               = 6
+SoundBank             = 8
+LevelsBank            = 10
+MainBank              = 12
 FixedBank             = 14
 
 MMC3_BankSelect		  = $8000

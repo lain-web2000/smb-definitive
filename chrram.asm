@@ -1,13 +1,11 @@
-sm2char1:
-sm2text:
-.incbin "chr/smb2/sm2text.chr"
-sm2spr:
-.incbin "chr/smb2/sm2bg.chr"
-sm2bg:
-.incbin "chr/smb2/sm2spr.chr"
-sm2char2:
-.incbin "chr/smb2/sm2char2.chr"
-sm2char3:
-.incbin "chr/definitive.chr"
+font_smb1:
+.incbin "chr/smb1/font_smb1.chr"
+bg_smb1:
+.incbin "chr/smb1/bg_smb1.chr"
+.incbin "chr/bg_main.chr"
+.incbin "chr/bg_title.chr"
+spr_smb1:
+.incbin "chr/smb1/spr_smb1.chr"
+.incbin "chr/spr_main.chr"
 wateranim:
 .incbin "chr/wateranim.chr"
