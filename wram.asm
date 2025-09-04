@@ -1,8 +1,9 @@
 .org $6000
 
 SaveDataHeader:
-	.byte "SM2SAVE"
+	.byte "SMB-COMP"
 
+SaveData:
 GamesBeatenCount:
 	.byte $00
 
@@ -35,6 +36,13 @@ SpinyEggBehavior:
 
 WarpZoneScroll:
 	.byte $00
+
+FontSelection:
+    .byte $00
+
+TilesetSelection:
+    .byte $00
+SaveData_End:
 
 CurrentGame:
 	.byte $00

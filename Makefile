@@ -5,7 +5,7 @@ LD = ld65
 INCS = inc/wram.inc 
 	   
 .PHONY: clean
-build: smb-definitive.nes
+build: smb-complete.nes
 
 %.o: %.asm
 	$(AS) --create-dep "$@.dep" --listing $@.lst -g --debug-info $< -o $@
@@ -16,10 +16,10 @@ inc/wram.inc: wram.asm wram.map
 wram.map: wram.asm
 	$(AS) -l wram.map wram.asm -o wram.o
 	
-smb-definitive.nes: $(INCS) layout sm2main.o
-	$(LD) --dbgfile $@.dbg -C layout sm2main.o -o $@
+smb-complete.nes: $(INCS) layout main.o
+	$(LD) --dbgfile $@.dbg -C layout main.o -o $@
 	
 clean:
-	rm -f smb-definitive*.nes *.o *.o.bin *.o.dep *.nes.dbg
+	rm -f smb-complete*.nes *.o *.o.bin *.o.dep *.nes.dbg
 
 include $(wildcard ./*.dep)
