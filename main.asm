@@ -2016,11 +2016,11 @@ PlayerStarting_Y_Pos:
       .byte $f0
 
 PlayerBGPriorityData:
-      .byte $00, $20, $00, $00, $00, $00, $00, $00
+      .byte $00, $20, $00, $00, $00, $00, $00, $00, $20
 
 GameTimerData:
-      .byte $20 ;dummy byte, used as part of bg priority data
-      .byte $04, $03, $02
+      .byte $04, $03, $03 ;hundreds digit
+      .byte $00, $00, $05 ;tens digit
 
 Entrance_GameTimerSetup:
           lda ScreenLeft_PageLoc      ;set current page for area objects
@@ -2056,12 +2056,14 @@ SetStPos: lda PlayerStarting_X_Pos,y  ;load appropriate horizontal position
           beq ChkOverR                ;if set to zero, branch (do not use dummy byte for this)
           lda FetchNewGameTimerFlag   ;do we need to set the game timer? if not, use 
           beq ChkOverR                ;old game timer setting
+		  dey
           lda GameTimerData,y         ;if game timer is set and game timer flag is also set,
           sta GameTimerDisplay        ;use value of game timer control for first digit of game timer
+          lda GameTimerData+3,y
+          sta GameTimerDisplay+1      ;set second digit of game timer
           lda #$01
           sta GameTimerDisplay+2      ;set last digit of game timer to 1
           lsr
-          sta GameTimerDisplay+1      ;set second digit of game timer
           sta FetchNewGameTimerFlag   ;clear flag for game timer reset
           sta StarInvincibleTimer     ;clear star mario timer
 ChkOverR: ldy JoypadOverride          ;if controller bits not set, branch to skip this part
@@ -4422,11 +4424,6 @@ ProcJumping:
            beq InitJS                 ;if on the ground, branch
            lda SwimmingFlag           ;if swimming flag not set, jump to do something else
            beq NoJump                 ;to prevent midair jumping, otherwise continue
-           lda JumpSwimTimer          ;if jump/swim timer nonzero, branch
-           bne InitJS
-           lda Player_Y_Speed         ;check player's vertical speed
-           bpl InitJS                 ;if player's vertical speed motionless or down, branch
-           jmp X_Physics              ;if timer at zero and player still rising, do not swim
 InitJS:    lda #$20                   ;set jump/swim timer
            sta JumpSwimTimer
            ldy #$00                   ;initialize vertical force and dummy variable
