@@ -258,7 +258,6 @@ ExitPause:     rts
 ;$00 - used for preset value
 
 SpriteShuffler:
-               ldy AreaType                ;residual code, this value is never used
                lda #$28                    ;load preset value which will put it at
                sta $00                     ;sprite #10
                ldx #$0e                    ;start at the end of OAM data offsets
@@ -513,23 +512,26 @@ NextWorld: lda #$01
            clc
            adc #$01                  ;add one to world number
            ldy CurrentGame           ;check current game
-           beq NextWorld_Complete    ;if playing complete, branch ahead
-           cpy #$01                  ;if not playing SMB1, branch ahead to simply
-           bne StoreWNum             ;store the world number
+           cpy #$01                  ;if not playing SMB1, branch ahead to run
+           bne NextWorld_Complete    ;SMB2J/complete routine
 NextWorld_SMB1:
            and #%00000111            ;otherwise keep world number between 1-8
            beq ChkHardM              ;and enable hard mode if we need to
 NextWorld_Complete:
            cmp #WorldA               ;are we going into world A?
            bcc StoreWNum             ;no, update world number accordingly
-           ldy HardWorldFlag         ;are we in SMB1 levels mode?
-           bne StoreWNum             ;no, it's fine to go to the next world
-           inc HardWorldFlag         ;otherwise we're going into 2J levels
+           ldy LevelSet              ;are we in SMB1 levels?
+           bne ChkHardF              ;no, it's fine to go to the next world
+           inc LevelSet              ;otherwise we're going into 2J levels
            lda #World1               ;continue the game at world 1 of SMB2J
            beq StoreWNum
+ChkHardF:  ldy HardWorldFlag         ;have we already toggled worlds A-D flag?
+           bne StoreWNum             ;if not, branch ahead
+           inc HardWorldFlag         ;otherwise go ahead and set the flag
+           bne StoreWNum             ;(TO-DO: Replace with conditional based on setting)
 ChkHardM:  ldy PrimaryHardMode       ;have we already set primary hard mode?
            bne StoreWNum             ;yes, branch ahead
-           inc PrimaryHardMode       ;otherwise go ahead and set it for 2J letter worlds
+           inc PrimaryHardMode       ;otherwise go ahead and set it
 StoreWNum: sta WorldNumber           ;update the world number
            jsr RunLoadAreaPointer    ;get pointer for the next area
            inc FetchNewGameTimerFlag ;and get a new game timer
@@ -792,7 +794,7 @@ WriteBottomStatusLine:
       iny                        ;increment the world number/letter because
       tya                        ;the internal world number counts from 0, not 1
       sta VRAM_Buffer1+3,x
-      lda HardWorldFlag
+      lda LevelSet
       beq PutD
       lda #$29                   ;put star instead of dash if playing 2J levels
       bne PutS
@@ -995,7 +997,7 @@ PutOnes:       sta VRAM_Buffer1+9        ;write ones digit of lives to screen
                iny                       ;increment the world number/letter because
                tya                       ;the internal world number counts from 0, not 1
                sta VRAM_Buffer1+19
-               lda HardWorldFlag
+               lda LevelSet
                beq PutLevelNum
                lda #$29                  ;put star instead of dash if playing 2J levels
                sta VRAM_Buffer1+20
@@ -1893,7 +1895,7 @@ SetInitNTHigh: sty CurrentNTAddr_High   ;store name table address
                ldy PrimaryHardMode      ;primary hard mode set?
                bne SetSecHard           ;yes, set secondary hard mode as well
                lda WorldNumber          ;check world number
-               ldy HardWorldFlag        ;check to see if we're playing 2J levels
+               ldy LevelSet             ;check to see if we're playing 2J levels
                bne ChkSecHard           ;if so, activate the secondary only past 4-4
                cmp #World5              ;if less than 5, do not activate secondary
                bcc CheckHalfway
@@ -1951,7 +1953,6 @@ ShufAmtLoop: lda DefaultSprOffsets,x
              sta SprDataOffset,x
              dex                       ;do this until they're all set
              bpl ShufAmtLoop
-             jsr DoNothing             ;do slightly less of nothing than in super mario bros 1
              inc IRQUpdateFlag
              inc OperMode_Task
              rts
@@ -2126,7 +2127,7 @@ PlayerLoseLife:
              sta OperMode             ;and leave
              rts
 StillInGame: lda WorldNumber          ;retrieve world number for offset
-             ldy HardWorldFlag        ;check if playing 2J levels
+             ldy LevelSet             ;check if playing 2J levels
              beq NrmlWorlds           ;if not, use world number as-is
              clc                      ;otherwise add nine for correct halfway pages
              adc #$09
@@ -2208,13 +2209,6 @@ ContinueGame:
            lda #$01                  ;if in game over mode, switch back to
            sta OperMode              ;game mode, because game is still on
 GameIsOn:  rts
-
-;-------------------------------------------------------------------------------------
-
-DoNothing:
-      lda #$ff       ;this is residual code, this value is
-      sta $06c9      ;not used anywhere in the program
-      rts
 
 ;-------------------------------------------------------------------------------------
 
@@ -2402,10 +2396,10 @@ NoFore:   iny
           bne SceLoop2
 RendTerr: ldy AreaType               ;check world type for water level
           bne TerMTile               ;if not water level, skip this part
-          lda WorldNumber            ;check world number, if not world number eight
-          cmp #World8                ;then skip this part
+          lda LevelNumber            ;check level number, if not level number four
+          cmp #Level4                ;then skip this part
           bne TerMTile
-          lda #$65                   ;if set as water level and world number eight,
+          lda #$65                   ;if set as water level and level number four,
           jmp StoreMT                ;use castle wall metatile as terrain type
 TerMTile: lda TerrainMetatiles,y     ;otherwise get appropriate metatile for area type
           ldy CloudTypeOverride      ;check for cloud type override
@@ -2752,11 +2746,10 @@ SetFore: sta ForegroundScenery     ;otherwise set new foreground scenery bits
 ;--------------------------------
 
 ScrollLockObject_Warp:
-         lda HardWorldFlag        ;playing SMB1 levels?
+         lda LevelSet             ;playing SMB1 levels?
          beq WarpsForSMB1Levels   ;yes, use alternate handler for warp zone control
-         lda WorldNumber          ;if on worlds A-D, skip ahead to next part
-         cmp #WorldA
-         bcs WarpWorldsAThruD     ;note d7 is set in all entries to prevent zero condition
+         lda HardWorldFlag        ;if on worlds A-D, skip ahead to next part
+         bne WarpWorldsAThruD     ;note d7 is set in all entries to prevent zero condition
          ldx #$83                 ;use base number for warp to world 2
          lda WorldNumber          ;from happening in warp zone code elsewhere
          bne WarpWorlds2Thru8     ;if not on world 1, branch to handle a different way
@@ -2880,7 +2873,7 @@ EndTreeL: lda #$18                ;render end of tree ledge
           jmp NoUnder
 
 MushroomOrCloudLedge:
-          lda HardWorldFlag       ;are we playing 2J levels?
+          lda LevelSet            ;are we playing 2J levels?
           beq MushroomLedge       ;no, use mushroom platforms
 
 ;note: This is the style utilized by world 8-3 and part of world 8-2, and not to
@@ -3109,10 +3102,15 @@ VerticalPipe:
           iny                      ;add four if usage control bit was not set
 WarpPipe: tya                      ;save value in stack
           pha
-          lda HardWorldFlag        ;are we playing 2J levels?
+          lda LevelSet             ;are we playing 2J levels?
           bne PutPlant             ;if we are, always try to add piranha plant
           lda AreaNumber           ;otherwise check if we're in SMB1 world 1-1
           ora WorldNumber          ;if at world 1-1, do not add piranha plant ever
+          beq DrawPipe
+          lda AreaType             ;workaround to prevent invisible plant in 8-4 water room
+          bne PutPlant             ;(TO-DO: Probably better to make a flag that prevents plants
+          lda AreaAddrsLOffset     ;so we don't have to run this code every time we make a pipe)
+          cmp #$02
           beq DrawPipe
 PutPlant: ldy AreaObjectLength,x   ;if on second column of pipe, branch
           beq DrawPipe             ;(because we only need to do this once)
@@ -4850,7 +4848,7 @@ WarpZoneBug:
       bne ExGTimer           ;if so, branch to leave
 UnlockScreen:
       sta ScrollLock         ;otherwise nullify scroll lock flag
-      lda HardWorldFlag      ;are we in smb2j levels?
+      lda LevelSet           ;are we in smb2j levels?
       bne SkipIncBug         ;if so, do not increment warpzonecontrol.
       inc WarpZoneControl    ;hiiiiiiiiii im back :3
 SkipIncBug:
@@ -5032,14 +5030,16 @@ PosJSpr:   lda Jumpspring_FixedYPos,x  ;get permanent vertical position
            tya
            pha
            lda #$f4                    ;set jumpspring force for red jumpsprings
-           ldy HardWorldFlag           ;if playing SMB1 levels, use red jumpspring force
+           ldy LevelSet                ;if playing SMB1 levels, use red jumpspring force
            beq SetJSF
            ldy WorldNumber             ;otherwise check world number
            cpy #World2
-           beq GreenJS                 ;if world number is 2, 3, 7, or C
+           beq GreenJS                 ;if world number is 2, 3, 7, B or C
            cpy #World3                 ;set jumpspring force for green jumpsprings
            beq GreenJS
            cpy #World7
+           beq GreenJS
+           cpy #WorldB                 ;(TO-DO: Add setting for red springs in world B)
            beq GreenJS
            cpy #WorldC                 ;otherwise use red jumpspring force
            bne SetJSF
@@ -6229,7 +6229,7 @@ ExecGameLoopback:
       sta AreaObjectPageSel
       sta EnemyDataOffset       ;initialize enemy object data offset
       sta EnemyObjectPageLoc    ;and enemy object page control
-      lda HardWorldFlag         ;use appropiate object offset
+      lda LevelSet              ;use appropiate object offset
       bne ExecGameLoopbackJ     ;depending on which game's levels we're playing
       lda AreaDataOfsLoopback,y ;adjust area object offset based on
       sta AreaDataOffset        ;which loop command we encountered
@@ -6315,7 +6315,7 @@ ProcLoopCommand:
           beq ChkEnemyFrenzy
           lda CurrentColumnPos      ;check to see if we're still on the first page
           bne ChkEnemyFrenzy        ;if not, do not loop yet
-          lda HardWorldFlag         ;use correct loop command routine
+          lda LevelSet              ;use correct loop command routine
           bne ProcLoopCommandJ      ;depending on which game we're playing
           ldy #$11                  ;start at the end of each set of loop data
 FindLoop: dey
@@ -6484,19 +6484,19 @@ StrID:  sta Enemy_ID,x       ;store enemy object number into buffer
         rts
 
 CheckFrenzyBuffer:
-        lda EnemyFrenzyBuffer    ;if enemy object stored in frenzy buffer
-        bne StrFre               ;then branch ahead to store in enemy object buffer
-        lda VineFlagOffset       ;otherwise check vine flag offset
+        lda VineFlagOffset       ;check vine flag offset
         cmp #$01
-        bne ExEPar               ;if other value <> 1, leave
-        lda #VineObject          ;otherwise put vine in enemy identifier
+        beq StrVin               ;if value equals 1, create second half of vine
+        lda EnemyFrenzyBuffer    ;otherwise if enemy object stored in frenzy buffer
+        bne StrFre               ;then branch ahead to store in enemy object buffer
+        rts
+StrVin: lda #VineObject          ;otherwise put vine in enemy identifier
 StrFre: sta Enemy_ID,x           ;store contents of frenzy buffer into enemy identifier value
 
 InitEnemyObject:
         lda #$00                 ;initialize enemy state
         sta Enemy_State,x
         jmp CheckpointEnemyID    ;jump ahead to run jump engine and subroutines
-ExEPar: rts                      ;then leave
 
 DoGroup:
         jmp HandleGroupEnemies   ;handle enemy group objects
@@ -6507,8 +6507,8 @@ ParseRow0e:
         lda WorldNumber
         cmp #World9              ;skip world number check if on world 9
         beq W9Skip
-        cmp #WorldA              ;2J letter worlds?
-        bcc Pars0e               ;if not, branch ahead to use world number as-is
+        ldx HardWorldFlag        ;2J letter worlds?
+        beq Pars0e               ;if not, branch ahead to use world number as-is
         sec
         sbc #$09                 ;otherwise subtract 9 for correct world comparison
 Pars0e: sta $05
@@ -6664,9 +6664,11 @@ InitHammerBro:
        lda #$00                    ;init horizontal speed and timer used by hammer bro
        sta HammerThrowingTimer,x   ;apparently to time hammer throwing
        sta Enemy_X_Speed,x
-       lda HardWorldFlag           ;playing SMB1 levels?
+       lda LevelSet                ;playing SMB1 levels?
        beq HBI                     ;skip world check, always have walk delay
-       lda WorldNumber             ;if on world 7+ of SMB2J, branch to skip the walk delay
+       lda HardWorldFlag           ;if on worlds A-D, always have walk delay
+       bne HBI
+       lda WorldNumber             ;if on world 7-9 of SMB2J, branch to skip the walk delay
        cmp #World7
        bcs NoHBI
 HBI:   ldy SecondaryHardMode       ;get secondary hard mode flag
@@ -6730,8 +6732,7 @@ InitLakitu:
 SetupLakitu:
       lda #$00                   ;erase counter for lakitu's reappearance
       sta LakituReappearTimer
-      jsr InitHorizFlySwimEnemy  ;set $03 as bounding box, set other attributes
-      jmp TallBBox2              ;set $03 as bounding box again (not necessary) and leave
+      jmp InitHorizFlySwimEnemy  ;set $03 as bounding box, set other attributes
 
 KillLakitu:
       jmp EraseEnemyObject
@@ -6771,15 +6772,15 @@ CreateL:  lda #$00                ;initialize enemy state
           sta Enemy_State,x
           lda #Lakitu             ;create lakitu enemy object
           sta Enemy_ID,x
-          jsr SetupLakitu         ;do a sub to set up lakitu
           lda #$20
-          ldy HardWorldFlag
+          ldy LevelSet
           beq SetLakXY            ;if in SMB1 levels, use default high position
           ldy WorldNumber
           cpy #World7             ;if in 2J worlds 1-6, branch to use default high position
           bcc SetLakXY            ;otherwise put lakitu lower on the screen
 SetLowLY: lda #$60
 SetLakXY: jsr PutAtRightExtent    ;finish setting up lakitu
+          jsr SetupLakitu         ;assign lakitu the correct bounding box
 RetEOfs:  ldx ObjectOffset        ;get enemy object buffer offset again and leave
 ExLSHand: rts
 
@@ -6799,6 +6800,7 @@ CreateSpiny:
           sec
           sbc #$08
           sta Enemy_Y_Position,x
+          jsr SmallBBox              ;set bounding box control, init attributes
           lda SpinyEggBehavior       ;if replicating original behavior, branch ahead
           beq SetSpSpd               ;so that horizontal speed is set to zero
           lda PseudoRandomBitReg,x   ;get 2 LSB of LSFR and save to Y
@@ -6833,7 +6835,6 @@ SetSpSpd: ldy #$02                   ;set moving direction to the left by defaul
           bmi SpinyRte               ;if spiny egg is set to be thrown left, branch
           dey
 SpinyRte: sty Enemy_MovingDir,x      ;set moving direction to the right
-          jsr SmallBBox              ;set bounding box control, init attributes
           lda #$fd
           sta Enemy_Y_Speed,x        ;set vertical speed to move upwards
           lda #$01
@@ -7339,7 +7340,8 @@ EndFrenzy:
 LakituChk: lda Enemy_ID,y         ;check enemy identifiers
            cmp #Lakitu            ;for lakitu
            bne NextFSlot
-           lda #$01               ;if found, set state
+           lda Enemy_State,y      ;if found, set state to retreat
+           ora #$01
            sta Enemy_State,y
 NextFSlot: dey                    ;move onto the next slot
            bpl LakituChk          ;do this until all slots are checked
@@ -7354,7 +7356,7 @@ InitJumpGPTroopa:
            lda #$02                  ;set for movement to the left
            sta Enemy_MovingDir,x
            lda #$f8                  ;load default horizontal speed
-           ldy HardWorldFlag         ;are we playing SMB1 levels?
+           ldy LevelSet              ;are we playing SMB1 levels?
            beq JumpGPSpd             ;use default horizontal speed if so
            lda #$f4                  ;otherwise load alternate horizontal speed
 JumpGPSpd: sta Enemy_X_Speed,x       ;and store it
@@ -8328,7 +8330,7 @@ ChkVFBD: cmp #$08                 ;if difference => 8 pixels, skip ahead of this
          clc                      ;otherwise get two's compliment
          adc #$01
 ChkFBCl: cmp #$08                 ;if difference < 8 pixels, collision, thus branch
-         bcc ChgSDir              ;to process
+         bcc DmgPlyr              ;to process
 Chk2Ofs: lda $05                  ;if value of $02 was set earlier for whatever reason,
          cmp #$02                 ;branch to increment OAM offset and leave, no collision
          beq NoColFB
@@ -8338,14 +8340,7 @@ Chk2Ofs: lda $05                  ;if value of $02 was set earlier for whatever 
          adc FirebarYPos,y        ;add value loaded with offset to player's vertical coordinate
          inc $05                  ;then increment temp and jump back
          jmp FBCLoop
-ChgSDir: ldx #$01                 ;set movement direction by default
-         lda $04                  ;if OAM X coordinate of player's sprite 1
-         cmp $06                  ;is greater than horizontal coordinate of firebar
-         bcs SetSDir              ;then do not alter movement direction
-         inx                      ;otherwise increment it
-SetSDir: stx Enemy_MovingDir      ;store movement direction here
-         ldx #$00
-         lda $00                  ;save value written to $00 to stack
+DmgPlyr: lda $00                  ;save value written to $00 to stack
          pha
          jsr InjurePlayer         ;perform sub to hurt or kill player
          pla
@@ -8470,7 +8465,7 @@ Fr12S:   lda #Spiny
          sta EnemyFrenzyBuffer      ;set spiny identifier in frenzy buffer
          ldy #$02
 LdLDa:   lda LakituDiffAdj,y        ;load values
-         sta $0001,y                ;store in zero page
+         sta $01,y                  ;store in zero page
          dey
          bpl LdLDa                  ;do this until all values are stired
          jsr PlayerLakituDiff       ;execute sub to set speed and create spinys
@@ -8542,7 +8537,7 @@ ChkSpinyO: lda Enemy_ID,x             ;check for spiny object
 ChkEmySpd: lda Enemy_Y_Speed,x        ;check vertical speed
            bne SubDifAdj              ;branch if nonzero
            ldy #$00                   ;otherwise reinit offset
-SubDifAdj: lda $0001,y                ;get one of three saved values from earlier
+SubDifAdj: lda $01,y                  ;get one of three saved values from earlier
            ldy $00                    ;get saved horizontal difference
 SPixelLak: sec                        ;subtract one for each pixel of horizontal difference
            sbc #$01                   ;from one of three saved values
@@ -8707,6 +8702,8 @@ HammerChk: lda EnemyFrameTimer,x      ;if timer set here not expired yet, skip a
            lda WorldNumber            ;check world number
            cmp #World6
            bcc SetHmrTmr              ;if world 1-5, skip this part (not time to throw hammers yet)
+           lda HardWorldFlag          ;if worlds A-D, do not throw hammers (TO-DO: Make this optional)
+           bne SetHmrTmr
            lda FrameCounter
            and #%00000011             ;check to see if it's time to execute sub
            bne SetHmrTmr              ;if not, skip sub, otherwise
@@ -8727,13 +8724,9 @@ MakeBJump: cmp #$01                   ;if timer not yet about to expire,
            lda #$fe
            sta Enemy_Y_Speed,x        ;set vertical speed to move bowser upwards
 ChkFireB:  lda WorldNumber            ;check world number here
-           cmp #World8                ;world 8?
-           beq SpawnFBr               ;if so, execute this part here
-           cmp #World9                ;world 9?
-           beq SpawnFBr               ;if so, execute this part here
-           cmp #WorldD                ;world D?
-           beq SpawnFBr               ;if so, execute this part here
-           cmp #World6                ;world 6-7 or A-C?
+           cmp #World8                ;world 8+? (TO-DO: Option for SMAS behavior)
+           bcs SpawnFBr               ;if so, execute this part here
+           cmp #World6                ;world 6-7?
            bcs BowserGfxHandler       ;if so, skip this part here
 SpawnFBr:  lda BowserFireBreathTimer  ;check timer here
            bne BowserGfxHandler       ;if not expired yet, skip all of this
@@ -9097,7 +9090,7 @@ ChkPlayerNearPipe:
       lda $00                     ;get saved horizontal difference
       cmp #$13
       bcc PutinPipe               ;if player within a certain distance, branch to leave
-      ldy HardWorldFlag           ;are we dealing with red piranha plants?
+      ldy LevelSet                ;are we dealing with red piranha plants?
       beq ExtD                    ;if we're playing SMB1 levels, nope!
       ldy WorldNumber             ;otherwise, check for world 4+ of SMB2J
       cpy #World4
@@ -9121,7 +9114,7 @@ SetupToMovePPlant:
 
 RiseFallPiranhaPlant:
        sta $00                     ;save vertical coordinate here
-       lda HardWorldFlag           ;check for red piranha plants
+       lda LevelSet                ;check for red piranha plants
        beq GrnPP                   ;no red piranha plants in SMB1 levels
        lda WorldNumber             ;only red piranha plants in world 4+ of SMB2J
        cmp #World4
@@ -10637,7 +10630,7 @@ CheckSideMTiles:
 ContSChk: jsr CheckForCoinMTiles     ;check to see if player touched coin
           bcs HandleCoinMetatile     ;if so, execute code to erase coin and award to player 1 coin
           jsr ChkJumpspringMetatiles ;check for jumpspring metatiles
-          bcc ChkPBtm                ;if not found, branch ahead to continue cude
+          bcc ChkPBtm                ;if not found, branch ahead to continue code
           lda JumpspringAnimCtrl     ;otherwise check jumpspring animation control
           bne ExCSM                  ;branch to leave if set
           jmp StopPlayerMove         ;otherwise jump to impede player's movement
@@ -10871,7 +10864,7 @@ HandlePipeEntry:
           sta Player_SprAttrib      ;set background priority bit in player's attributes
           lda WarpZoneControl       ;check warp zone control
           beq ExPipeE               ;branch to leave if none found
-          ldy HardWorldFlag         ;are we in SMB1?
+          ldy LevelSet              ;are we in SMB1?
           beq SMB1WarpZoneHandler	;if so, use all stars warp-zone handler
           and #%00001111            ;mask bits
           asl
@@ -12258,7 +12251,7 @@ EnemyGfxHandler:
        cmp #PiranhaPlant           ;is enemy object piranha plant?
        bne CheckForRetainerObj     ;if not, branch
        ldy #$02                    ;default data makes red piranha plants
-       lda HardWorldFlag
+       lda LevelSet
        beq GPlnt                   ;make green piranha plants if playing SMB1 levels
        lda WorldNumber
        cmp #$03
@@ -12301,14 +12294,16 @@ CheckForJumpspring:
        cmp #JumpspringObject        ;check for jumpspring object
        bne CheckForPodoboo
        lda #$02
-       ldy HardWorldFlag            ;check if we're playing SMB1 levels
+       ldy LevelSet                 ;check if we're playing SMB1 levels
        beq RedJS                    ;if so, paint jumpsprings red
-       ldy WorldNumber              ;if the world number is not 2, 3, 7 or C
+       ldy WorldNumber              ;if the world number is not 2, 3, 7, B or C
        cpy #World2                  ;then use regular attributes for jumpsprings
        beq GrnJS                    ;which will paint them red
        cpy #World3
        beq GrnJS
        cpy #World7
+       beq GrnJS
+       cpy #WorldB
        beq GrnJS                    ;otherwise use alternate attributes
        cpy #WorldC                  ;to get the green superhigh jumpsprings
        bne RedJS
@@ -13739,7 +13734,8 @@ InitWorldPos:
            lda #$00
            sta FileListNumber    ;reset filelist number
            sta WorldNumber       ;reset world number
-           sta HardWorldFlag     ;force player to start at SMB1 levels
+           sta HardWorldFlag     ;reset flag related to worlds A-D
+           sta LevelSet          ;force player to start at SMB1 levels
            ;lda #$03              ;load title screen graphics data
            ;jsr GraphicsLoader
            jmp ResetDiskIOTask   ;end disk subroutines
@@ -13754,7 +13750,7 @@ GameModeDiskRoutines:
 LoadWindWorlds5ThruD:
 	  ;lda #Spr_MainBank+1
 	  ;jsr SwitchSPR_CHR0       ;overwrite princess graphics with door again
-      lda HardWorldFlag     ;if in SMB1 levels
+      lda LevelSet          ;if in SMB1 levels
       beq ResetDiskIOTask   ;then leave without loading anything
       ;lda WorldNumber       ;if in 2J worlds 1-4
       ;cmp #World5           ;then leave without loading anything
@@ -13860,8 +13856,8 @@ ContinueOrRetry:
   bne RetryGame                ;if not selected "save", don't save progress
   lda WorldNumber              ;otherwise save world number and worlds completed
   sta ContinueWorld
-  lda HardWorldFlag
-  sta SavedHardWorldFlag
+  lda LevelSet
+  sta SavedLevelSet
   lda CompletedWorlds
   sta SavedCompletedWorlds
 RetryGame:
@@ -13915,14 +13911,17 @@ GameMenuRoutine:
               sta WorldNumber
               sta CompletedWorlds
               sta DiskIOTask
-              sta HardWorldFlag
+              sta LevelSet
               lda SavedJoypadBits
               and #A_Button               ;check if the player pressed A + start
               beq StG                     ;if not, start the game as usual at world 1
               lda ContinueWorld           ;otherwise load save data to start at previous world
               sta WorldNumber
-              lda SavedHardWorldFlag
-              sta HardWorldFlag
+              cmp #WorldA
+              bcc @num_worlds
+              inc HardWorldFlag
+@num_worlds:  lda SavedLevelSet
+              sta LevelSet
               lda SavedCompletedWorlds
               sta CompletedWorlds
 StG:          jmp StartGame
@@ -14086,6 +14085,7 @@ InitializeGame:
             lda #$00
             sta CompletedWorlds      ;clean slate player's progress (except for games beaten)
             sta HardWorldFlag
+            sta LevelSet
             sta SelectedPlayer
             ldy #$6f                 ;clear all memory as in initialization procedure,
             jsr InitializeMemory     ;but this time, clear only as far as $076f
@@ -14147,7 +14147,7 @@ UpsideDownPipe_High:
        pha
        bne UDP
 UpsideDownPipe_Low:
-       lda HardWorldFlag            ;playing 2J levels?
+       lda LevelSet                 ;playing 2J levels?
        bne UDPJ                     ;if so, use standard position
        lda #$03                     ;otherwise start at fourth row like
        pha                          ;that god-forsaken upside-down pipe
@@ -14524,21 +14524,21 @@ RunMushroomRetainers:
 ExRMR: rts
 
 EndingDiskRoutines:
-    lda DiskIOTask
-    jsr JumpEngine
+    ;lda DiskIOTask
+    ;jsr JumpEngine
 
-    .word DiskScreen
-    .word UpdateGamesBeaten
+    ;.word DiskScreen
+    ;.word UpdateGamesBeaten
 
 UpdateGamesBeaten:
-    lda GamesBeatenCount     ;get the new count of games beaten
-    clc                      ;note that this code is skipped if not on world D
-    adc #$01                 ;add one to it, to a maximum of 18/$12
-    cmp #19
-    bcc SetS2S
-    lda #18                  ;sorry, only 18 stars allowed
+    ;lda GamesBeatenCount     ;get the new count of games beaten
+    ;clc                      ;note that this code is skipped if not on world D
+    ;adc #$01                 ;add one to it, to a maximum of 18/$12
+    ;cmp #19
+    ;bcc SetS2S
+    ;lda #18                  ;sorry, only 18 stars allowed
 SetS2S:
-    sta GamesBeatenCount
+    ;sta GamesBeatenCount
 
 BackToNormal:
     lda #$00
@@ -14563,7 +14563,7 @@ EndTheGame:
     lda #$00
     sta CompletedWorlds      ;init completed worlds flag
     sta ContinueWorld        ;reset saved progress
-    sta SavedHardWorldFlag
+    sta SavedLevelSet
     sta SavedCompletedWorlds
     lda #GameOverMode        ;set game over mode
     sta OperMode
@@ -14852,7 +14852,7 @@ LoadGameTileset:
       lda #SPR_SMB1_INDEX
       ldy TilesetSelection
       bne @static_tileset
-      ldy HardWorldFlag
+      ldy LevelSet
       beq @write_tileset
       bne @smb2_tileset
 @static_tileset:

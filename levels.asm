@@ -14,24 +14,24 @@ GetAreaType: and #%01100000       ;mask out all but d6 and d5
 FindAreaPointer:
       lda WorldNumber        ;load offset from world variable
       tay
-      lda HardWorldFlag      ;are we playing 2J levels?
+      lda LevelSet           ;are we playing 2J levels?
       bne FindAreaPointerJ   ;yes, use 2J offsets instead
       lda WorldAddrOffsets,y
-	  clc
+      clc
       adc AreaNumber         ;add area number used to find data
       tay
       lda AreaAddrOffsets,y  ;from there we have our area pointer
       rts
 FindAreaPointerJ:
       lda WorldAddrOffsetsJ,y
-	  clc
+      clc
       adc AreaNumber         ;add area number used to find data
       tay
       lda AreaAddrOffsetsJ,y  ;from there we have our area pointer
       rts
 
 GetAreaPointer:
-     lda HardWorldFlag         ;are we playing 2J levels?
+     lda LevelSet              ;are we playing 2J levels?
      bne GetAreaPointerJ       ;yes, use 2J offsets instead
      ldx WorldAddrOffsets,y    ;get offset to where this world's area offsets are
      ldy AreaAddrOffsets,x     ;get area offset based on world offset
@@ -48,7 +48,7 @@ GetAreaDataAddrs:
             lda AreaPointer            ;mask out all but 5 LSB
             and #%00011111
             sta AreaAddrsLOffset       ;save as low offset
-            lda HardWorldFlag          ;check if playing 2J levels
+            lda LevelSet               ;check if playing 2J levels
             bne GetAreaDataAddrsJ      ;if so, refer to alternate offsets
             lda EnemyAddrHOffsets,y    ;load base value with 2 altered MSB,
             clc                        ;then add base value to 5 LSB, result
@@ -71,9 +71,8 @@ GetAreaDataAddrs:
             sta AreaDataLow
             jmp ContinueAreaDataAddrs
 GetAreaDataAddrsJ:
-            lda WorldNumber           ;playing 2J letter worlds?
-            cmp #WorldA
-            bcs GetAreaDataAddrsL     ;yes, alternate offsets
+            lda HardWorldFlag         ;playing 2J letter worlds?
+            bne GetAreaDataAddrsL     ;yes, alternate offsets
             lda EnemyAddrHOffsetsJ,y  ;load base value with 2 altered MSB,
             clc                        ;then add base value to 5 LSB, result
             adc AreaAddrsLOffset       ;becomes offset for level data
@@ -322,86 +321,86 @@ AreaDataAddrsL:
 
 ;level 1-4/6-4
 E_CastleArea1_:
-      .incbin "levels/E_1-4_6-4.bin"
+      .incbin "levels/smb1/E_1-4_6-4.bin"
 
 ;level 4-4
 E_CastleArea2_:
-      .incbin "levels/E_4-4.bin"
+      .incbin "levels/smb1/E_4-4.bin"
 
 ;level 2-4/5-4
 E_CastleArea3_:
-      .incbin "levels/E_2-4_5-4.bin"
+      .incbin "levels/smb1/E_2-4_5-4.bin"
 
 ;level 3-4
 E_CastleArea4_:
-      .incbin "levels/E_3-4.bin"
+      .incbin "levels/smb1/E_3-4.bin"
 
 ;level 7-4
 E_CastleArea5_:
-      .incbin "levels/E_7-4.bin"
+      .incbin "levels/smb1/E_7-4.bin"
 
 ;level 8-4
 E_CastleArea6_:
-      .incbin "levels/E_8-4.bin"
+      .incbin "levels/smb1/E_8-4.bin"
 
 ;level 3-3
 E_GroundArea1_:
-      .incbin "levels/E_3-3.bin"
+      .incbin "levels/smb1/E_3-3.bin"
 
 ;level 8-3
 E_GroundArea2_:
-      .incbin "levels/E_8-3.bin"
+      .incbin "levels/smb1/E_8-3.bin"
 
 ;level 4-1
 E_GroundArea3_:
-      .incbin "levels/E_4-1.bin"
+      .incbin "levels/smb1/E_4-1.bin"
 
 ;level 6-2
 E_GroundArea4_:
-      .incbin "levels/E_6-2.bin"
+      .incbin "levels/smb1/E_6-2.bin"
 
 ;level 3-1
 E_GroundArea5_:
-      .incbin "levels/E_3-1.bin"
+      .incbin "levels/smb1/E_3-1.bin"
 
 ;level 1-1
 E_GroundArea6_:
-      .incbin "levels/E_1-1.bin"
+      .incbin "levels/smb1/E_1-1.bin"
 
 ;level 1-3/5-3
 E_GroundArea7_:
-      .incbin "levels/E_1-3_5-3.bin"
+      .incbin "levels/smb1/E_1-3_5-3.bin"
 
 ;level 2-3/7-3
 E_GroundArea8_:
-      .incbin "levels/E_2-3_7-3.bin"
+      .incbin "levels/smb1/E_2-3_7-3.bin"
 
 ;level 2-1
 E_GroundArea9_:
-      .incbin "levels/E_2-1.bin"
+      .incbin "levels/smb1/E_2-1.bin"
 ;end of data terminator here is also used by pipe intro area
 E_GroundArea10_:
       .byte $ff
 
 ;level 5-1
 E_GroundArea11_:
-      .incbin "levels/E_5-1.bin"
+      .incbin "levels/smb1/E_5-1.bin"
 
 ;cloud level used in levels 2-1 and 5-2
 E_GroundArea12_:
-      .incbin "levels/E_CLOUD1.bin"
+      .incbin "levels/smb1/E_CLOUD1.bin"
 
 ;level 4-3
 E_GroundArea13_:
-      .incbin "levels/E_4-3.bin"
+      .incbin "levels/smb1/E_4-3.bin"
 
 ;level 6-3
 E_GroundArea14_:
-      .incbin "levels/E_6-3.bin"
+      .incbin "levels/smb1/E_6-3.bin"
 
 ;level 6-1
 E_GroundArea15_:
-      .incbin "levels/E_6-1.bin"
+      .incbin "levels/smb1/E_6-1.bin"
 
 ;warp zone area used in level 4-2
 E_GroundArea16_:
@@ -409,221 +408,221 @@ E_GroundArea16_:
 
 ;level 8-1
 E_GroundArea17_:
-      .incbin "levels/E_8-1.bin"
+      .incbin "levels/smb1/E_8-1.bin"
 
 ;level 5-2
 E_GroundArea18_:
-      .incbin "levels/E_5-2.bin"
+      .incbin "levels/smb1/E_5-2.bin"
 
 ;level 8-2
 E_GroundArea19_:
-      .incbin "levels/E_8-2.bin"
+      .incbin "levels/smb1/E_8-2.bin"
 
 ;level 7-1
 E_GroundArea20_:
-      .incbin "levels/E_7-1.bin"
+      .incbin "levels/smb1/E_7-1.bin"
 
 ;cloud level used in levels 3-1 and 6-2
 E_GroundArea21_:
-      .incbin "levels/E_CLOUD2.bin"
+      .incbin "levels/smb1/E_CLOUD2.bin"
 
 ;level 3-2
 E_GroundArea22_:
-      .incbin "levels/E_3-2.bin"
+      .incbin "levels/smb1/E_3-2.bin"
 
 ;level 1-2
 E_UndergroundArea1_:
-      .incbin "levels/E_1-2.bin"
+      .incbin "levels/smb1/E_1-2.bin"
 
 ;level 4-2
 E_UndergroundArea2_:
-      .incbin "levels/E_4-2.bin"
+      .incbin "levels/smb1/E_4-2.bin"
 
 ;underground bonus rooms area used in many levels
 E_UndergroundArea3_:
-      .incbin "levels/E_BONUS.bin"
+      .incbin "levels/smb1/E_BONUS.bin"
 
 ;level 9-4
 E_UndergroundArea4_:
-      .incbin "levels/E_9-4.bin"
+      .incbin "levels/smb1/E_9-4.bin"
 
 ;water area used in levels 5-2 and 6-2
 E_WaterArea1_:
-      .incbin "levels/E_WATER.bin"
+      .incbin "levels/smb1/E_WATER.bin"
 
 ;level 2-2/7-2
 E_WaterArea2_:
-      .incbin "levels/E_2-2_7-2.bin"
+      .incbin "levels/smb1/E_2-2_7-2.bin"
 
 ;water area used in level 8-4
 E_WaterArea3_:
-      .incbin "levels/E_8-4WATER.bin"
+      .incbin "levels/smb1/E_8-4WATER.bin"
 
 ;level 9-1
 E_WaterArea4_:
-      .incbin "levels/E_9-1.bin"
+      .incbin "levels/smb1/E_9-1.bin"
 
 ;level 9-2
 E_WaterArea5_:
-      .incbin "levels/E_9-2.bin"
+      .incbin "levels/smb1/E_9-2.bin"
 
 ;level 9-3
 E_WaterArea6_:
-      .incbin "levels/E_9-3.bin"
+      .incbin "levels/smb1/E_9-3.bin"
 
 ;AREA OBJECT DATA
 
 ;level 1-4/6-4
 L_CastleArea1_:
-      .incbin "levels/L_1-4_6-4.bin"
+      .incbin "levels/smb1/L_1-4_6-4.bin"
 
 ;level 4-4
 L_CastleArea2_:
-      .incbin "levels/L_4-4.bin"
+      .incbin "levels/smb1/L_4-4.bin"
 
 ;level 2-4/5-4
 L_CastleArea3_:
-      .incbin "levels/L_2-4_5-4.bin"
+      .incbin "levels/smb1/L_2-4_5-4.bin"
 
 ;level 3-4
 L_CastleArea4_:
-      .incbin "levels/L_3-4.bin"
+      .incbin "levels/smb1/L_3-4.bin"
 
 ;level 7-4
 L_CastleArea5_:
-      .incbin "levels/L_7-4.bin"
+      .incbin "levels/smb1/L_7-4.bin"
 
 ;level 8-4
 L_CastleArea6_:
-      .incbin "levels/L_8-4.bin"
+      .incbin "levels/smb1/L_8-4.bin"
 
 ;level 3-3
 L_GroundArea1_:
-      .incbin "levels/L_3-3.bin"
+      .incbin "levels/smb1/L_3-3.bin"
 
 ;level 8-3
 L_GroundArea2_:
-      .incbin "levels/L_8-3.bin"
+      .incbin "levels/smb1/L_8-3.bin"
 
 ;level 4-1
 L_GroundArea3_:
-      .incbin "levels/L_4-1.bin"
+      .incbin "levels/smb1/L_4-1.bin"
 
 ;level 6-2
 L_GroundArea4_:
-      .incbin "levels/L_6-2.bin"
+      .incbin "levels/smb1/L_6-2.bin"
 
 ;level 3-1
 L_GroundArea5_:
-      .incbin "levels/L_3-1.bin"
+      .incbin "levels/smb1/L_3-1.bin"
 
 ;level 1-1
 L_GroundArea6_:
-      .incbin "levels/L_1-1.bin"
+      .incbin "levels/smb1/L_1-1.bin"
 
 ;level 1-3/5-3
 L_GroundArea7_:
-      .incbin "levels/L_1-3_5-3.bin"
+      .incbin "levels/smb1/L_1-3_5-3.bin"
 
 ;level 2-3/7-3
 L_GroundArea8_:
-      .incbin "levels/L_2-3_7-3.bin"
+      .incbin "levels/smb1/L_2-3_7-3.bin"
 
 ;level 2-1
 L_GroundArea9_:
-      .incbin "levels/L_2-1.bin"
+      .incbin "levels/smb1/L_2-1.bin"
 
 ;pipe intro area
 L_GroundArea10_:
-      .incbin "levels/L_PIPE.bin"
+      .incbin "levels/smb1/L_PIPE.bin"
 
 ;level 5-1
 L_GroundArea11_:
-      .incbin "levels/L_5-1.bin"
+      .incbin "levels/smb1/L_5-1.bin"
 
 ;cloud level used in levels 2-1 and 5-2
 L_GroundArea12_:
-      .incbin "levels/L_CLOUD1.bin"
+      .incbin "levels/smb1/L_CLOUD1.bin"
 
 ;level 4-3
 L_GroundArea13_:
-      .incbin "levels/L_4-3.bin"
+      .incbin "levels/smb1/L_4-3.bin"
 
 ;level 6-3
 L_GroundArea14_:
-      .incbin "levels/L_6-3.bin"
+      .incbin "levels/smb1/L_6-3.bin"
 
 ;level 6-1
 L_GroundArea15_:
-      .incbin "levels/L_6-1.bin"
+      .incbin "levels/smb1/L_6-1.bin"
 
 ;warp zone area used in level 4-2
 L_GroundArea16_:
-      .incbin "levels/L_WARP.bin"
+      .incbin "levels/smb1/L_WARP.bin"
 
 ;level 8-1
 L_GroundArea17_:
-      .incbin "levels/L_8-1.bin"
+      .incbin "levels/smb1/L_8-1.bin"
 
 ;level 5-2
 L_GroundArea18_:
-      .incbin "levels/L_5-2.bin"
+      .incbin "levels/smb1/L_5-2.bin"
 
 ;level 8-2
 L_GroundArea19_:
-      .incbin "levels/L_8-2.bin"
+      .incbin "levels/smb1/L_8-2.bin"
 
 ;level 7-1
 L_GroundArea20_:
-      .incbin "levels/L_7-1.bin"
+      .incbin "levels/smb1/L_7-1.bin"
 
 ;cloud level used in levels 3-1 and 6-2
 L_GroundArea21_:
-      .incbin "levels/L_CLOUD2.bin"
+      .incbin "levels/smb1/L_CLOUD2.bin"
 
 ;level 3-2
 L_GroundArea22_:
-      .incbin "levels/L_3-2.bin"
+      .incbin "levels/smb1/L_3-2.bin"
 
 ;level 1-2
 L_UndergroundArea1_:
-      .incbin "levels/L_1-2.bin"
+      .incbin "levels/smb1/L_1-2.bin"
 
 ;level 4-2
 L_UndergroundArea2_:
-      .incbin "levels/L_4-2.bin"
+      .incbin "levels/smb1/L_4-2.bin"
 
 ;underground bonus rooms area used in many levels
 L_UndergroundArea3_:
-      .incbin "levels/L_BONUS.bin"
+      .incbin "levels/smb1/L_BONUS.bin"
 
 ;level 9-4
 L_UndergroundArea4_:
-      .incbin "levels/L_9-4.bin"
+      .incbin "levels/smb1/L_9-4.bin"
 
 ;water area used in levels 5-2 and 6-2
 L_WaterArea1_:
-      .incbin "levels/L_WATER.bin"
+      .incbin "levels/smb1/L_WATER.bin"
 
 ;level 2-2/7-2
 L_WaterArea2_:
-      .incbin "levels/L_2-2_7-2.bin"
+      .incbin "levels/smb1/L_2-2_7-2.bin"
 
 ;water area used in level 8-4
 L_WaterArea3_:
-      .incbin "levels/L_8-4WATER.bin"
+      .incbin "levels/smb1/L_8-4WATER.bin"
 
 ;level 9-1
 L_WaterArea4_:
-      .incbin "levels/L_9-1.bin"
+      .incbin "levels/smb1/L_9-1.bin"
 
 ;level 9-2
 L_WaterArea5_:
-      .incbin "levels/L_9-2.bin"
+      .incbin "levels/smb1/L_9-2.bin"
 
 ;level 9-3
 L_WaterArea6_:
-      .incbin "levels/L_9-3.bin"
+      .incbin "levels/smb1/L_9-3.bin"
 
 ;-------------------------------------------------------------------------------------
 
@@ -1107,7 +1106,7 @@ L_CastleArea8:
 
 ;level 9-3
 L_CastleArea9:
-    .byte $55, $31, $0d, $01, $cf, $33, $fe, $39, $fe, $b2, $2e, $be, $fe, $31, $29, $8f
+    .byte $d5, $31, $0d, $01, $cf, $33, $fe, $39, $fe, $b2, $2e, $be, $fe, $31, $29, $8f
     .byte $9e, $43, $fe, $30, $16, $b1, $23, $09, $4e, $31, $4e, $40, $d7, $e0, $e6, $61
     .byte $fe, $3e, $f5, $62, $fa, $60, $0c, $df, $0c, $df, $0c, $d1, $1e, $3c, $2d, $40
     .byte $4e, $32, $5e, $36, $5e, $42, $ce, $38, $0d, $0b, $8e, $36, $8e, $40, $87, $37
@@ -1248,7 +1247,7 @@ L_GroundArea8:
 
 ;level 4-2
 L_GroundArea9:
-  .byte $50, $a1, $0f, $26, $17, $91, $19, $11, $48, $00, $68, $11, $6a, $10, $96, $14
+  .byte $d0, $a1, $0f, $26, $17, $91, $19, $11, $48, $00, $68, $11, $6a, $10, $96, $14
   .byte $d8, $0a, $e8, $02, $f8, $02, $dc, $81, $6c, $81, $89, $0f, $9c, $00, $c3, $29
   .byte $f8, $62, $47, $a7, $c6, $61, $0d, $07, $56, $74, $b7, $00, $b9, $11, $cc, $76
   .byte $ed, $4a, $1c, $80, $37, $01, $3a, $10, $de, $20, $e9, $0b, $ee, $21, $c8, $bc
@@ -1335,7 +1334,7 @@ L_GroundArea17:
 
 ;level 7-3
 L_GroundArea18:
-  .byte $57, $11, $0f, $26, $fe, $10, $4b, $92, $59, $0f, $ad, $4c, $d3, $93, $0b, $94
+  .byte $d7, $11, $0f, $26, $fe, $10, $4b, $92, $59, $0f, $ad, $4c, $d3, $93, $0b, $94
   .byte $29, $0f, $7b, $93, $99, $0f, $0d, $06, $27, $12, $35, $0f, $23, $b1, $57, $75
   .byte $a3, $31, $ab, $71, $f7, $75, $23, $b1, $87, $13, $95, $0f, $0d, $0a, $23, $35
   .byte $38, $13, $55, $00, $9b, $16, $0b, $96, $c7, $75, $3b, $92, $49, $0f, $ad, $4c
@@ -1368,7 +1367,7 @@ L_GroundArea21:
 
 ;level 8-2
 L_GroundArea22:
-  .byte $50, $61, $0f, $26, $bb, $f1, $dc, $06, $23, $87, $b5, $71, $b7, $31, $d7, $28
+  .byte $d0, $61, $0f, $26, $bb, $f1, $dc, $06, $23, $87, $b5, $71, $b7, $31, $d7, $28
   .byte $06, $c5, $67, $08, $0d, $05, $39, $71, $7c, $00, $9e, $62, $b6, $0b, $e6, $08
   .byte $4e, $e0, $5d, $4c, $59, $0f, $6c, $02, $93, $67, $ac, $56, $ad, $4c, $1f, $b1
   .byte $3c, $01, $98, $0a, $9e, $20, $a8, $21, $f3, $09, $0e, $a1, $27, $20, $3e, $62
@@ -1423,7 +1422,7 @@ L_GroundArea30:
 
 ;level A-3
 L_GroundArea31:
-  .byte $50, $50, $0b, $1f, $0f, $26, $19, $96, $84, $43, $b7, $1f, $5d, $cc, $6d, $48
+  .byte $d0, $50, $0b, $1f, $0f, $26, $19, $96, $84, $43, $b7, $1f, $5d, $cc, $6d, $48
   .byte $e0, $42, $e3, $12, $39, $9c, $56, $43, $47, $9b, $a4, $12, $c1, $06, $ed, $4d
   .byte $f4, $42, $1b, $98, $b7, $13, $02, $c2, $03, $12, $47, $1f, $ad, $48, $63, $9c
   .byte $82, $48, $76, $93, $08, $94, $8e, $11, $b0, $03, $c9, $0f, $1d, $c1, $2d, $4a
@@ -1465,7 +1464,7 @@ L_GroundArea34:
 
 ;level C-2
 L_GroundArea35:
-  .byte $54, $11, $0f, $26, $cf, $32, $f8, $62, $fe, $10, $3c, $b2, $bd, $48, $ea, $62
+  .byte $d4, $11, $0f, $26, $cf, $32, $f8, $62, $fe, $10, $3c, $b2, $bd, $48, $ea, $62
   .byte $fc, $4d, $fc, $4d, $17, $c9, $da, $62, $0b, $97, $b7, $12, $2c, $b1, $33, $43
   .byte $6c, $31, $ac, $41, $0b, $98, $ad, $4a, $db, $30, $27, $b0, $b7, $14, $c6, $42
   .byte $c7, $96, $d6, $44, $2b, $92, $39, $0f, $72, $41, $a7, $00, $1b, $95, $97, $13
@@ -1474,7 +1473,7 @@ L_GroundArea35:
 
 ;level C-3
 L_GroundArea36:
-  .byte $57, $11, $0f, $26, $fe, $10, $4b, $92, $59, $0f, $ad, $4c, $d3, $93, $0b, $94
+  .byte $d7, $11, $0f, $26, $fe, $10, $4b, $92, $59, $0f, $ad, $4c, $d3, $93, $0b, $94
   .byte $29, $0f, $7b, $93, $99, $0f, $0d, $06, $27, $12, $35, $0f, $23, $b1, $57, $75
   .byte $a3, $31, $ab, $71, $f7, $75, $23, $b1, $87, $13, $95, $0f, $0d, $0a, $23, $35
   .byte $38, $13, $55, $00, $9b, $16, $0b, $96, $c7, $75, $dd, $4a, $3b, $92, $49, $0f
@@ -1556,7 +1555,7 @@ L_UndergroundArea3:
 
 ;level 5-2
 L_UndergroundArea4:
-  .byte $48, $0f, $1e, $01, $27, $06, $5e, $02, $8f, $63, $8c, $01, $ef, $67, $1c, $81
+  .byte $c8, $0f, $1e, $01, $27, $06, $5e, $02, $8f, $63, $8c, $01, $ef, $67, $1c, $81
   .byte $2e, $09, $3c, $63, $73, $01, $8c, $60, $fe, $02, $1e, $8e, $3e, $02, $44, $07
   .byte $45, $52, $4e, $0e, $8e, $02, $99, $71, $b5, $24, $b6, $24, $b7, $24, $fe, $02
   .byte $07, $87, $17, $22, $37, $52, $37, $0b, $47, $52, $4e, $0a, $57, $52, $5e, $02
@@ -1580,7 +1579,7 @@ L_UndergroundArea5:
 
 ;level A-2
 L_UndergroundArea6:
-  .byte $48, $8f, $1e, $01, $4e, $02, $00, $8c, $09, $0f, $6e, $0a, $ee, $82, $2e, $80
+  .byte $c8, $8f, $1e, $01, $4e, $02, $00, $8c, $09, $0f, $6e, $0a, $ee, $82, $2e, $80
   .byte $30, $20, $7e, $01, $87, $27, $07, $87, $17, $23, $3e, $00, $9e, $05, $5b, $f1
   .byte $8b, $71, $bb, $71, $eb, $71, $3e, $82, $7f, $38, $fe, $0a, $3e, $84, $47, $29
   .byte $48, $2e, $af, $71, $cb, $71, $e7, $0a, $f7, $23, $2b, $f1, $37, $51, $3e, $00
@@ -1659,7 +1658,7 @@ L_WaterArea6:
 
 ;level 9-2
 L_WaterArea7:
-    .byte $50, $11, $d7, $73, $fe, $1a, $6f, $e2, $1f, $e5, $bf, $63, $c7, $a8, $df, $61
+    .byte $90, $11, $d7, $73, $fe, $1a, $6f, $e2, $1f, $e5, $bf, $63, $c7, $a8, $df, $61
     .byte $15, $f1, $7f, $62, $9b, $2f, $a8, $72, $fe, $10, $69, $f1, $b7, $25, $c5, $71
     .byte $33, $ac, $5f, $71, $8d, $4a, $aa, $14, $d1, $71, $17, $95, $26, $42, $72, $42
     .byte $73, $12, $7a, $14, $c6, $14, $d5, $42, $fe, $11, $7f, $b8, $8d, $c1, $cf, $26
@@ -1667,7 +1666,7 @@ L_WaterArea7:
 
 ;level 9-4
 L_WaterArea8:
-    .byte $57, $00, $0b, $3f, $0b, $bf, $0b, $bf, $73, $36, $9a, $30, $a5, $64, $b6, $31
+    .byte $97, $00, $0b, $3f, $0b, $bf, $0b, $bf, $73, $36, $9a, $30, $a5, $64, $b6, $31
     .byte $d4, $61, $0b, $bf, $13, $63, $4a, $60, $53, $66, $a5, $34, $b3, $67, $e5, $65
     .byte $f4, $60, $0b, $bf, $14, $60, $53, $67, $67, $32, $c4, $62, $d4, $31, $f3, $61
     .byte $fa, $60, $0b, $bf, $04, $30, $09, $61, $14, $65, $63, $65, $6a, $60, $0b, $bf

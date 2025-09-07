@@ -13,7 +13,7 @@ ContinueWorld:
 ContinueLevel: ;only for easy mode
 	.byte $00
 	
-SavedHardWorldFlag:
+SavedLevelSet:
 	.byte $00
 
 SavedCompletedWorlds:
@@ -46,6 +46,9 @@ SaveData_End:
 
 CurrentGame:
 	.byte $00
+
+LevelSet:
+    .byte $00
 
 LeavesXPosCopy:
 	.res $0c, $00
