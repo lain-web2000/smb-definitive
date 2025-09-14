@@ -20,5 +20,3 @@ bg_main:
 .incbin "chr/bg_title.chr"
 spr_main:
 .incbin "chr/spr_main.chr"
-wateranim:
-.incbin "chr/wateranim.chr"

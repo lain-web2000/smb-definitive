@@ -370,8 +370,6 @@ VictoryModeSubsForW8andD:
     .word PlayerVictoryWalk
     .word StartVMDelay
     .word ContinueVMDelay
-    .word VictoryModeDiskRoutines
-    .word ScreenSubsForFinalRoom    ;all these subs are in SM2DATA3
     .word PrintVictoryMsgsForWorld8 
     .word EndCastleAward            ;except this one
     .word AwardExtraLives           
@@ -3618,11 +3616,28 @@ GameCoreRoutine:
       bcs GameEngine             ;branch to the game engine itself
       rts
 
-WaterAnimIntervals:				 ;lookup table for water animation speed 
-	  .byte $0a, $10, $10, $10   ;10 frames for water area types, 16 frames for everything else
+WaterAnimIntervals:              ;lookup table for water animation speed 
+	  .byte 10, 16, 16, 16     ;10 frames for water area types, 16 frames for everything else
+
+WaterAnimOffsets:
+        .byte WaterAnimFrame1-WaterAnimTiles
+        .byte WaterAnimFrame2-WaterAnimTiles
+        .byte WaterAnimFrame3-WaterAnimTiles
+        .byte WaterAnimFrame4-WaterAnimTiles
 
 WaterAnimTiles:
-	  .incbin "chr/wateranim.chr"
+WaterAnimFrame1:
+        .byte $06, $a0, $10
+	  .incbin "chr/water_frame1.chr"
+WaterAnimFrame2:
+        .byte $06, $a0, $10
+	  .incbin "chr/water_frame2.chr"
+WaterAnimFrame3:
+        .byte $06, $a0, $10
+	  .incbin "chr/water_frame3.chr"
+WaterAnimFrame4:
+        .byte $06, $a0, $10
+	  .incbin "chr/water_frame4.chr"
 
 GameEngine:
               jsr ProcFireball_Bubble    ;process fireballs and air bubbles
@@ -3650,40 +3665,31 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr RunGameTimer           ;count down the game timer
               jsr ColorRotation          ;cycle one of the background colors
               jsr SimulateWind           ;otherwise, simulate wind where needed
-NoWind:       lda WaterAnimTimer		 
-			  bne NoWAnim
-			  ldy AreaType
-			  lda WaterAnimIntervals,y
-			  sta WaterAnimTimer
-			  inc WaterAnimCurrentTile
-			  lda WaterAnimCurrentTile
-			  and #$03
-			  sta WaterAnimCurrentTile
-			  asl
-			  asl
-			  asl
-			  asl
-			  tay
-			  ldx VRAM_Buffer1_Offset
-			  lda #$06
-			  sta VRAM_Buffer1,x
-			  lda #$a0
-			  sta VRAM_Buffer1+1,x
-			  lda #$10
-			  sta VRAM_Buffer1+2,x
-			: lda WaterAnimTiles,y
-			  sta VRAM_Buffer1+3,x
-			  inx
-			  iny
-			  cpx #$10
-			  bcc :-
-			  lda #$00
-			  sta VRAM_Buffer1+3,x
-			  txa
-			  clc
-			  adc #$03
-			  adc VRAM_Buffer1_Offset
-			  sta VRAM_Buffer1_Offset
+NoWind:       lda WaterAnimTimer
+              bne NoWAnim
+              ldy AreaType
+              lda WaterAnimIntervals,y
+              sta WaterAnimTimer
+              inc WaterAnimCurrentTile
+              lda WaterAnimCurrentTile
+              and #$03
+              sta WaterAnimCurrentTile
+              tay
+              lda WaterAnimOffsets,y
+              tay
+              ldx VRAM_Buffer1_Offset
+              lda #19
+              sta $00
+:             lda WaterAnimTiles,y
+              sta VRAM_Buffer1,x
+              iny
+              inx
+              dec $00
+              bne :-
+              lda #$00
+              sta VRAM_Buffer1,x
+              txa
+              sta VRAM_Buffer1_Offset
 NoWAnim:      lda Player_Y_HighPos
               cmp #$02                   ;if player is below the screen, don't bother with the music
               bpl NoChgMus
@@ -13742,8 +13748,6 @@ StartTheGame:
          sta OperMode_Task
          sta DemoTimer
          rts
-         ;lda #$02
-         ;jmp GraphicsLoader        ;replace title screen gfx data
 
 AttractModeDiskRoutines:
       lda DiskIOTask
@@ -13758,8 +13762,6 @@ InitWorldPos:
            sta WorldNumber       ;reset world number
            sta HardWorldFlag     ;reset flag related to worlds A-D
            sta LevelSet          ;force player to start at SMB1 levels
-           ;lda #$03              ;load title screen graphics data
-           ;jsr GraphicsLoader
            jmp ResetDiskIOTask   ;end disk subroutines
 
 GameModeDiskRoutines:
@@ -13770,8 +13772,6 @@ GameModeDiskRoutines:
       .word LoadWindWorlds5ThruD
 
 LoadWindWorlds5ThruD:
-	  ;lda #Spr_MainBank+1
-	  ;jsr SwitchSPR_CHR0       ;overwrite princess graphics with door again
       lda LevelSet          ;if in SMB1 levels
       beq ResetDiskIOTask   ;then leave without loading anything
       ;lda WorldNumber       ;if in 2J worlds 1-4
@@ -13793,29 +13793,14 @@ VMDelay:
       rts
 
 StartVMDelay:
-      lda #$10           ;start world end delay
-      sta EndGameTimer
+      lda #$40           ;start world end delay
+      sta WorldEndTimer
       bne VMDelay
 
 ContinueVMDelay:
-      lda EndGameTimer  ;wait for delay to end, then move on
+      lda WorldEndTimer  ;wait for delay to end, then move on
       beq VMDelay
       rts
-
-VictoryModeDiskRoutines:
-      lda DiskIOTask
-      jsr JumpEngine
-
-      .word DiskScreen
-      .word LoadEnding
-
-LoadEnding:
-        ;lda #$01
-        ;jsr GraphicsLoader       ;load princess graphics
-        jsr InitializeNameTables
-        jsr ResetDiskIOTask      ;end disk subroutines
-        sta ScreenRoutineTask    ;init screen routine task
-        rts
 
 DiskScreenPalette:
   .byte $3f, $00, $04
@@ -13888,18 +13873,17 @@ RetryGame:
   jmp TerminateGame            ;and end the game
 
 Continue:
-        ldy #$02					;give three lives if on hard mode
-		ldx DifficultyFlag
-		cpx #$02
-		beq :+
-		ldy #$04			
+        ldy #$02				;give three lives if on hard mode
+        ldx DifficultyFlag
+        cpx #$02
+        beq :+
+        ldy #$04			
 :       sty NumberofLives           ;give five lives
-		cpx #$00
-		beq :+
+        cpx #$00
+        beq :+
         sta LevelNumber
         sta AreaNumber              ;put at x-1 of the current world
-:
-        sta CoinTally
+:       sta CoinTally
         ldy #$0b
 ISCont: sta ScoreAndCoinDisplay,y   ;reset score
         dey
@@ -14385,42 +14369,8 @@ DemoResetOrGameOver:
        sta SpecialTimer
        lda #$1e                  ;set VRAM pointer to print special game over message
        sta VRAM_Buffer_AddrCtrl
-       jmp NextOperTask          ;move on to next task
-
-ScreenSubsForFinalRoom:
-    lda ScreenRoutineTask
-    jsr JumpEngine
-
-    .word InitScreenPalette
-    .word WriteTopStatusLine
-    .word WriteBottomStatusLine
-    .word DrawFinalRoom
-    .word GetAreaPalette
-    .word GetBackgroundColor
-    .word RevealPrincess
-
-DrawFinalRoom:
-    lda #$1c                   ;draw the princess's room
-    sta VRAM_Buffer_AddrCtrl
-    lda #$00
-    sta IRQUpdateFlag
-NextScreenTask:
-    inc ScreenRoutineTask
-    rts
-
-RevealPrincess:
-    lda #$a2                   ;print game timer
-    jsr PrintStatusBarNumbers
-    lda #VictoryMusic          ;play victory music
-    sta EventMusicQueue
-    lda #$00
-    sta Left_Right_Buttons     ;not residual, this does something
-    sta NameTableSelect
-    sta IRQUpdateFlag          ;turn screen back on but without IRQs
-    sta DisableScreenFlag
-NextOperTask:
-    inc OperMode_Task
-    rts
+       inc OperMode_Task         ;move on to next task
+       rts
 
 PrintVictoryMsgsForWorld8:
          lda MsgFractional          ;if fractional not looped to zero
@@ -14436,6 +14386,10 @@ PrintVictoryMsgsForWorld8:
 DoVicM:  iny
          iny
          iny                        ;add 3 to message counter to print the messages for world 8
+         cpy #$05                   ;for world 8 (as opposed to worlds 1-7)
+         bne PrintVM
+         lda #VictoryMusic          ;residual code from original smb source, this will not
+         sta EventMusicQueue        ;be checked due to alternate vector for sound engine
          lda SelectedPlayer         ;check selected player
          beq PrintVM                ;if mario, use standard message offset
          cpy #$04                   ;are we thanking the player?
@@ -14539,7 +14493,7 @@ NextBlue:  lda BlueTints,y        ;set background color based on color offset
 ExFade:    rts
 
 EraseLivesLines:
-     ldx #$08                  ;erase bottom two lines
+     ldx #$08                  ;erase bottom two lines (TO-DO: Fix this, not working currently)
 ELL: lda TwoBlankRows,x
      sta VRAM_Buffer1,x
      dex
@@ -14578,7 +14532,6 @@ BackToNormal:
     lda #$00
     sta DiskIOTask           ;erase task numbers
     sta OperMode_Task
-    ;jsr GraphicsLoader       ;overwrite princess graphics with door again
     lda WorldNumber          ;if in world D, branch to end the game
     cmp #WorldD
     beq EndTheGame
@@ -14694,102 +14647,107 @@ FinalRoomPalette:
     .byte $3f, $00, $10
     .byte $0f, $0f, $0f, $0f, $0f, $30, $10, $00
     .byte $0f, $21, $12, $02, $0f, $27, $17, $00
+
+    .byte $23, $c0, $50, $55
     .byte $00
 
 MarioThankYouMsgFinal:
-    .byte $20, $e8, $10
+    .byte $24, $e8, $10
     .byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
     .byte $16, $0a, $1b, $12, $18, $27
-    .byte $23, $c8, $48, $05
+
+    .byte $27, $c8, $48, $05
     .byte $00
 
 LuigiThankYouMsgFinal:
-    .byte $20, $e8, $10
+    .byte $24, $e8, $10
     .byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
     .byte $15, $1e, $12, $10, $12, $27
-    .byte $23, $c8, $48, $05
+
+    .byte $27, $c8, $48, $05
     .byte $00
 
 PeaceIsPavedMsg:
-    .byte $21, $09, $0e
+    .byte $25, $09, $0e
     .byte $19, $0e, $0a, $0c, $0e, $24, $12, $1c, $24
     .byte $19, $0a, $1f, $0e, $0d
-    .byte $23, $d0, $58, $aa
+    
+    .byte $27, $d0, $58, $aa
     .byte $00
 
 WithKingdomSavedMsg:
-    .byte $21, $47, $12
+    .byte $25, $47, $12
     .byte $20, $12, $1d, $11, $24, $14, $12, $17, $10, $0d, $18, $16, $24
     .byte $1c, $0a, $1f, $0e, $0d
     .byte $00
 
 MarioHurrahMsg:
-    .byte $21, $89, $0f
+    .byte $25, $89, $0f
     .byte $11, $1e, $1b, $1b, $0a, $11, $24, $1d, $18, $24, $16, $0a, $1b
     .byte $12, $18
     .byte $00
 
 LuigiHurrahMsg:
-    .byte $21, $89, $0f
+    .byte $25, $89, $0f
     .byte $11, $1e, $1b, $1b, $0a, $11, $24, $1d, $18, $24, $15, $1e, $12
     .byte $10, $12
     .byte $00
 
 OurOnlyHeroMsg:
-    .byte $21, $ca, $0d
+    .byte $25, $ca, $0d
     .byte $18, $1e, $1b, $24, $18, $17, $15, $22, $24, $11, $0e, $1b, $18
     .byte $00
 
 ThisEndsYourTripMsg:
-    .byte $22, $07, $13
+    .byte $26, $07, $13
     .byte $1d, $11, $12, $1c, $24, $0e, $17, $0d, $1c, $24, $22, $18, $1e
     .byte $1b, $24, $1d, $1b, $12, $19
     .byte $00
 
 OfALongFriendshipMsg:
-    .byte $22, $46, $14
+    .byte $26, $46, $14
     .byte $18, $0f, $24, $0a, $24, $15, $18, $17, $10, $24, $0f, $1b, $12
     .byte $0e, $17, $0d, $1c, $11, $12, $19
     .byte $00
 
 PointsAddedMsg:
-    .byte $22, $88, $10
+    .byte $26, $88, $10
     .byte $01, $00, $00, $00, $00, $00, $24, $19, $1d, $1c, $28, $0a, $0d
     .byte $0d, $0e, $0d
 
-    .byte $23, $e8, $48, $ff
+    .byte $27, $e8, $48, $ff
     .byte $00
     
 ForEachPlayerLeftMsg:
-    .byte $22, $a6, $15
+    .byte $26, $a6, $15
     .byte $0f, $18, $1b, $24, $0e, $0a, $0c, $11, $24, $19, $15, $0a, $22
     .byte $0e, $1b, $24, $15, $0e, $0f, $1d, $28
     .byte $00
 
 PrincessPeachsRoom:
-    .byte $20, $80, $60, $48
-    .byte $20, $a0, $60, $49
-    .byte $23, $40, $60, $48
-    .byte $23, $60, $60, $49
-    .byte $23, $80, $60, $48
-    .byte $23, $a0, $60, $49
-    .byte $23, $c0, $50, $55
-    .byte $23, $f0, $50, $55
-    .byte $00
+    ;.byte $20, $80, $60, $48
+    ;.byte $20, $a0, $60, $49
+    ;.byte $23, $40, $60, $48
+    ;.byte $23, $60, $60, $49
+    ;.byte $23, $80, $60, $48
+    ;.byte $23, $a0, $60, $49
+    ;.byte $23, $c0, $50, $55
+    ;.byte $23, $f0, $50, $55
+    ;.byte $00
 
 FantasyWorld9Msg:
-    .byte $22, $24, $18
-    .byte $20, $0e, $24, $19, $1b, $0e, $1c, $0e, $17, $1d, $24, $0f, $0a
-    .byte $17, $1d, $0a, $1c, $22, $24, $20, $18, $1b, $15, $0d
+    ;.byte $22, $24, $18
+    ;.byte $20, $0e, $24, $19, $1b, $0e, $1c, $0e, $17, $1d, $24, $0f, $0a
+    ;.byte $17, $1d, $0a, $1c, $22, $24, $20, $18, $1b, $15, $0d
 
-    .byte $22, $66, $13
-    .byte $15, $0e, $1d, $2a, $1c, $24, $1d, $1b, $22, $24, $76, $09, $24
-    .byte $20, $18, $1b, $15, $0d, $75
+    ;.byte $22, $66, $13
+    ;.byte $15, $0e, $1d, $2a, $1c, $24, $1d, $1b, $22, $24, $76, $09, $24
+    ;.byte $20, $18, $1b, $15, $0d, $75
 
-    .byte $22, $a9, $0e
-    .byte $20, $12, $1d, $11, $24, $18, $17, $0e, $24, $10, $0a, $16, $0e
-    .byte $28
-    .byte $00
+    ;.byte $22, $a9, $0e
+    ;.byte $20, $12, $1d, $11, $24, $18, $17, $0e, $24, $10, $0a, $16, $0e
+    ;.byte $28
+    ;.byte $00
 
 ThanksForPlayingMsg:
     ;clears "CONTINUE" and "RETRY" text
