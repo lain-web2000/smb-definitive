@@ -683,7 +683,7 @@ MMC3_IRQReload		  = $c001
 MMC3_IRQDisable		  = $e000
 MMC3_IRQEnable		  = $e001
 
-WaterAnimCurrentBank  = $013a
+WaterAnimCurrentTile  = $013a
 WaterAnimTimer		  = $0788
 
 PrincessGfxOffset     = $1760

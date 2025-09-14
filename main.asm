@@ -848,13 +848,6 @@ DisplayIntermediate:
 PlayerInter:   jsr DrawPlayer_Intermediate  ;put player in appropriate place for
                lda #$01                     ;lives display, then output lives display to buffer
 OutputInter:   jsr OtherInter
-			   lda #$c5                    ;reseed RNG for the next level
-			   sta PseudoRandomBitReg
-			   lda #$00
-			   ldx #$05
-:        	   sta PseudoRandomBitReg+1,x
-			   dex
-			   bpl :-
 			   sta IntervalTimerControl	 	;clear framerule counter
                lda GameOverMsgFlag          ;if special message flag not set, do next task
                beq IncSubtask
@@ -2126,8 +2119,11 @@ PlayerLoseLife:
              lda #GameOverMode        ;switch to game over mode
              sta OperMode             ;and leave
              rts
-StillInGame: lda WorldNumber          ;retrieve world number for offset
-             ldy LevelSet             ;check if playing 2J levels
+StillInGame: lda DifficultyFlag
+			 cmp #$02
+			 beq :+
+			 lda WorldNumber          ;retrieve world number for offset
+			 ldy LevelSet             ;check if playing 2J levels
              beq NrmlWorlds           ;if not, use world number as-is
              clc                      ;otherwise add nine for correct halfway pages
              adc #$09
@@ -2150,7 +2146,7 @@ MaskHPNyb:   and #%00001111           ;mask out all but lower nybble
              cmp ScreenLeft_PageLoc
              beq SetHalfway           ;left side of screen must be at the halfway page,
              bcc SetHalfway           ;otherwise player must start at the
-             lda #$00                 ;beginning of the level
+:            lda #$00                 ;beginning of the level
 SetHalfway:  sta HalfwayPage          ;store as halfway page for player
              jmp ContinueGame         ;continue the game
 
@@ -3625,9 +3621,9 @@ GameCoreRoutine:
 WaterAnimIntervals:				 ;lookup table for water animation speed 
 	  .byte $0a, $10, $10, $10   ;10 frames for water area types, 16 frames for everything else
 
-;WaterAnimBanks:
-;	  .byte WaterF1, BG_MainBank+1, WaterF3, WaterF4
-	  
+WaterAnimTiles:
+	  .incbin "chr/wateranim.chr"
+
 GameEngine:
               jsr ProcFireball_Bubble    ;process fireballs and air bubbles
               ldx #$00
@@ -3654,18 +3650,40 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr RunGameTimer           ;count down the game timer
               jsr ColorRotation          ;cycle one of the background colors
               jsr SimulateWind           ;otherwise, simulate wind where needed
-NoWind:       ;lda WaterAnimTimer		 
-		;	  bne NoWAnim
-		;	  ldy AreaType
-		;	  lda WaterAnimIntervals,y
-		;	  sta WaterAnimTimer
-		;	  inc WaterAnimCurrentBank
-		;	  lda WaterAnimCurrentBank
-		;	  and #$03
-		;	  sta WaterAnimCurrentBank
-		;	  tay
-		;	  lda WaterAnimBanks,y
-			  ;jsr SwitchBG_CHR1
+NoWind:       lda WaterAnimTimer		 
+			  bne NoWAnim
+			  ldy AreaType
+			  lda WaterAnimIntervals,y
+			  sta WaterAnimTimer
+			  inc WaterAnimCurrentTile
+			  lda WaterAnimCurrentTile
+			  and #$03
+			  sta WaterAnimCurrentTile
+			  asl
+			  asl
+			  asl
+			  asl
+			  tay
+			  ldx VRAM_Buffer1_Offset
+			  lda #$06
+			  sta VRAM_Buffer1,x
+			  lda #$a0
+			  sta VRAM_Buffer1+1,x
+			  lda #$10
+			  sta VRAM_Buffer1+2,x
+			: lda WaterAnimTiles,y
+			  sta VRAM_Buffer1+3,x
+			  inx
+			  iny
+			  cpx #$10
+			  bcc :-
+			  lda #$00
+			  sta VRAM_Buffer1+3,x
+			  txa
+			  clc
+			  adc #$03
+			  adc VRAM_Buffer1_Offset
+			  sta VRAM_Buffer1_Offset
 NoWAnim:      lda Player_Y_HighPos
               cmp #$02                   ;if player is below the screen, don't bother with the music
               bpl NoChgMus
@@ -4818,8 +4836,12 @@ RunGameTimer:
            bne ResGTCtrl              ;if timer not at 100, branch to reset game timer control
            lda #TimeRunningOutMusic
            sta EventMusicQueue        ;otherwise load time running out music
-ResGTCtrl: lda #$18                   ;reset game timer control
-           sta GameTimerCtrlTimer
+ResGTCtrl: lda #24                    ;reset game timer control
+           ldy DifficultyFlag
+		   cpy #$02
+		   bne :+
+		   lda #21
+:          sta GameTimerCtrlTimer
            ldy #$17                   ;set offset for last digit
            lda #$ff                   ;set value to decrement game timer digit
            sta DigitModifier+5
@@ -6250,7 +6272,7 @@ LoopCmdWorldNumber:
       .byte $08, $08
 
 LoopCmdPageNumber:
-      .byte $05, $09, $04, $05, $06, $08, $09, $0a, $06, $0b, $10
+      .byte $05, $09, $04, $05, $06, $08, $09, $0a, $07, $0b, $10
       .byte $05, $09
 
 LoopCmdYPosition:
@@ -13866,10 +13888,17 @@ RetryGame:
   jmp TerminateGame            ;and end the game
 
 Continue:
-        ldy #$04
-        sty NumberofLives           ;give five lives
+        ldy #$02					;give three lives if on hard mode
+		ldx DifficultyFlag
+		cpx #$02
+		beq :+
+		ldy #$04			
+:       sty NumberofLives           ;give five lives
+		cpx #$00
+		beq :+
         sta LevelNumber
         sta AreaNumber              ;put at x-1 of the current world
+:
         sta CoinTally
         ldy #$0b
 ISCont: sta ScoreAndCoinDisplay,y   ;reset score
@@ -14104,8 +14133,13 @@ PrimaryGameSetup:
       lda #$01
       sta FetchNewGameTimerFlag   ;set flag to load game timer from header
       sta PlayerSize              ;set player's size to small
-      lda #$04
-      sta NumberofLives           ;give each player five lives
+      lda #$02
+	  ldx DifficultyFlag
+	  cpx #$02
+	  beq :+
+	  lda #$04
+:     sta NumberofLives           ;give each player five lives
+GoToSecondary:
       jmp SecondaryGameSetup
 
 ;-------------------------------------------------------------------------------------
