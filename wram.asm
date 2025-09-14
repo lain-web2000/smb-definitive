@@ -28,7 +28,7 @@ LuigiPalette:
 LuigiPhysics:
 	.byte $00
 	
-BGTileset:
+ProbablyCouldUseThisElsewhere:
 	.byte $00
 
 SpinyEggBehavior:

@@ -964,7 +964,12 @@ EndGameText:   lda #$00                  ;put null terminator at end
                tax
                dex                       ;if printing anything else besides world/lives display
                bne ExWGT                 ;then branch to leave
-               lda NumberofLives         ;otherwise, check number of lives
+			   lda DifficultyFlag
+			   bne :+
+:              lda #$CE
+			   sta VRAM_Buffer1+7
+			   bne PutWorldNum
+			   lda NumberofLives         ;otherwise, check number of lives
                clc                       ;and increment by one for display
                adc #1
                ldy #0                    ;initialize register for tens digit
@@ -986,7 +991,7 @@ PutTens:       cpy #0                    ;if tens digit is 0, don't bother showi
                beq PutOnes
 WriteTens:     sty VRAM_Buffer1+7        ;write tens digit of lives to screen
 PutOnes:       sta VRAM_Buffer1+8        ;write ones digit of lives to screen
-               ldy WorldNumber           ;get the current world number
+PutWorldNum:   ldy WorldNumber           ;get the current world number
                iny                       ;increment the world number/letter because
                tya                       ;the internal world number counts from 0, not 1
                sta VRAM_Buffer1+19
@@ -14855,7 +14860,14 @@ LoadGameTileset:
       ; load font based on menu selection
       lda #FONT_SMB1_INDEX
       ldy FontSelection
+      bne @static_fonts
+      ldy LevelSet
       beq @write_font
+      bne @smb2_fonts
+@static_fonts:
+      cpy #$01
+      beq @write_font
+@smb2_fonts:
       lda #FONT_SMB2_INDEX
 @write_font:
       jsr FetchCHRPacket
