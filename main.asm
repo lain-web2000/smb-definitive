@@ -4112,10 +4112,10 @@ InitChangeSize:
           ldy PlayerChangeSizeFlag  ;if growing/shrinking flag already set
           bne ExitBoth              ;then branch to leave
           sty PlayerAnimCtrl        ;otherwise initialize player's animation frame control
-          inc PlayerChangeSizeFlag  ;set growing/shrinking flag
-          lda PlayerSize
-          eor #$01                  ;invert player's size
-          sta PlayerSize
+		  inc PlayerChangeSizeFlag
+		  jmp ChkPUPStatus
+ChgSize:  eor #$01
+		  sta PlayerSize
 ExitBoth: rts                       ;leave
 
 ;-------------------------------------------------------------------------------------
@@ -9971,7 +9971,10 @@ InjurePlayer:
 ForceInjury:
           ldx PlayerStatus          ;check player's status
           beq KillPlayer            ;branch if small
-          sta PlayerStatus          ;otherwise set player's status to small
+		  lda DifficultyFlag
+		  beq :+
+		  dec PlayerStatus
+:         dec PlayerStatus          ;otherwise set player's status to small
           lda #$08
           sta InjuryTimer           ;set injured invincibility timer
           asl
@@ -9989,7 +9992,7 @@ SetPRout: sta GameEngineSubroutine  ;load new value to run subroutine on next fr
 ExInjColRoutines:
       ldx ObjectOffset              ;get enemy offset and leave
       rts
-
+	  
 KillPlayer:
       stx Player_X_Speed   ;halt player's horizontal movement by initializing speed
       stx WindFlag         ;disable wind
@@ -10065,6 +10068,20 @@ ChkForDemoteKoopa:
       sta Enemy_X_Speed,x        ;set appropriate moving speed based on direction
       rts
 
+
+ChkPUPStatus:
+      lda PlayerStatus
+	  beq :+
+	  lda PlayerSize
+	  beq :++
+:     jmp ChgSize
+:	  sta PlayerChangeSizeFlag
+	  lda #$01
+	  sta Player_State
+	  lda #$c9
+	  sta TimerControl
+	  rts
+	  
 RevivalRateData:
       .byte $10, $0b
 
