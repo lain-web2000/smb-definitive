@@ -635,11 +635,13 @@ SetupNumSpr:  lda FloateyNum_Y_Pos,x       ;get vertical coordinate
               rts
 
 GiveExtraLife:
+      lda DifficultyFlag
+	  beq NotMaxLives		 ;easy mode has infinite lives
       inc NumberofLives      ;give the player an extra life
       lda NumberofLives      ;have we exceeded the maximum number of lives?
-      cmp #$80
+      cmp #99
       bcc NotMaxLives        ;if not, branch ahead to play 1-up sound
-      lda #$7f               ;otherwise cap lives at 128
+      lda #98                ;otherwise cap lives at 100
       sta NumberofLives
 NotMaxLives:
       lda #Sfx_ExtraLife
@@ -978,12 +980,12 @@ LivesLoop:     cmp #10                   ;more than 9 lives?
                bne LivesLoop             ;unconditional branch
 PutHundreds:   cpx #0                    ;if hundreds digit is 0, don't bother showing it
                beq PutTens
-               stx VRAM_Buffer1+7        ;write hundreds digit of lives to screen
+               stx VRAM_Buffer1+6        ;write hundreds digit of lives to screen
                bne WriteTens
 PutTens:       cpy #0                    ;if tens digit is 0, don't bother showing it
                beq PutOnes
-WriteTens:     sty VRAM_Buffer1+8        ;write tens digit of lives to screen
-PutOnes:       sta VRAM_Buffer1+9        ;write ones digit of lives to screen
+WriteTens:     sty VRAM_Buffer1+7        ;write tens digit of lives to screen
+PutOnes:       sta VRAM_Buffer1+8        ;write ones digit of lives to screen
                ldy WorldNumber           ;get the current world number
                iny                       ;increment the world number/letter because
                tya                       ;the internal world number counts from 0, not 1
@@ -1676,29 +1678,30 @@ WriteBufferToScreen:
                lda ($00),y               ;load next byte (second)
                sta PPU_ADDRESS           ;store low byte of vram address
                iny
+               ldx #%00001000
                lda ($00),y               ;load next byte (third)
-               asl                       ;shift to left and save in stack
-               pha
-               lda Mirror_PPU_CTRL
-               ora #%00000100            ;set ppu to increment by 32 by default
-               bcs SetupWrites           ;if d7 of third byte was clear, ppu will
-               and #%11111011            ;only increment by 1
-SetupWrites:   jsr WritePPUReg1          ;write to register
-               pla                       ;pull from stack and shift to left again
-               asl
-               bcc GetLength             ;if d6 of third byte was clear, do not repeat byte
-               ora #%00000010            ;otherwise set d1 and increment Y
-               iny
-GetLength:     lsr                       ;shift back to the right to get proper length
-               lsr                       ;note that d1 will now be in carry
+               bpl SetupWrite
+               ldx #%00001100
+SetupWrite:    stx PPU_CTRL
+               and #%01111111
+               cmp #%01000000
+               bcc LiteralData
+               and #%00111111
                tax
-OutputToVRAM:  bcs RepeatByte            ;if carry set, repeat loading the same byte
                iny                       ;otherwise increment Y to load next byte
-RepeatByte:    lda ($00),y               ;load more data from buffer and write to vram
-               sta PPU_DATA
+               lda ($00),y               ;load more data from buffer and write to vram
+RepeatByte:    sta PPU_DATA
                dex                       ;done writing?
-               bne OutputToVRAM
-               sec          
+               bne RepeatByte
+               beq UpdateAddr
+LiteralData:   and #%00111111
+               tax
+NextByte:      iny                       ;otherwise increment Y to load next byte
+               lda ($00),y
+               sta PPU_DATA
+               dex
+               bne NextByte
+UpdateAddr:    sec
                tya
                adc $00                   ;add end length plus one to the indirect at $00
                sta $00                   ;to allow this routine to read another set of updates
@@ -1711,8 +1714,7 @@ RepeatByte:    lda ($00),y               ;load more data from buffer and write t
                sta PPU_ADDRESS
                sta PPU_ADDRESS           ;then reinitializes it for some reason
                sta PPU_ADDRESS
-UpdateScreen:  ldx PPU_STATUS            ;reset flip-flop
-               ldy #$00                  ;load first byte from indirect as a pointer
+UpdateScreen:  ldy #$00                  ;load first byte from indirect as a pointer
                lda ($00),y  
                bne WriteBufferToScreen   ;if byte is zero we have no further updates to make here
 InitScroll:    sta PPU_SCROLL            ;store contents of A into scroll registers
@@ -2110,6 +2112,8 @@ PlayerLoseLife:
              sta IRQUpdateFlag
              lda #Silence             ;silence music
              sta EventMusicQueue
+			 lda DifficultyFlag
+			 beq StillInGame
              dec NumberofLives        ;take one life from player
              bpl StillInGame          ;if player still has lives, branch
              lda #$00
@@ -10730,7 +10734,6 @@ ErACM: ldy $02             ;load vertical high nybble offset for block buffer
 ;$04 - low nybble of horizontal coordinate from block buffer
 ;$06-$07 - block buffer address
 
-	  .byte $69 ; Fix L+R vine wrapping (shoutouts to threecreepio)
 ClimbXPosAdder:
       .byte $f9, $07
 
@@ -13873,13 +13876,13 @@ RetryGame:
   jmp TerminateGame            ;and end the game
 
 Continue:
-        ldy #$02				;give three lives if on hard mode
+        ldy #$02                    ;give three lives if on hard mode
         ldx DifficultyFlag
         cpx #$02
         beq :+
         ldy #$04			
 :       sty NumberofLives           ;give five lives
-        cpx #$00
+        cpx #$01                    ;restart on current level if on normal mode
         beq :+
         sta LevelNumber
         sta AreaNumber              ;put at x-1 of the current world
@@ -13924,7 +13927,6 @@ GameMenuRoutine:
               sta WorldNumber
               sta CompletedWorlds
               sta DiskIOTask
-              sta LevelSet
               lda SavedJoypadBits
               and #A_Button               ;check if the player pressed A + start
               beq StG                     ;if not, start the game as usual at world 1
@@ -14098,7 +14100,11 @@ InitializeGame:
             lda #$00
             sta CompletedWorlds      ;clean slate player's progress (except for games beaten)
             sta HardWorldFlag
-            sta LevelSet
+			ldy CurrentGame
+			cpy #$02
+			bne :+
+			lda #$01
+:           sta LevelSet
             sta SelectedPlayer
             ldy #$6f                 ;clear all memory as in initialization procedure,
             jsr InitializeMemory     ;but this time, clear only as far as $076f
@@ -14378,7 +14384,14 @@ PrintVictoryMsgsForWorld8:
          ldy MsgCounter
          cpy #$0a                   ;if message counter gone past a certain
          bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
-         lda WorldNumber            ;are we on world D?
+		 lda CurrentGame
+		 cmp #$01
+		 bne :+
+		 lda PrimaryHardMode
+		 beq :+
+		 lda #WorldD
+		 sta WorldNumber
+:        lda WorldNumber            ;are we on world D?
          cmp #WorldD
          beq DoVicM                 ;yes, display the two extra lives lines
          cpy #$08                   ;otherwise we shouldn't display them
@@ -14536,9 +14549,12 @@ BackToNormal:
     cmp #WorldD
     beq EndTheGame
     lda CurrentGame          ;if playing SMB1, don't bother with world 9
-    lsr
-    bcs GoToNextWorld
-    lda CompletedWorlds      ;if completed all worlds without skipping over any
+    cmp #$01
+	bne :+
+	lda PrimaryHardMode
+	beq GoToNextWorld
+	bne EndTheGame
+:   lda CompletedWorlds      ;if completed all worlds without skipping over any
     cmp #$ff                 ;then branch elsewhere (note warping backwards may
     beq GoToNextWorld        ;allow player to complete skipped worlds)
     inc WorldNumber          ;otherwise skip over world 9
@@ -14552,10 +14568,15 @@ EndTheGame:
     sta ContinueWorld        ;reset saved progress
     sta SavedLevelSet
     sta SavedCompletedWorlds
+	lda CurrentGame
+	bne :+
     lda #GameOverMode        ;set game over mode
     sta OperMode
     inc GameOverMsgFlag      ;increment flag for special message
     jmp GameOverSubs         ;jump to game over mode routines
+:	lda #AttractMode
+	sta OperMode
+	jmp AttractModeSubs
 
 FlashMRSpriteDataOfs:
     .byte $50, $b0, $e0, $68, $98, $c8
