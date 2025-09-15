@@ -794,12 +794,8 @@ WriteBottomStatusLine:
       iny                        ;increment the world number/letter because
       tya                        ;the internal world number counts from 0, not 1
       sta VRAM_Buffer1+3,x
-      lda LevelSet
-      beq PutD
-      lda #$29                   ;put star instead of dash if playing 2J levels
-      bne PutS
-PutD: lda #$25                   ;next the dash
-PutS: sta VRAM_Buffer1+4,x
+      jsr GetDashStarForDisplay
+      sta VRAM_Buffer1+4,x
       ldy LevelNumber            ;next the level number
       iny                        ;increment for proper number display
       tya
@@ -887,11 +883,11 @@ TopStatusBarLine:
   .byte $ff ;end of data block
 
 WorldLivesDisplay:
-  .byte $21, $cd, $07, $24, $24 ;cross with spaces used on
-  .byte $26, $24, $24, $24, $24 ;lives display
+  .byte $21, $cf, $04, $26, $24, $24, $24 ;cross with spaces used on lives display
   .byte $21, $4b, $09, $20, $18 ;"WORLD  - " used on lives display
   .byte $1b, $15, $0d, $24, $24, $25, $24
   .byte $22, $0c, $47, $24 ;possibly used to clear time up
+  .byte $23, $dc, $01, $ba ;attribute table data for crown
   .byte $ff
 
 TimeUp:
@@ -964,45 +960,50 @@ EndGameText:   lda #$00                  ;put null terminator at end
                tax
                dex                       ;if printing anything else besides world/lives display
                bne ExWGT                 ;then branch to leave
-			   lda DifficultyFlag
-			   bne :+
-:              lda #$CE
-			   sta VRAM_Buffer1+7
-			   bne PutWorldNum
-			   lda NumberofLives         ;otherwise, check number of lives
+               lda DifficultyFlag        ;if not easy mode, print lives display
+               bne PrepLivesDisp
+               lda #$ce                  ;otherwise put crown tile in its place
+               sta VRAM_Buffer1+5        ;and branch ahead to display world/level numbers
+               bne PutWorldNum
+PrepLivesDisp: lda #$aa                  ;fix attribute data for lives display
+               sta VRAM_Buffer1+26
+               lda NumberofLives         ;check number of lives
                clc                       ;and increment by one for display
                adc #1
                ldy #0                    ;initialize register for tens digit
-               ldx #0                    ;and register for hundreds digit
 LivesLoop:     cmp #10                   ;more than 9 lives?
-               bcc PutHundreds           ;if not, branch ahead
+               bcc PutTens               ;if not, branch ahead
                sbc #10                   ;if so, subtract 10 from ones digit
                iny                       ;and increment tens digit
-               cpy #10                   ;have we reached the hundreds digit?
-               bcc LivesLoop             ;if not, branch back
-               ldy #0                    ;otherwise set tens digit to zero
-               inx                       ;and increment hundreds digit
-               bne LivesLoop             ;unconditional branch
-PutHundreds:   cpx #0                    ;if hundreds digit is 0, don't bother showing it
-               beq PutTens
-               stx VRAM_Buffer1+6        ;write hundreds digit of lives to screen
-               bne WriteTens
+               bne LivesLoop             ;unconditional branch back
 PutTens:       cpy #0                    ;if tens digit is 0, don't bother showing it
                beq PutOnes
-WriteTens:     sty VRAM_Buffer1+7        ;write tens digit of lives to screen
-PutOnes:       sta VRAM_Buffer1+8        ;write ones digit of lives to screen
+               sty VRAM_Buffer1+5        ;write tens digit of lives to screen
+PutOnes:       sta VRAM_Buffer1+6        ;write ones digit of lives to screen
 PutWorldNum:   ldy WorldNumber           ;get the current world number
                iny                       ;increment the world number/letter because
                tya                       ;the internal world number counts from 0, not 1
-               sta VRAM_Buffer1+19
-               lda LevelSet
-               beq PutLevelNum
-               lda #$29                  ;put star instead of dash if playing 2J levels
-               sta VRAM_Buffer1+20
+               sta VRAM_Buffer1+16
+               jsr GetDashStarForDisplay
+               sta VRAM_Buffer1+17
 PutLevelNum:   ldy LevelNumber
                iny
-               sty VRAM_Buffer1+21       ;we're done here
+               sty VRAM_Buffer1+18       ;we're done here
 ExWGT:         rts
+
+GetDashStarForDisplay:
+               lda #$25
+               ldy CurrentGame
+               beq CheckLevelSet
+               dey
+               bne ExGDS
+               ldy PrimaryHardMode
+               bne DisplayStar
+               rts
+CheckLevelSet: ldy LevelSet
+               beq ExGDS
+DisplayStar:   lda #$29
+ExGDS:         rts
 
 CheckPlayerName:
              lda SelectedPlayer     ;check selected player
@@ -4107,15 +4108,17 @@ PlayerInjuryBlink:
            beq DonePlayerTask     ;branch if at that point, and not before or after
            jmp PlayerCtrlRoutine  ;otherwise run player control routine
 ExitBlink: bne ExitBoth           ;do unconditional branch to leave
+           lda PlayerStatus       ;if player was only demoted to big, then
+           bne ExitBoth           ;do not change player size
 
 InitChangeSize:
           ldy PlayerChangeSizeFlag  ;if growing/shrinking flag already set
           bne ExitBoth              ;then branch to leave
           sty PlayerAnimCtrl        ;otherwise initialize player's animation frame control
-		  inc PlayerChangeSizeFlag
-		  jmp ChkPUPStatus
-ChgSize:  eor #$01
-		  sta PlayerSize
+          inc PlayerChangeSizeFlag  ;set growing/shrinking flag
+          lda PlayerSize
+          eor #$01                  ;invert player's size
+          sta PlayerSize
 ExitBoth: rts                       ;leave
 
 ;-------------------------------------------------------------------------------------
@@ -4240,7 +4243,8 @@ ExitNA:   rts
 ;-------------------------------------------------------------------------------------
 
 PlayerMovementSubs:
-           lda #$00                  ;set A to init crouch flag by default
+           lda TimerControl          ;if timer control set,
+           bne NoMoveSub             ;branch to leave
            ldy PlayerSize            ;is player small?
            bne SetCrouch             ;if so, branch
            lda Player_State          ;check state of player
@@ -4249,8 +4253,6 @@ PlayerMovementSubs:
            and #%00000100            ;single out bit for down button
 SetCrouch: sta CrouchingFlag         ;store value in crouch flag
 ProcMove:  jsr PlayerPhysicsSub      ;run sub related to jumping and swimming
-           lda PlayerChangeSizeFlag  ;if growing/shrinking flag set,
-           bne NoMoveSub             ;branch to leave
            lda Player_State
            cmp #$03                  ;get player state
            beq MoveSubs              ;if climbing, branch ahead, leave timer unset
@@ -4853,9 +4855,9 @@ RunGameTimer:
            sta EventMusicQueue        ;otherwise load time running out music
 ResGTCtrl: lda #24                    ;reset game timer control
            ldy DifficultyFlag
-		   cpy #$02
-		   bne :+
-		   lda #21
+           cpy #$02
+           bne :+
+           lda #21
 :          sta GameTimerCtrlTimer
            ldy #$17                   ;set offset for last digit
            lda #$ff                   ;set value to decrement game timer digit
@@ -4863,8 +4865,7 @@ ResGTCtrl: lda #24                    ;reset game timer control
            jsr DigitsMathRoutine      ;do sub to decrement game timer slowly
            lda #$a2                   ;set status nybbles to update game timer display
            jmp PrintStatusBarNumbers  ;do sub to update the display
-TimeUpOn:  sta PlayerStatus           ;init player status (note A will always be zero here)
-           jsr ForceInjury            ;do sub to kill the player (note player is small here)
+TimeUpOn:  jsr KillPlayer             ;do sub to kill the player
            inc GameTimerExpiredFlag   ;set game timer expiration flag
 ExGTimer:  rts                        ;leave
 
@@ -9971,10 +9972,11 @@ InjurePlayer:
 ForceInjury:
           ldx PlayerStatus          ;check player's status
           beq KillPlayer            ;branch if small
-		  lda DifficultyFlag
-		  beq :+
-		  dec PlayerStatus
-:         dec PlayerStatus          ;otherwise set player's status to small
+          ldy DifficultyFlag        ;if not easy mode, set player's status
+          bne PlyrStat              ;to small as in the original game
+          dex                       ;otherwise demote by one level as in
+          txa                       ;most games since super mario bros. 3
+PlyrStat: sta PlayerStatus          ;set player's status appropiately
           lda #$08
           sta InjuryTimer           ;set injured invincibility timer
           asl
@@ -9992,7 +9994,7 @@ SetPRout: sta GameEngineSubroutine  ;load new value to run subroutine on next fr
 ExInjColRoutines:
       ldx ObjectOffset              ;get enemy offset and leave
       rts
-	  
+
 KillPlayer:
       stx Player_X_Speed   ;halt player's horizontal movement by initializing speed
       stx WindFlag         ;disable wind
@@ -10068,20 +10070,6 @@ ChkForDemoteKoopa:
       sta Enemy_X_Speed,x        ;set appropriate moving speed based on direction
       rts
 
-
-ChkPUPStatus:
-      lda PlayerStatus
-	  beq :+
-	  lda PlayerSize
-	  beq :++
-:     jmp ChgSize
-:	  sta PlayerChangeSizeFlag
-	  lda #$01
-	  sta Player_State
-	  lda #$c9
-	  sta TimerControl
-	  rts
-	  
 RevivalRateData:
       .byte $10, $0b
 
