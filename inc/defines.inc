@@ -35,11 +35,17 @@ FrameCounter          = $09
 SavedJoypadBits       = $06fc
 SavedJoypad1Bits      = $06fc
 SavedJoypad2Bits      = $06fd
-JoypadBitMask         = $074a
+RawJoypadBits         = $074a
+RawJoypad1Bits        = $074a
+RawJoypad2Bits        = $074b
+PressedJoypadBits     = $074c
+PressedJoypad1Bits    = $074c
+PressedJoypad2Bits    = $074d
 JoypadOverride        = $0758
 
 IRQAckFlag			  = $077b
 IRQUpdateFlag		  = $0722
+NMIAckFlag            = $077c
 
 A_B_Buttons           = $0a
 PreviousA_B_Buttons   = $0d
@@ -374,6 +380,7 @@ Enemy_Flag            = $0f
 Enemy_ID              = $16
 
 PlayerGfxOffset       = $06d5
+PlayerDamageFlag      = $06d8
 Player_XSpeedAbsolute = $0700
 FrictionAdderHigh     = $0701
 FrictionAdderLow      = $0702

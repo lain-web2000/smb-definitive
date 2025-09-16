@@ -76,9 +76,68 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             lda Mirror_PPU_CTRL
             ora #%10000000
             jsr WritePPUReg1
-EndlessLoop:
-            lda $00                     ;endless loop
-            jmp EndlessLoop
+WaitForNMI: lda NMIAckFlag            ;spin until NMI routine has concluded
+            beq WaitForNMI 
+            jsr ReadJoypads
+            lda RawJoypadBits         ;copy controller 1 inputs over to
+            sta SavedJoypadBits       ;temp address that may be modified
+            jsr PauseRoutine
+            jsr UpdateTopScore
+            lda GamePauseStatus       ;check d0 of game pause flags
+            lsr                       ;if set, branch to skip 
+            bcs SeedLFSR
+            lda TimerControl          ;if master timer control not set, branch
+            beq CheckIntervalTC       ;to decrement frame and interval timers
+            dec TimerControl          ;otherwise count this timer down
+            bne IncFrameCntr                 
+CheckIntervalTC:
+            ldx #$14                  ;set offset to decrement only frame timers
+            dec IntervalTimerControl  ;if interval timer control not expired, branch
+            bpl DecrTheTimers         ;to skip and thus decrement only frame timers
+            lda #$14
+            sta IntervalTimerControl  ;otherwise reset interval timer control to 20 frames
+            ldx #$23                  ;and load offset to decrement frame and interval timers
+DecrTheTimers:
+            lda Timers,x              ;if current timer is already expired, skip it
+            beq DTTLoop               ;otherwise decrement it
+            dec Timers,x
+DTTLoop:    dex                       ;loop until all timers that need to be counted down are
+            bpl DecrTheTimers
+IncFrameCntr:
+            inc FrameCounter
+SeedLFSR:   ldx #$00
+            ldy #$07
+            lda PseudoRandomBitReg    ;get d1 of first byte
+            and #$02
+            sta $00
+            lda PseudoRandomBitReg+1  ;get d1 of second byte, XOR it with the first byte
+            and #$02
+            eor $00
+            clc
+            beq RotateLFSR            ;prepare to rotate the result in
+            sec
+RotateLFSR: ror PseudoRandomBitReg,x  ;basically, rotate the operation result into d7
+            inx                       ;then rotate the entire LFSR
+            dey
+            bne RotateLFSR
+            lda GamePauseStatus       ;if d0 of game pause flag is set, skip this part
+            lsr
+            bcs WaitForIRQ
+            lda IRQUpdateFlag
+            beq CheckInvalidWorldNum
+            jsr MoveSpritesOffscreen
+            jsr SpriteShuffler
+CheckInvalidWorldNum:
+            lda WorldNumber           ;if world number somehow goes past D, just end the game
+            cmp #WorldD+1                  
+            bcc ExecutionTree
+            jsr TerminateGame
+ExecutionTree:
+            jsr OperModeExecutionTree ;run one of the program's four modes
+WaitForIRQ: lda IRQAckFlag            ;wait for IRQ (TO-DO: is this necessary?)
+            bne WaitForIRQ
+            sta NMIAckFlag            ;clear NMI flag and wait for next NMI
+            jmp WaitForNMI
 
 ;-------------------------------------------------------------------------------------
 
@@ -97,129 +156,6 @@ VRAM_Buffer_Offset:
 
 ;-------------------------------------------------------------------------------------
 
-NMIHandler:
-   lda Mirror_PPU_CTRL       ;alter name table address to be $2800
-   and #%01111110            ;(essentially $2000) and disable another NMI
-   sta Mirror_PPU_CTRL       ;from interrupting this one
-   sta PPU_CTRL
-   sei
-   lda Mirror_PPU_MASK
-   and #%11100110            ;disable OAM and background display by default
-   ldy DisableScreenFlag     ;if screen disabled, skip this
-   bne ScrnSwch
-   lda Mirror_PPU_MASK       ;otherwise reenable bits and save them
-   ora #%00011110
-ScrnSwch:
-   sta Mirror_PPU_MASK
-   and #%11100111            ;turn screen off regardless of mirror reg
-   sta PPU_MASK
-   ldx PPU_STATUS
-   lda #$00
-   jsr InitScroll
-   sta PPU_SPR_ADDR
-   lda #$02                  ;dump OAM data to PPU's sprite RAM
-   sta SPR_DMA
-   lda VRAM_Buffer_AddrCtrl
-   asl
-   tax
-   lda VRAM_AddrTable,x      ;get pointer to VRAM data
-   sta $00
-   inx
-   lda VRAM_AddrTable,x
-   sta $01
-   jsr UpdateScreen          ;now update the screen with it
-   ldy #$00
-   ldx VRAM_Buffer_AddrCtrl
-   cpx #$06                  ;if pointer number was set to 6 (for
-   bne InitVRAMVars          ;second VRAM buffer), increment Y to get
-   iny                       ;offset for second VRAM buffer
-InitVRAMVars:
-   ldx VRAM_Buffer_Offset,y  ;get pointer to correct buffer offset
-   lda #$00                  ;erase the VRAM buffer offset, init first VRAM buffer
-   sta VRAM_Buffer1_Offset,x ;by writing end terminator at the first byte, and
-   sta VRAM_Buffer1,x        ;init address control to point at first VRAM buffer
-   sta VRAM_Buffer_AddrCtrl
-   lda Mirror_PPU_MASK
-   sta PPU_MASK              ;dump PPU control register 2
-   cli
-   lda IRQUpdateFlag
-   beq SkipIRQ
-   lda #31                   ;count 31 scanlines (plus the pre-render scanline)
-   sta MMC3_IRQLatch
-   sta MMC3_IRQReload
-   sta MMC3_IRQEnable
-   inc IRQAckFlag            ;reset flag to wait for next IRQ
-SkipIRQ:
-   jsr RunSoundEngine        ;run subs that need to be run on every frame
-   jsr ReadJoypads
-   jsr PauseRoutine
-   jsr UpdateTopScore
-   lda GamePauseStatus       ;check d0 of game pause flags
-   lsr                       ;if set, branch to skip 
-   bcs SeedLFSR
-   lda TimerControl          ;if master timer control not set, branch
-   beq CheckIntervalTC       ;to decrement frame and interval timers
-   dec TimerControl          ;otherwise count this timer down
-   bne IncFrameCntr                 
-CheckIntervalTC:
-   ldx #$14                  ;set offset to decrement only frame timers
-   dec IntervalTimerControl  ;if interval timer control not expired, branch
-   bpl DecrTheTimers         ;to skip and thus decrement only frame timers
-   lda #$14
-   sta IntervalTimerControl  ;otherwise reset interval timer control to 20 frames
-   ldx #$23                  ;and load offset to decrement frame and interval timers
-DecrTheTimers:
-   lda Timers,x              ;if current timer is already expired, skip it
-   beq DTTLoop               ;otherwise decrement it
-   dec Timers,x
-DTTLoop:
-   dex                       ;loop until all timers that need to be counted down are
-   bpl DecrTheTimers
-IncFrameCntr:
-   inc FrameCounter
-SeedLFSR:
-   ldx #$00
-   ldy #$07
-   lda PseudoRandomBitReg    ;get d1 of first byte
-   and #$02
-   sta $00
-   lda PseudoRandomBitReg+1  ;get d1 of second byte, XOR it with the first byte
-   and #$02
-   eor $00
-   clc
-   beq RotateLFSR            ;prepare to rotate the result in
-   sec
-RotateLFSR:
-   ror PseudoRandomBitReg,x  ;basically, rotate the operation result into d7
-   inx                       ;then rotate the entire LFSR
-   dey
-   bne RotateLFSR
-   lda GamePauseStatus       ;if d0 of game pause flag is set, skip this part
-   lsr
-   bcs WaitForIRQ
-   lda IRQUpdateFlag
-   beq CheckInvalidWorldNum
-   jsr MoveSpritesOffscreen
-   jsr SpriteShuffler
-CheckInvalidWorldNum:
-   lda WorldNumber           ;if world number somehow goes past D, just end the game
-   cmp #WorldD+1                  
-   bcc ExecutionTree
-   jsr TerminateGame
-ExecutionTree:
-   jsr OperModeExecutionTree ;run one of the program's four modes
-WaitForIRQ:
-   lda IRQAckFlag            ;wait for IRQ
-   bne WaitForIRQ
-   lda PPU_STATUS
-   lda Mirror_PPU_CTRL       ;reenable NMIs 
-   ora #$80
-   sta Mirror_PPU_CTRL       ;then park it at endless loop until next NMI
-   sta PPU_CTRL
-   rti
-
-;-------------------------------------------------------------------------------------
-
 PauseRoutine:
                lda OperMode           ;are we in victory mode?
                cmp #VictoryMode       ;if so, go ahead
@@ -233,7 +169,7 @@ ChkPauseTimer: lda GamePauseTimer     ;check if pause timer is still counting do
                beq ChkStart
                dec GamePauseTimer     ;if so, decrement and leave
                rts
-ChkStart:      lda SavedJoypad1Bits   ;check to see if start is pressed
+ChkStart:      lda SavedJoypadBits    ;check to see if start is pressed
                and #Start_Button
                beq ClrPauseTimer
                lda GamePauseStatus    ;check to see if timer flag is set
@@ -311,7 +247,7 @@ OperModeExecutionTree:
 
 MoveAllSpritesOffscreen:
               ldy #$00                ;this routine moves all sprites off the screen
-              .byte $2c                 ;BIT instruction opcode
+              .byte $2c               ;BIT instruction opcode
 
 MoveSpritesOffscreen:
               ldy #$04                ;this routine moves all but sprite 0
@@ -1641,40 +1577,6 @@ InitATLoop:   sta PPU_DATA
               sta HorizontalScroll      ;reset scroll variables
               sta VerticalScroll
               jmp InitScroll            ;initialize scroll registers to zero
-
-;------------------------------------------------------------------------------------
-
-ReadJoypads: 
-              lda #$01               ;reset and clear strobe of joypad ports
-              sta JOYPAD_PORT
-              lsr
-              tax                    ;start with joypad 1's port
-              sta JOYPAD_PORT
-              jsr ReadPortBits
-              inx                    ;increment for joypad 2's port
-ReadPortBits: ldy #$08
-PortLoop:     pha                    ;push previous bit onto stack
-              lda JOYPAD_PORT,x      ;read current bit on joypad port
-              sta $00                ;check d1 and d0 of port output
-              lsr                    ;this is necessary on the old
-              ora $00                ;famicom systems in japan
-              lsr
-              pla                    ;read bits from stack
-              rol                    ;rotate bit from carry flag
-              dey
-              bne PortLoop           ;count down bits left
-              sta SavedJoypadBits,x  ;save controller status here always
-              pha
-              and #%00110000         ;check for select or start
-              and JoypadBitMask,x    ;if neither saved state nor current state
-              beq Save8Bits          ;have any of these two set, branch
-              pla
-              and #%11001111         ;otherwise store without select
-              sta SavedJoypadBits,x  ;or start bits and leave
-              rts
-Save8Bits:    pla
-              sta JoypadBitMask,x    ;save with all bits in another place and leave
-              rts
 
 ;------------------------------------------------------------------------------------
 
@@ -3183,7 +3085,7 @@ Hole_Water:
 
 QuestionBlockRow_High:
       lda #$03              ;start on the fourth row
-      .byte $2c               ;BIT instruction opcode
+      .byte $2c             ;BIT instruction opcode
 
 QuestionBlockRow_Low:
       lda #$07             ;start on the eighth row
@@ -3199,11 +3101,11 @@ QuestionBlockRow_Low:
 
 Bridge_High:
       lda #$06  ;start on the seventh row from top of screen
-      .byte $2c   ;BIT instruction opcode
+      .byte $2c ;BIT instruction opcode
 
 Bridge_Middle:
       lda #$07  ;start on the eighth row
-      .byte $2c   ;BIT instruction opcode
+      .byte $2c ;BIT instruction opcode
 
 Bridge_Low:
       lda #$09             ;start on the tenth row
@@ -4108,8 +4010,10 @@ PlayerInjuryBlink:
            beq DonePlayerTask     ;branch if at that point, and not before or after
            jmp PlayerCtrlRoutine  ;otherwise run player control routine
 ExitBlink: bne ExitBoth           ;do unconditional branch to leave
-           lda PlayerStatus       ;if player was only demoted to big, then
-           bne ExitBoth           ;do not change player size
+           lda PlayerStatus       ;if player was demoted to small,
+           beq InitChangeSize     ;go ahead and change player size
+           inc PlayerDamageFlag   ;otherwise set flag for big damage animation
+           rts
 
 InitChangeSize:
           ldy PlayerChangeSizeFlag  ;if growing/shrinking flag already set
@@ -4133,6 +4037,7 @@ PlayerDeath:
 DonePlayerTask:
       lda #$00
       sta TimerControl          ;initialize master timer control to continue timers
+      sta PlayerDamageFlag
       lda #$08
       sta GameEngineSubroutine  ;set player control routine to run next frame
       rts                       ;leave
@@ -4243,8 +4148,9 @@ ExitNA:   rts
 ;-------------------------------------------------------------------------------------
 
 PlayerMovementSubs:
-           lda TimerControl          ;if timer control set,
-           bne NoMoveSub             ;branch to leave
+           lda PlayerChangeSizeFlag  ;if player is growing/shrinking or
+           ora PlayerDamageFlag      ;player has otherwise taken damage,
+           bne NoMoveSub             ;then do not allow player movement
            ldy PlayerSize            ;is player small?
            bne SetCrouch             ;if so, branch
            lda Player_State          ;check state of player
@@ -6113,7 +6019,7 @@ MaxSpdBlockData:
 
 ResidualGravityCode:
       ldy #$00       ;this part appears to be residual,
-      .byte $2c        ;no code branches or jumps to it...
+      .byte $2c      ;no code branches or jumps to it...
 
 ImposeGravityBlock:
       ldy #$01       ;set offset for maximum speed
@@ -6130,7 +6036,7 @@ ImposeGravitySprObj:
 
 MovePlatformDown:
       lda #$00    ;save value to stack (if branching here, execute next
-      .byte $2c     ;part as BIT instruction)
+      .byte $2c   ;part as BIT instruction)
 
 MovePlatformUp:
            lda #$01        ;save value to stack
@@ -6879,7 +6785,7 @@ SpinyRte: sty Enemy_MovingDir,x      ;set moving direction to the right
           sta Enemy_Flag,x           ;enable enemy object by setting flag
           lda #$05
           sta Enemy_State,x          ;put spiny in egg state and leave
-ChpChpEx: rts
+          rts
 
 ;--------------------------------
 
@@ -6891,6 +6797,8 @@ FirebarSpinDirData:
 
 InitLongFirebar:
       jsr DuplicateEnemyObj       ;create enemy object for long firebar
+      bcc InitShortFirebar        ;if free slot was found, initialize it
+      jmp EraseEnemyObject        ;otherwise erase the object
 
 InitShortFirebar:
       lda #$00                    ;initialize low byte of spin state
@@ -6933,6 +6841,8 @@ FlyCCXSpeedData:
 FlyCCTimerData:
       .byte $10, $60, $20, $48
 
+ChpChpEx:
+         rts
 InitFlyingCheepCheep:
          lda FrenzyEnemyTimer       ;if timer here not expired yet, branch to leave
          bne ChpChpEx
@@ -7031,7 +6941,9 @@ NoBowser: dey                   ;loop until all slots are checked
 
 CreateBowser:
       jsr DuplicateEnemyObj     ;jump to create another bowser object
-      stx BowserFront_Offset    ;save offset of first here
+      bcc :+                    ;if free slot was found, initialize bowser
+      jmp EraseEnemyObject      ;otherwise erase object
+:     stx BowserFront_Offset    ;save offset of first here
       lda #$00
       sta BowserBodyControls    ;initialize bowser's body controls
       sta BridgeCollapseOffset  ;and bridge collapse offset
@@ -7052,6 +6964,8 @@ CreateBowser:
 DuplicateEnemyObj:
         ldy #$ff                ;start at beginning of enemy slots
 FSLoop: iny                     ;increment one slot
+        cpy #$05                ;if no slot is empty, then
+        bcs FlmEx               ;branch with carry set
         lda Enemy_Flag,y        ;check enemy buffer flag for empty slot
         bne FSLoop              ;if set, branch and keep checking
         sty DuplicateObj_Offset ;otherwise set offset here
@@ -7067,7 +6981,7 @@ FSLoop: iny                     ;increment one slot
         sta Enemy_Y_HighPos,y   ;set high vertical byte for new enemy
         lda Enemy_Y_Position,x
         sta Enemy_Y_Position,y  ;copy vertical coordinate from original to new
-FlmEx:  rts                     ;and then leave
+FlmEx:  rts                     ;and then leave (carry clear if slot found)
 
 ;--------------------------------
 
@@ -8815,7 +8729,7 @@ CopyFToR: tya                      ;move bowser's rear object position value to 
           pla
           sta ObjectOffset         ;get original enemy object offset
           tax
-		  jsr OffscreenBoundsCheck
+          jsr OffscreenBoundsCheck
           lda #$00                 ;nullify bowser's front/rear graphics flag
           sta BowserGfxFlag
 ExBGfxH:  rts                      ;leave!
@@ -10445,7 +10359,7 @@ PositionPlayerOnS_Plat:
       lda Enemy_Y_Position,x     ;for offset
       clc                        ;add positioning data using offset to the vertical
       adc PlayerPosSPlatData-1,y ;coordinate
-      .byte $2c                    ;BIT instruction opcode
+      .byte $2c                  ;BIT instruction opcode
 
 PositionPlayerOnVPlat:
          lda Enemy_Y_Position,x    ;get vertical coordinate
@@ -11706,7 +11620,7 @@ BlockBufferColli_Feet:
 
 BlockBufferColli_Head:
        lda #$00       ;set flag to return vertical coordinate
-       .byte $2c        ;BIT instruction opcode
+       .byte $2c      ;BIT instruction opcode
 
 BlockBufferColli_Side:
        lda #$01       ;set flag to return horizontal coordinate
@@ -13136,6 +13050,8 @@ CntPl:  lda GameEngineSubroutine    ;if executing specific game engine routine,
         beq PlayerKilled
         lda PlayerChangeSizeFlag    ;if grow/shrink flag set
         bne DoChangeSize            ;then branch to some other code
+        lda PlayerDamageFlag        ;if player has taken damage but is not shrinking
+        bne PlayerDamaged           ;then branch to display animation frame
         ldy SwimmingFlag            ;if swimming flag set, branch to
         beq FindPlayerAction        ;different part, do not return
         lda Player_State
@@ -13172,6 +13088,9 @@ DoChangeSize:
       jsr HandleChangeSize          ;find proper offset to graphics table for grow/shrink
       jmp PlayerGfxProcessing       ;draw player, then process for fireball throwing
 
+PlayerDamaged:
+      ldy #$01
+      .byte $2c                     ;BIT instruction opcode
 PlayerKilled:
       ldy #$0e                      ;load offset for player killed
       lda PlayerGfxTblOffsets,y     ;get offset to graphics table
@@ -13822,9 +13741,6 @@ DiskScreenPalette:
 
 DiskScreen:
       lda #$00
-      ;apparently MMC3 IRQ does not like this :(
-      ;sta Mirror_PPU_MASK
-      ;sta PPU_MASK
       sta IRQUpdateFlag
       inc DisableScreenFlag
       lda #$1b
@@ -13841,16 +13757,12 @@ GameOverCursorY:
 GameOverMenu:
             lda #$00
             sta DisableScreenFlag
-            lda SavedJoypadBits          ;if player pressed the start button
+            lda PressedJoypadBits        ;if player pressed the start button
             and #Start_Button            ;then either continue or start over
             bne ContinueOrRetry
-            lda SavedJoypadBits
+            lda PressedJoypadBits
             and #Select_Button           ;if player pressed the select button
             beq ChgSel                   ;then do not branch ahead
-            ldx SelectTimer              ;if select timer not expired while
-            bne ChgSel                   ;pressing select, skip this
-            lsr
-            sta SelectTimer              ;otherwise set the select timer
             lda #Sfx_Fireball            ;play sound effect when moving cursor
             sta Square1SoundQueue
             inc ContinueMenuSelect       ;move cursor to the next menu option
@@ -13930,7 +13842,7 @@ FDSLoop:
 ;-------------------------------------------------------------------------------------
 		   
 GameMenuRoutine:
-              lda SavedJoypadBits         ;check to see if the player pressed start
+              lda PressedJoypadBits       ;check to see if the player pressed start
               and #Start_Button
               beq ChkSelect               ;if not, branch to check other buttons
               lda #$00
@@ -13950,12 +13862,12 @@ GameMenuRoutine:
               lda SavedCompletedWorlds
               sta CompletedWorlds
 StG:          jmp StartGame
-ChkSelect:    lda SavedJoypadBits
+ChkSelect:    lda PressedJoypadBits
               cmp #Select_Button          ;branch if pressing select
               beq SelectLogic
               ldx DemoTimer
               bne NullJoypad
-              sta SelectTimer             ;run demo after a certain period of time
+              sta SelectedPlayer          ;run demo after a certain period of time
               jsr DemoEngine
               bcs ResetTitle
               bcc RunDemo
@@ -13966,10 +13878,6 @@ SelectLogic:  lda DemoTimer               ;if select pressed, check demo timer o
               lda FrameCounter            ;erase LSB of frame counter
               and #$fe
               sta FrameCounter
-              lda SelectTimer             ;if select timer not expired, skip to slow select down
-              bne NullJoypad
-              lda #$10                    ;reset select button timer
-              sta SelectTimer
               lda SelectedPlayer          ;switch between the two players to select one
               eor #$01
               sta SelectedPlayer
@@ -14041,7 +13949,7 @@ DemoEngine:
           sta DemoActionTimer    ;store as current timer
           beq DemoOver           ;if timer already at zero, skip
 DoAction: lda DemoActionData-1,x ;get and perform action (current or next)
-          sta SavedJoypad1Bits
+          sta SavedJoypadBits
           dec DemoActionTimer    ;decrement action timer
           clc                    ;clear carry if demo still going
 DemoOver: rts
@@ -14110,12 +14018,12 @@ InitializeGame:
             lda #$00
             sta CompletedWorlds      ;clean slate player's progress (except for games beaten)
             sta HardWorldFlag
-			ldy CurrentGame
-			cpy #$02
-			bne :+
-			lda #$01
-:           sta LevelSet
             sta SelectedPlayer
+		ldy CurrentGame
+		cpy #$02
+		bne :+
+		lda #$01
+:           sta LevelSet
             ldy #$6f                 ;clear all memory as in initialization procedure,
             jsr InitializeMemory     ;but this time, clear only as far as $076f
             ldy #$1f
@@ -14134,10 +14042,10 @@ PrimaryGameSetup:
       sta FetchNewGameTimerFlag   ;set flag to load game timer from header
       sta PlayerSize              ;set player's size to small
       lda #$02
-	  ldx DifficultyFlag
-	  cpx #$02
-	  beq :+
-	  lda #$04
+      ldx DifficultyFlag
+      cpx #$02
+      beq :+
+      lda #$04
 :     sta NumberofLives           ;give each player five lives
 GoToSecondary:
       jmp SecondaryGameSetup
@@ -14814,7 +14722,8 @@ ThanksForPlayingMsg:
     .byte $00
 
 ;-------------------------------------------------------------------------------------
-.res $FE00 - *, $FF
+; FIXED BANK
+.res $F000 - *, $FF
 
 SaveHeader:
         .byte "SMB-COMP"
@@ -14931,9 +14840,12 @@ FetchCHRPacket:
             sta $03
             lda CHRPacket_Dest,y
             tay
-            jmp RunWriteCHRPacket ;(TO-DO: Better banking so we don't need this)
-
+            lda #CHRBank          ;switch bank
+            jsr Switch16KBank
 WriteCHRPacket:
+            lda Mirror_PPU_CTRL   ;disable NMI while updating graphics
+            and #%01111111        ;(TO-DO: Hacky, may want to move into NMI handler)
+            sta PPU_CTRL
             lda Mirror_PPU_MASK
             and #%11100111
             sta PPU_MASK
@@ -14953,40 +14865,75 @@ WriteCHRPacket:
             inc $01
             inx
             bne @chklen
-@done:      rts
-      
+@done:      lda Mirror_PPU_CTRL    ;re-enable NMI
+            sta PPU_CTRL
+            jmp LoadMainBank       ;return to main bank
+
+;------------------------------------------------------------------------------------
+
+ReadJoypads:
+; taken from https://www.nesdev.org/wiki/Controller_reading_code
+    lda RawJoypad1Bits ; save inputs from previous frame
+    tax
+    lda RawJoypad2Bits
+    tay
+    lda #$01
+    sta JOYPAD_PORT1
+    sta RawJoypad2Bits ; player 2's buttons double as a ring counter
+    lsr a
+    sta JOYPAD_PORT1
+:   lda JOYPAD_PORT1
+    and #%00000011
+    cmp #$01
+    rol RawJoypad1Bits
+    lda JOYPAD_PORT2
+    and #%00000011
+    cmp #$01
+    rol RawJoypad2Bits
+    bcc :-
+    ; newly pressed buttons: not held last frame, and held now
+    txa
+    eor #%11111111
+    and RawJoypad1Bits
+    sta PressedJoypad1Bits
+    tya
+    eor #%11111111
+    and RawJoypad2Bits
+    sta PressedJoypad2Bits
+    rts
+
+;------------------------------------------------------------------------------------
+
+;call to switch to main game bank (TO-DO: Improve banking system)
 LoadMainBank:
-	lda #MainBank        ;load main bank
+	lda #MainBank
+;call to switch bank and save in shadow register
 Switch16KBank:
-	jsr SwitchPRGBank0   ;switch first 8K bank
+      sta ShadowPRGBank
+;call to switch bank without saving in shadow register
+TempSwitch16KBank:
+      ;bankswitch $8000-$9FFF region
+	pha
+	lda #%00000110
+	sta MMC3_BankSelect
+	pla
+	sta MMC3_BankData
+      ;bankswitch $A000-$BFFF region
 	clc
-      adc #$01             ;switch second 8K bank	
-SwitchPRGBank1:
+      adc #$01
 	pha
 	lda #%00000111
 	sta MMC3_BankSelect
 	pla
 	sta MMC3_BankData
 	rts
-SwitchPRGBank0:
-	pha
-	lda #%00000110
-	sta MMC3_BankSelect
-	pla
-	sta MMC3_BankData
-	rts
-
-RunWriteCHRPacket:
-	lda #CHRBank          ;switch bank
-	jsr Switch16KBank
-	jsr WriteCHRPacket    ;run relevant routine
-	jmp LoadMainBank      ;and return to main bank
 
 RunSoundEngine:
 	lda #SoundBank        ;switch bank
-	jsr Switch16KBank
+	jsr TempSwitch16KBank
 	jsr SoundEngine       ;run relevant routine
-	jmp LoadMainBank      ;and return to main bank
+      lda #MainBank
+	jmp TempSwitch16KBank ;and return to main bank
 
 RunLoadAreaPointer:
 	lda #LevelsBank       ;switch bank
@@ -15006,38 +14953,119 @@ RunGetAreaPointer:
 	jsr GetAreaPointer    ;run relevant routine
 	jmp LoadMainBank      ;and return to main bank
 
+NMI_Stub:
+      pha                       ;preserve accumulator, X and Y registers
+      txa
+      pha
+      tya
+      pha
+      jsr NMIHandler
+      lda ShadowPRGBank         ;restore original bank
+      jsr TempSwitch16KBank
+      pla                       ;restore accumulator, X and Y registers
+      tay
+      pla
+      tax
+      pla
+      rti
+
+NMIHandler:
+   lda Mirror_PPU_CTRL       ;alter name table address to be $2000
+   and #%01111110            ;and disable another NMI
+   sta Mirror_PPU_CTRL       ;from interrupting this one
+   sta PPU_CTRL              ;(TO-DO: Prevent reentrant NMI with software flag)
+   sei
+   lda #MainBank             ;load in main bank for this NMI handler
+   jsr TempSwitch16KBank
+   lda NMIAckFlag            ;if lag frame, do not update VRAM
+   bne SkipVRAMUpdate
+   lda $00                   ;also preserve $00 and $01 since we use them
+   pha
+   lda $01
+   pha
+   inc NMIAckFlag
+   lda Mirror_PPU_MASK
+   and #%11100110            ;disable OAM and background display by default
+   ldy DisableScreenFlag     ;if screen disabled, skip this
+   bne ScrnSwch
+   lda Mirror_PPU_MASK       ;otherwise reenable bits and save them
+   ora #%00011110
+ScrnSwch:
+   sta Mirror_PPU_MASK
+   and #%11100111            ;turn screen off regardless of mirror reg
+   sta PPU_MASK
+   ldx PPU_STATUS
+   lda #$00
+   jsr InitScroll
+   sta PPU_SPR_ADDR
+   lda #$02                  ;dump OAM data to PPU's sprite RAM
+   sta SPR_DMA
+   lda VRAM_Buffer_AddrCtrl
+   asl
+   tax
+   lda VRAM_AddrTable,x      ;get pointer to VRAM data
+   sta $00
+   inx
+   lda VRAM_AddrTable,x
+   sta $01
+   jsr UpdateScreen          ;now update the screen with it
+   ldy #$00
+   ldx VRAM_Buffer_AddrCtrl
+   cpx #$06                  ;if pointer number was set to 6 (for
+   bne InitVRAMVars          ;second VRAM buffer), increment Y to get
+   iny                       ;offset for second VRAM buffer
+InitVRAMVars:
+   ldx VRAM_Buffer_Offset,y  ;get pointer to correct buffer offset
+   lda #$00                  ;erase the VRAM buffer offset, init first VRAM buffer
+   sta VRAM_Buffer1_Offset,x ;by writing end terminator at the first byte, and
+   sta VRAM_Buffer1,x        ;init address control to point at first VRAM buffer
+   sta VRAM_Buffer_AddrCtrl
+   lda Mirror_PPU_MASK
+   sta PPU_MASK              ;dump PPU control register 2
+   pla                       ;restore zero page RAM
+   sta $01
+   pla
+   sta $00
+SkipVRAMUpdate:
+   cli
+   lda IRQUpdateFlag
+   beq SkipIRQ
+   lda #31                   ;count 31 scanlines (plus the pre-render scanline)
+   sta MMC3_IRQLatch
+   sta MMC3_IRQReload
+   sta MMC3_IRQEnable
+   inc IRQAckFlag            ;reset flag to wait for next IRQ
+SkipIRQ:
+   jsr RunSoundEngine        ;run sound engine every frame
+   lda PPU_STATUS            ;reset flip-flop
+   lda Mirror_PPU_CTRL       ;reenable NMIs 
+   ora #$80
+   sta Mirror_PPU_CTRL
+   sta PPU_CTRL
+   lda PPU_STATUS
+   rts
+
 IRQHandler:
-	sei
-	php                      ;save regs
-	pha
-	txa
-	pha
-	tya
-	pha        
-      ldy #$06                 ;delay for right part of scanline 31
+      pha                      ;save accumulator and Y
+      tya
+      pha
+      ldy #$09                 ;delay for right part of scanline 31
 DelS: dey
       bne DelS
-	lda Mirror_PPU_CTRL
-	and #$ef                 ;mask out sprite address high reg of ctrl reg mirror
-	ora NameTableSelect      ;mask in whatever's set here
-	sta Mirror_PPU_CTRL      ;update the register and its mirror
-	sta PPU_CTRL
+      lda Mirror_PPU_CTRL
+      ora NameTableSelect      ;set appropiate nametable for rendering
+      sta Mirror_PPU_CTRL      ;update the register and its mirror
+      sta PPU_CTRL
+      lda HorizontalScroll
+      sta PPU_SCROLL           ;set scroll position for the screen under the status bar
+      lda PPU_STATUS           ;reset flip-flop
 	lda #$00
 	sta MMC3_IRQDisable      ;disable IRQs for the rest of the frame
-	lda HorizontalScroll
-	sta PPU_SCROLL           ;set scroll regs for the screen under the status bar
-	lda VerticalScroll       ;to achieve the split screen effect
-	sta PPU_SCROLL
-	lda #$00
 	sta IRQAckFlag           ;indicate IRQ was acknowledged
-	pla
-	tay                      ;return regs, reenable IRQs and leave
-	pla
-	tax
-	pla
-	plp
-	cli
-	rti
+      pla                      ;restore accumulator and Y, then leave
+      tay
+      pla
+      rti
 
 Reset:
 	sei                        ;replicate init code present in FDS BIOS
@@ -15061,19 +15089,18 @@ VBlank:
 	ldx #$ff
 	txs
 	lda #$00
-	sta MMC3_Mirroring 			; vertical mirroring
+	sta MMC3_Mirroring          ;vertical mirroring
+      sta Mirror_PPU_CTRL         ;workaround for hacky GFX loader
+      sta Mirror_PPU_MASK
 	lda #%10000000
-	sta MMC3_PRGRAMProtect 		; enable PRG-RAM
-	jsr InitCHRBanks
-	lda #CHRBank
-	jsr SwitchPRGBank0
-	lda #CHRBank+1
-	jsr SwitchPRGBank1
+	sta MMC3_PRGRAMProtect      ;enable PRG-RAM
+	jsr InitCHRBanks            ;set up CHR bank registers
       ldx #BG_MAIN_INDEX          ;load universal CHR data
       lda #SPR_MAIN_INDEX
       jsr FetchCHRPacket_AX
       jsr LoadGameTileset         ;load game-appropiate CHR data
-	jsr LoadMainBank            ;switch PRG banks
+      lda #MainBank
+	jsr Switch16KBank           ;switch PRG banks
 	jsr CheckSaveData           ;check validity of save data
 	jmp Start                   ;now start the game!
 
@@ -15083,6 +15110,6 @@ VBlank:
 .res $FFFA - *, $FF
 
 ;"VECTORS"
-        .word NMIHandler
+        .word NMI_Stub
         .word Reset
         .word IRQHandler
