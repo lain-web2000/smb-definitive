@@ -193,10 +193,8 @@ FlagpoleCollisionYPos = $070f
 StompChainCounter     = $0484
 FlagpoleMusicFlag     = $07f6
 
-VRAM_Buffer1_Offset   = $0300
-VRAM_Buffer1          = $0301
-VRAM_Buffer2_Offset   = $0340
-VRAM_Buffer2          = $0341
+VRAM_Buffer_Offset    = $0300
+VRAM_Buffer           = $0301
 VRAM_Buffer_AddrCtrl  = $0773
 Sprite0HitDetectFlag  = $0722
 DisableScreenFlag     = $0774

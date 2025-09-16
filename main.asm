@@ -142,17 +142,14 @@ WaitForIRQ: lda IRQAckFlag            ;wait for IRQ (TO-DO: is this necessary?)
 ;-------------------------------------------------------------------------------------
 
 VRAM_AddrTable:
-   .word VRAM_Buffer1, WaterPaletteData, GroundPaletteData, UndergroundPaletteData
-   .word CastlePaletteData, TitleScreenGfxData, VRAM_Buffer2, VRAM_Buffer2
+   .word VRAM_Buffer, WaterPaletteData, GroundPaletteData, UndergroundPaletteData
+   .word CastlePaletteData, TitleScreenGfxData_SMB1, VRAM_Buffer, TitleScreenGfxData_SMB2
    .word BowserPaletteData, DaySnowPaletteData, NightSnowPaletteData, MushroomPaletteData
    .word MarioThankYouMsg, LuigiThankYouMsg, MushroomRetainerMsg, FinalRoomPalette
    .word MarioThankYouMsgFinal, PeaceIsPavedMsg, WithKingdomSavedMsg, MarioHurrahMsg
    .word OurOnlyHeroMsg, ThisEndsYourTripMsg, OfALongFriendshipMsg, PointsAddedMsg
    .word ForEachPlayerLeftMsg, LuigiThankYouMsgFinal, LuigiHurrahMsg, DiskScreenPalette
    .word PrincessPeachsRoom, FantasyWorld9Msg, ThanksForPlayingMsg
-
-VRAM_Buffer_Offset:
-   .byte <VRAM_Buffer1_Offset, <VRAM_Buffer2_Offset
 
 ;-------------------------------------------------------------------------------------
 
@@ -343,7 +340,11 @@ DrawTitleScreen:
     lda OperMode       ;if not in attract mode, do not draw title screen
     bne IncModeTask    ;yes, this routine is run in other modes
     lda #$05
-    jmp SetVRAMAddr_B  ;otherwise set up VRAM address controller accordingly
+    ldy CurrentGame
+    cpy #$02
+    bne :+
+    lda #$07
+:   jmp SetVRAMAddr_B  ;otherwise set up VRAM address controller accordingly
 
 ;-------------------------------------------------------------------------------------
 
@@ -665,7 +666,7 @@ GetBackgroundColor:
 NoBGColor: inc ScreenRoutineTask     ;increment to next subtask and plod on through
       
 GetPlayerColors:
-               ldx VRAM_Buffer1_Offset  ;get current buffer offset
+               ldx VRAM_Buffer_Offset   ;get current buffer offset
                lda #$00                 ;load offset for mario
                ldy SelectedPlayer       ;check which player is on the screen
                beq ChkFiery             ;if mario, branch
@@ -679,29 +680,29 @@ StartClrGet:   tay                      ;transfer our offset into Y
                lda #$03                 ;do four colors
                sta $00
 ClrGetLoop:    lda PlayerColors,y       ;fetch player colors and store them
-               sta VRAM_Buffer1+3,x     ;in the buffer
+               sta VRAM_Buffer+3,x      ;in the buffer
                iny
                inx
                dec $00
                bpl ClrGetLoop
-               ldx VRAM_Buffer1_Offset  ;load original offset from before
+               ldx VRAM_Buffer_Offset   ;load original offset from before
                ldy BackgroundColorCtrl  ;if this value is four or greater, it will be set
                bne SetBGColor           ;therefore use it as offset to background color
                ldy AreaType             ;otherwise use area type bits from area offset as offset
 SetBGColor:    lda BackgroundColors,y   ;to background color instead
-               sta VRAM_Buffer1+3,x
+               sta VRAM_Buffer+3,x
                lda #$3f                 ;set for sprite palette address
-               sta VRAM_Buffer1,x       ;save to buffer
+               sta VRAM_Buffer,x        ;save to buffer
                lda #$10
-               sta VRAM_Buffer1+1,x
+               sta VRAM_Buffer+1,x
                lda #$04                 ;write length byte to buffer
-               sta VRAM_Buffer1+2,x
+               sta VRAM_Buffer+2,x
                lda #$00                 ;now the null terminator
-               sta VRAM_Buffer1+7,x
+               sta VRAM_Buffer+7,x
                txa                      ;move the buffer pointer ahead 7 bytes
                clc                      ;in case we want to write anything else later
                adc #$07
-SetVRAMOffset: sta VRAM_Buffer1_Offset  ;store as new vram buffer offset
+SetVRAMOffset: sta VRAM_Buffer_Offset   ;store as new vram buffer offset
                rts
 
 GetAlternatePalette1:
@@ -719,29 +720,29 @@ WriteTopStatusLine:
 
 WriteBottomStatusLine:
       jsr WriteScoreAndCoinTally ;write player's score and coin tally to screen
-      ldx VRAM_Buffer1_Offset
+      ldx VRAM_Buffer_Offset
       lda #$20                   ;write address for world-area number on screen
-      sta VRAM_Buffer1,x
+      sta VRAM_Buffer,x
       lda #$73
-      sta VRAM_Buffer1+1,x
+      sta VRAM_Buffer+1,x
       lda #$03                   ;write length for it
-      sta VRAM_Buffer1+2,x
+      sta VRAM_Buffer+2,x
       ldy WorldNumber            ;get the current world number
       iny                        ;increment the world number/letter because
       tya                        ;the internal world number counts from 0, not 1
-      sta VRAM_Buffer1+3,x
+      sta VRAM_Buffer+3,x
       jsr GetDashStarForDisplay
-      sta VRAM_Buffer1+4,x
+      sta VRAM_Buffer+4,x
       ldy LevelNumber            ;next the level number
       iny                        ;increment for proper number display
       tya
-      sta VRAM_Buffer1+5,x
+      sta VRAM_Buffer+5,x
       lda #$00                   ;put null terminator at the end
-      sta VRAM_Buffer1+6,x
+      sta VRAM_Buffer+6,x
       txa                        ;move the buffer offset up by 6 bytes
       clc
       adc #$06
-      sta VRAM_Buffer1_Offset
+      sta VRAM_Buffer_Offset
       jmp IncSubtask
 
 DisplayTimeUp:
@@ -804,9 +805,7 @@ TaskLoop:  jsr AreaParserTaskHandler ;render column set of current area
            dec ColumnSets            ;do we need to render more column sets?
            bpl OutputCol
            inc ScreenRoutineTask     ;if not, move on to the next task
-OutputCol: lda #$06                  ;set vram buffer to output rendered column set
-           sta VRAM_Buffer_AddrCtrl  ;on next NMI
-           rts
+OutputCol: rts
 
 GameText:
 TopStatusBarLine:
@@ -885,12 +884,12 @@ WriteGameText:
 GameTextLoop:  lda GameText,x            ;load game text data
                cmp #$ff                  ;check for terminator
                beq EndGameText           ;branch to end text if found
-               sta VRAM_Buffer1,y        ;otherwise write data to buffer
+               sta VRAM_Buffer,y         ;otherwise write data to buffer
                inx                       ;and increment increment
                iny
                bne GameTextLoop          ;do this for 256 bytes if no terminator found
 EndGameText:   lda #$00                  ;put null terminator at end
-               sta VRAM_Buffer1,y
+               sta VRAM_Buffer,y
                pla                       ;pull original text number from stack
                beq CheckPlayerName       ;if printing top status bar, branch to check player's name
                tax
@@ -899,10 +898,10 @@ EndGameText:   lda #$00                  ;put null terminator at end
                lda DifficultyFlag        ;if not easy mode, print lives display
                bne PrepLivesDisp
                lda #$ce                  ;otherwise put crown tile in its place
-               sta VRAM_Buffer1+5        ;and branch ahead to display world/level numbers
+               sta VRAM_Buffer+5         ;and branch ahead to display world/level numbers
                bne PutWorldNum
 PrepLivesDisp: lda #$aa                  ;fix attribute data for lives display
-               sta VRAM_Buffer1+26
+               sta VRAM_Buffer+26
                lda NumberofLives         ;check number of lives
                clc                       ;and increment by one for display
                adc #1
@@ -914,17 +913,17 @@ LivesLoop:     cmp #10                   ;more than 9 lives?
                bne LivesLoop             ;unconditional branch back
 PutTens:       cpy #0                    ;if tens digit is 0, don't bother showing it
                beq PutOnes
-               sty VRAM_Buffer1+5        ;write tens digit of lives to screen
-PutOnes:       sta VRAM_Buffer1+6        ;write ones digit of lives to screen
+               sty VRAM_Buffer+5         ;write tens digit of lives to screen
+PutOnes:       sta VRAM_Buffer+6         ;write ones digit of lives to screen
 PutWorldNum:   ldy WorldNumber           ;get the current world number
                iny                       ;increment the world number/letter because
                tya                       ;the internal world number counts from 0, not 1
-               sta VRAM_Buffer1+16
+               sta VRAM_Buffer+16
                jsr GetDashStarForDisplay
-               sta VRAM_Buffer1+17
+               sta VRAM_Buffer+17
 PutLevelNum:   ldy LevelNumber
                iny
-               sty VRAM_Buffer1+18       ;we're done here
+               sty VRAM_Buffer+18       ;we're done here
 ExWGT:         rts
 
 GetDashStarForDisplay:
@@ -946,36 +945,37 @@ CheckPlayerName:
              beq ExitChkName        ;if mario, leave
              ldy #$04
 NameLoop:    lda LuigiName,y        ;otherwise, replace "MARIO" with "LUIGI"
-             sta VRAM_Buffer1+3,y
+             sta VRAM_Buffer+3,y
              dey
              bpl NameLoop           ;do this until each letter is replaced
 ExitChkName: rts
 
 WriteWarpZoneMessage:
-         pha                   ;save warp zone control temporarily
+         pha                    ;save warp zone control temporarily
          ldy #$ff
 WZMLoop: iny
-         lda WarpZone,y        ;write warp zone message to VRAM buffer
-         sta VRAM_Buffer1,y
+         lda WarpZone,y         ;write warp zone message to VRAM buffer
+         sta VRAM_Buffer,y
          bne WZMLoop
          pla
          sec
-         sbc #$80              ;clear d7 of warp zone control, use as offset
-         asl                   ;shift to the left twice to get
-         asl                   ;proper warp zone number offset
+         sbc #$80               ;clear d7 of warp zone control, use as offset
+         asl                    ;shift to the left twice to get
+         asl                    ;proper warp zone number offset
          tax
          ldy #$00
-WNumLp:  lda WarpZoneNumbers,x ;print warp zone numbers into the
-         sta VRAM_Buffer1+27,y ;placeholders from earlier
+WNumLp:  lda WarpZoneNumbers,x  ;print warp zone numbers into the
+         sta VRAM_Buffer+27,y   ;placeholders from earlier
          inx
-         iny                   ;put a number in every fourth space
+         iny                    ;put a number in every fourth space
          iny
          iny
          iny
          cpy #$0c
          bcc WNumLp
-         lda #$2c              ;set VRAM offset after the contents
-         jmp SetVRAMOffset     ;in case anything else needs to go in there
+         lda #$2c               ;set VRAM offset after the contents
+         sta VRAM_Buffer_Offset ;in case anything else needs to go in there
+         rts
 
 ResetSpritesAndScreenTimer:
          lda ScreenTimer             ;check if screen timer has expired
@@ -1002,14 +1002,14 @@ RenderAreaGraphics:
             lda CurrentColumnPos         ;store LSB of where we're at
             and #$01
             sta $05
-            ldy VRAM_Buffer2_Offset      ;store vram buffer offset
+            ldy VRAM_Buffer_Offset       ;store vram buffer offset
             sty $00
             lda CurrentNTAddr_Low        ;get current name table address we're supposed to render
-            sta VRAM_Buffer2+1,y
+            sta VRAM_Buffer+1,y
             lda CurrentNTAddr_High
-            sta VRAM_Buffer2,y
+            sta VRAM_Buffer,y
             lda #$9a                     ;store length byte of 26 here with d7 set
-            sta VRAM_Buffer2+2,y         ;to increment by 32 (in columns)
+            sta VRAM_Buffer+2,y          ;to increment by 32 (in columns)
             lda #$00                     ;init attribute row
             sta $04
             tax
@@ -1037,10 +1037,10 @@ DrawMTLoop: stx $01                      ;store init value of 0 or incremented o
             tay
             ldx $00                      ;use vram buffer offset from before as X
             lda ($06),y
-            sta VRAM_Buffer2+3,x         ;get first tile number (top left or top right) and store
+            sta VRAM_Buffer+3,x          ;get first tile number (top left or top right) and store
             iny
             lda ($06),y                  ;now get the second (bottom left or bottom right) and store
-            sta VRAM_Buffer2+4,x
+            sta VRAM_Buffer+4,x
             ldy $04                      ;get current attribute row
             lda $05                      ;get LSB of current column where we're at, and
             bne RightCheck               ;branch if set (clear = left attrib, set = right)
@@ -1076,8 +1076,8 @@ SetAttrib:  lda AttributeBuffer,y        ;get previously saved bits from before
             iny
             iny
             lda #$00
-            sta VRAM_Buffer2,y           ;put null terminator at end of data for name table
-            sty VRAM_Buffer2_Offset      ;store new buffer offset
+            sta VRAM_Buffer,y            ;put null terminator at end of data for name table
+            sty VRAM_Buffer_Offset       ;store new buffer offset
             inc CurrentNTAddr_Low        ;increment name table address low
             lda CurrentNTAddr_Low        ;check current low byte
             and #%00011111               ;if no wraparound, just skip this part
@@ -1087,7 +1087,7 @@ SetAttrib:  lda AttributeBuffer,y        ;get previously saved bits from before
             lda CurrentNTAddr_High       ;and then invert d2 of the name table address high
             eor #%00000100               ;to move onto the next appropriate name table
             sta CurrentNTAddr_High
-ExitDrawM:  jmp SetVRAMCtrl              ;jump to set VRAM address controller
+ExitDrawM:  rts
 
 RenderAttributeTables:
              lda CurrentNTAddr_Low    ;get low byte of next name table address
@@ -1108,18 +1108,18 @@ SetATHigh:   and #%00000100           ;mask out all other bits
              adc #$c0                 ;we should now have the appropriate block of
              sta $01                  ;attribute table in our temp address
              ldx #$00
-             ldy VRAM_Buffer2_Offset  ;get buffer offset
+             ldy VRAM_Buffer_Offset   ;get buffer offset
 AttribLoop:  lda $00
-             sta VRAM_Buffer2,y       ;store high byte of attribute table address
+             sta VRAM_Buffer,y        ;store high byte of attribute table address
              lda $01
              clc                      ;get low byte, add 8 because we want to start
              adc #$08                 ;below the status bar, and store
-             sta VRAM_Buffer2+1,y
+             sta VRAM_Buffer+1,y
              sta $01                  ;also store in temp again
              lda AttributeBuffer,x    ;fetch current attribute table byte and store
-             sta VRAM_Buffer2+3,y     ;in the buffer
+             sta VRAM_Buffer+3,y      ;in the buffer
              lda #$01
-             sta VRAM_Buffer2+2,y     ;store length of 1 in buffer
+             sta VRAM_Buffer+2,y      ;store length of 1 in buffer
              lsr
              sta AttributeBuffer,x    ;clear current byte in attribute buffer
              iny                      ;increment buffer offset by 4 bytes
@@ -1129,10 +1129,8 @@ AttribLoop:  lda $00
              inx                      ;increment attribute offset and check to see
              cpx #$07                 ;if we're at the end yet
              bcc AttribLoop
-             sta VRAM_Buffer2,y       ;put null terminator at the end
-             sty VRAM_Buffer2_Offset  ;store offset in case we want to do any more
-SetVRAMCtrl: lda #$06
-             sta VRAM_Buffer_AddrCtrl ;set VRAM address controller to second VRAM buffer
+             sta VRAM_Buffer,y        ;put null terminator at the end
+             sty VRAM_Buffer_Offset   ;store offset in case we want to do any more
              rts
 
 ;-------------------------------------------------------------------------------------
@@ -1155,17 +1153,17 @@ ColorRotation:
               lda FrameCounter         ;get frame counter
               and #$07                 ;mask out all but three LSB
               bne ExitColorRot         ;branch if not set to zero to do this every eighth frame
-              ldx VRAM_Buffer1_Offset  ;check vram buffer offset
+              ldx VRAM_Buffer_Offset   ;check vram buffer offset
               cpx #$31
               bcs ExitColorRot         ;if offset over 48 bytes, branch to leave
               tay                      ;otherwise use frame counter's 3 LSB as offset here
 GetBlankPal:  lda BlankPalette,y       ;get blank palette for palette 3
-              sta VRAM_Buffer1,x       ;store it in the vram buffer
+              sta VRAM_Buffer,x        ;store it in the vram buffer
               inx                      ;increment offsets
               iny
               cpy #$08
               bcc GetBlankPal          ;do this until all bytes are copied
-              ldx VRAM_Buffer1_Offset  ;get current vram buffer offset
+              ldx VRAM_Buffer_Offset   ;get current vram buffer offset
               lda #$03
               sta $00                  ;set counter here
               lda AreaType             ;get area type
@@ -1173,19 +1171,19 @@ GetBlankPal:  lda BlankPalette,y       ;get blank palette for palette 3
               asl
               tay                      ;save as offset here
 GetAreaPal:   lda Palette3Data,y       ;fetch palette to be written based on area type
-              sta VRAM_Buffer1+3,x     ;store it to overwrite blank palette in vram buffer
+              sta VRAM_Buffer+3,x      ;store it to overwrite blank palette in vram buffer
               iny
               inx
               dec $00                  ;decrement counter
               bpl GetAreaPal           ;do this until the palette is all copied
-              ldx VRAM_Buffer1_Offset  ;get current vram buffer offset
+              ldx VRAM_Buffer_Offset   ;get current vram buffer offset
               ldy ColorRotateOffset    ;get color cycling offset
               lda ColorRotatePalette,y
-              sta VRAM_Buffer1+4,x     ;get and store current color in second slot of palette
-              lda VRAM_Buffer1_Offset
+              sta VRAM_Buffer+4,x      ;get and store current color in second slot of palette
+              lda VRAM_Buffer_Offset
               clc                      ;add seven bytes to vram buffer offset
               adc #$07
-              sta VRAM_Buffer1_Offset
+              sta VRAM_Buffer_Offset
               inc ColorRotateOffset    ;increment color cycling offset
               lda ColorRotateOffset
               cmp #$06                 ;check to see if it's still in range
@@ -1196,7 +1194,6 @@ ExitColorRot: rts                      ;leave
 
 ;-------------------------------------------------------------------------------------
 ;$00 - temp store for offset control bit
-;$01 - temp vram buffer offset
 ;$02 - temp store for vertical high nybble in block buffer routine
 ;$03 - temp adder for high byte of name table address
 ;$04, $05 - name table address low/high
@@ -1210,15 +1207,11 @@ BlockGfxData:
        .byte $5d, $5d, $5d, $5d
 
 RemoveCoin_Axe:
-              ldy #$41                 ;set low byte so offset points to second vram buffer
               lda #$03                 ;load offset for default blank metatile
               ldx AreaType             ;check area type
               bne WriteBlankMT         ;if not water type, use offset
               lda #$04                 ;otherwise load offset for blank metatile used in water
-WriteBlankMT: jsr PutBlockMetatile     ;do a sub to write blank metatile to vram buffer
-              lda #$06
-              sta VRAM_Buffer_AddrCtrl ;set vram address controller to second vram buffer and leave
-              rts
+WriteBlankMT: bne PutBlockMetatile     ;do a sub to write blank metatile to vram buffer
 
 ReplaceBlockMetatile:
        jsr WriteBlockMetatile    ;write metatile to vram buffer to replace block object
@@ -1230,85 +1223,79 @@ DestroyBlockMetatile:
        lda #$00       ;force blank metatile if branched/jumped to this point
 
 WriteBlockMetatile:
-             ldy #$03                ;load offset for blank metatile
-             cmp #$00                ;check contents of A for blank metatile
-             beq UseBOffset          ;branch if found (unconditional if destroying metatile)
-             ldy #$00                ;load offset for brick metatile w/ line
-             cmp #$58 
-             beq UseBOffset          ;use offset if metatile is brick with coins (w/ line)
-             cmp #$51
-             beq UseBOffset          ;use offset if metatile is breakable brick w/ line
-             iny                     ;increment offset for brick metatile w/o line
-             cmp #$5e
-             beq UseBOffset          ;use offset if metatile is brick with coins (w/o line)
-             cmp #$52
-             beq UseBOffset          ;use offset if metatile is breakable brick w/o line
-             iny                     ;if any other metatile, increment offset for empty block
-UseBOffset:  tya                     ;put Y in A
-             ldy VRAM_Buffer1_Offset ;get vram buffer offset
-             iny                     ;move onto next byte
-             jsr PutBlockMetatile    ;get appropriate block data and write to vram buffer
-MoveVOffset: dey                     ;decrement vram buffer offset
-             tya                     ;add 10 bytes to it
-             clc
-             adc #10
-             jmp SetVRAMOffset       ;branch to store as new vram buffer offset
-
+            ldy #$03                ;load offset for blank metatile
+            cmp #$00                ;check contents of A for blank metatile
+            beq UseBOffset          ;branch if found (unconditional if destroying metatile)
+            ldy #$00                ;load offset for brick metatile w/ line
+            cmp #$58 
+            beq UseBOffset          ;use offset if metatile is brick with coins (w/ line)
+            cmp #$51
+            beq UseBOffset          ;use offset if metatile is breakable brick w/ line
+            iny                     ;increment offset for brick metatile w/o line
+            cmp #$5e
+            beq UseBOffset          ;use offset if metatile is brick with coins (w/o line)
+            cmp #$52
+            beq UseBOffset          ;use offset if metatile is breakable brick w/o line
+            iny                     ;if any other metatile, increment offset for empty block
+UseBOffset: tya                     ;put Y in A
 PutBlockMetatile:
-            stx $00               ;store control bit from SprDataOffset_Ctrl
-            sty $01               ;store vram buffer offset for next byte
+            stx $00                 ;store control bit from SprDataOffset_Ctrl
             asl
-            asl                   ;multiply A by four and use as X
+            asl                     ;multiply A by four and use as X
             tax
-            ldy #$20              ;load high byte for name table 0
-            lda $06               ;get low byte of block buffer pointer
-            cmp #$d0              ;check to see if we're on odd-page block buffer
-            bcc SaveHAdder        ;if not, use current high byte
-            ldy #$24              ;otherwise load high byte for name table 1
-SaveHAdder: sty $03               ;save high byte here
-            and #$0f              ;mask out high nybble of block buffer pointer
-            asl                   ;multiply by 2 to get appropriate name table low byte
-            sta $04               ;and then store it here
+            ldy #$20                ;load high byte for name table 0
+            lda $06                 ;get low byte of block buffer pointer
+            cmp #$d0                ;check to see if we're on odd-page block buffer
+            bcc SaveHAdder          ;if not, use current high byte
+            ldy #$24                ;otherwise load high byte for name table 1
+SaveHAdder: sty $03                 ;save high byte here
+            and #$0f                ;mask out high nybble of block buffer pointer
+            asl                     ;multiply by 2 to get appropriate name table low byte
+            sta $04                 ;and then store it here
             lda #$00
-            sta $05               ;initialize temp high byte
-            lda $02               ;get vertical high nybble offset used in block buffer routine
+            sta $05                 ;initialize temp high byte
+            lda $02                 ;get vertical high nybble offset used in block buffer routine
             clc
-            adc #$20              ;add 32 pixels for the status bar
+            adc #$20                ;add 32 pixels for the status bar
             asl
-            rol $05               ;shift and rotate d7 onto d0 and d6 into carry
+            rol $05                 ;shift and rotate d7 onto d0 and d6 into carry
             asl
-            rol $05               ;shift and rotate d6 onto d0 and d5 into carry
-            adc $04               ;add low byte of name table and carry to vertical high nybble
-            sta $04               ;and store here
-            lda $05               ;get whatever was in d7 and d6 of vertical high nybble
-            adc #$00              ;add carry
+            rol $05                 ;shift and rotate d6 onto d0 and d5 into carry
+            adc $04                 ;add low byte of name table and carry to vertical high nybble
+            sta $04                 ;and store here
+            lda $05                 ;get whatever was in d7 and d6 of vertical high nybble
+            adc #$00                ;add carry
             clc
-            adc $03               ;then add high byte of name table
-            sta $05               ;store here
-            ldy $01               ;get vram buffer offset to be used
-RemBridge:  lda BlockGfxData,x    ;write top left and top right
-            sta VRAM_Buffer1+2,y  ;tile numbers into first spot
+            adc $03                 ;then add high byte of name table
+            sta $05                 ;store here
+RemBridge:  ldy VRAM_Buffer_Offset  ;get vram buffer offset
+            lda BlockGfxData,x      ;write top left and top right
+            sta VRAM_Buffer+3,y     ;tile numbers into first spot
             lda BlockGfxData+1,x
-            sta VRAM_Buffer1+3,y
-            lda BlockGfxData+2,x  ;write bottom left and bottom
-            sta VRAM_Buffer1+7,y  ;right tiles numbers into
-            lda BlockGfxData+3,x  ;second spot
-            sta VRAM_Buffer1+8,y
+            sta VRAM_Buffer+4,y
+            lda BlockGfxData+2,x    ;write bottom left and bottom
+            sta VRAM_Buffer+8,y     ;right tiles numbers into
+            lda BlockGfxData+3,x    ;second spot
+            sta VRAM_Buffer+9,y
             lda $04
-            sta VRAM_Buffer1,y    ;write low byte of name table
-            clc                   ;into first slot as read
-            adc #$20              ;add 32 bytes to value
-            sta VRAM_Buffer1+5,y  ;write low byte of name table
-            lda $05               ;plus 32 bytes into second slot
-            sta VRAM_Buffer1-1,y  ;write high byte of name
-            sta VRAM_Buffer1+4,y  ;table address to both slots
+            sta VRAM_Buffer+1,y     ;write low byte of name table
+            clc                     ;into first slot as read
+            adc #$20                ;add 32 bytes to value
+            sta VRAM_Buffer+6,y     ;write low byte of name table
+            lda $05                 ;plus 32 bytes into second slot
+            sta VRAM_Buffer,y       ;write high byte of name
+            sta VRAM_Buffer+5,y     ;table address to both slots
             lda #$02
-            sta VRAM_Buffer1+1,y  ;put length of 2 in
-            sta VRAM_Buffer1+6,y  ;both slots
+            sta VRAM_Buffer+2,y     ;put length of 2 in
+            sta VRAM_Buffer+7,y     ;both slots
             lda #$00
-            sta VRAM_Buffer1+9,y  ;put null terminator at end
-            ldx $00               ;get offset control bit here
-            rts                   ;and leave
+            sta VRAM_Buffer+10,y    ;put null terminator at end
+            tya                     ;add 10 bytes to buffer offset
+            clc
+            adc #10
+            sta VRAM_Buffer_Offset  ;store new vram buffer offset
+            ldx $00                 ;get offset control bit here
+            rts                     ;and leave
 
 ;-------------------------------------------------------------------------------------
 ;METATILE GRAPHICS TABLE
@@ -1569,8 +1556,8 @@ InitNTLoop:   sta PPU_DATA              ;count out exactly 768 tiles
               bne InitNTLoop
               ldy #64                   ;now to clear the attribute table (with zero this time)
               txa
-              sta VRAM_Buffer1_Offset   ;init vram buffer 1 offset
-              sta VRAM_Buffer1          ;init vram buffer 1
+              sta VRAM_Buffer_Offset    ;init vram buffer offset
+              sta VRAM_Buffer           ;init vram buffer
 InitATLoop:   sta PPU_DATA
               dey
               bne InitATLoop
@@ -1669,16 +1656,16 @@ OutputNumbers:
              pha                      ;save incremented value to stack for now and
              asl                      ;multiply by 2 to use as offset
              tay
-             ldx VRAM_Buffer1_Offset  ;get current buffer pointer
+             ldx VRAM_Buffer_Offset   ;get current buffer pointer
              lda #$20                 ;put at top of screen by default
              cpy #$00                 ;are we writing top score on title screen?
              bne SetupNums
              lda #$22                 ;if so, put further down on the screen
-SetupNums:   sta VRAM_Buffer1,x
+SetupNums:   sta VRAM_Buffer,x
              lda StatusBarData,y      ;write vram address low and length of thing
-             sta VRAM_Buffer1+1,x     ;we're printing to the buffer
+             sta VRAM_Buffer+1,x      ;we're printing to the buffer
              lda StatusBarData+1,y
-             sta VRAM_Buffer1+2,x
+             sta VRAM_Buffer+2,x
              sta $03                  ;save length byte in counter
              stx $02                  ;and buffer pointer elsewhere for now
              pla                      ;pull original incremented value from stack
@@ -1689,17 +1676,17 @@ SetupNums:   sta VRAM_Buffer1,x
              tay                      ;use value as offset to display digits
              ldx $02
 DigitPLoop:  lda DisplayDigits,y      ;write digits to the buffer
-             sta VRAM_Buffer1+3,x    
+             sta VRAM_Buffer+3,x    
              inx
              iny
              dec $03                  ;do this until all the digits are written
              bne DigitPLoop
              lda #$00                 ;put null terminator at end
-             sta VRAM_Buffer1+3,x
+             sta VRAM_Buffer+3,x
              inx                      ;increment buffer pointer by 3
              inx
              inx
-             stx VRAM_Buffer1_Offset  ;store it in case we want to use it again
+             stx VRAM_Buffer_Offset   ;store it in case we want to use it again
 ExitOutputN: rts
 
 DigitsMathRoutine:
@@ -1831,7 +1818,7 @@ SecondaryGameSetup:
        sta WindFlag
        sta FlagpoleMusicFlag
        tay
-ClearVRLoop: sta VRAM_Buffer1-1,y      ;clear buffer at $0300-$03ff
+ClearVRLoop: sta VRAM_Buffer-1,y       ;clear buffer at $0300-$03ff
              iny
              bne ClearVRLoop
              sta GameTimerExpiredFlag  ;clear game timer exp flag
@@ -3589,19 +3576,19 @@ NoWind:       lda WaterAnimTimer
               tay
               lda WaterAnimOffsets,y
               tay
-              ldx VRAM_Buffer1_Offset
+              ldx VRAM_Buffer_Offset
               lda #19
               sta $00
 :             lda WaterAnimTiles,y
-              sta VRAM_Buffer1,x
+              sta VRAM_Buffer,x
               iny
               inx
               dec $00
               bne :-
               lda #$00
-              sta VRAM_Buffer1,x
+              sta VRAM_Buffer,x
               txa
-              sta VRAM_Buffer1_Offset
+              sta VRAM_Buffer_Offset
 NoWAnim:      lda Player_Y_HighPos
               cmp #$02                   ;if player is below the screen, don't bother with the music
               bpl NoChgMus
@@ -3626,10 +3613,7 @@ SaveAB:       lda A_B_Buttons            ;save current A and B button
               sta PreviousA_B_Buttons    ;into temp variable to be used on next frame
               lda #$00
               sta Left_Right_Buttons     ;nullify left and right buttons temp variable
-UpdScrollVar: lda VRAM_Buffer_AddrCtrl
-              cmp #$06                   ;if vram address controller set to 6
-              beq ExitEng                ;then branch to leave
-              lda AreaParserTaskNum      ;otherwise check number of tasks
+UpdScrollVar: lda AreaParserTaskNum      ;check number of tasks
               bne RunParser
               lda ScrollThirtyTwo        ;get horizontal scroll in 0-31 or $00-$20 range
               cmp #$20                   ;check to see if exceeded $21
@@ -3637,8 +3621,6 @@ UpdScrollVar: lda VRAM_Buffer_AddrCtrl
               lda ScrollThirtyTwo
               sbc #$20                   ;otherwise subtract $20 to set appropriately
               sta ScrollThirtyTwo        ;and store
-              lda #$00                   ;reset vram buffer offset used in conjunction with
-              sta VRAM_Buffer2_Offset    ;level graphics buffer in second VRAM buffer
 RunParser:    jsr AreaParserTaskHandler  ;update the name table with more level graphics
 ExitEng:      rts                        ;and after all that, we're finally done!
 
@@ -5467,11 +5449,11 @@ WriteScoreAndCoinTally:
         lda #$01
 WriteDigits:
         jsr PrintStatusBarNumbers ;print status bar numbers
-        ldy VRAM_Buffer1_Offset   
-        lda VRAM_Buffer1-6,y      ;check highest digit of score
+        ldy VRAM_Buffer_Offset   
+        lda VRAM_Buffer-6,y       ;check highest digit of score
         bne NoZSup                ;if zero, overwrite with space tile for zero suppression
         lda #$24
-        sta VRAM_Buffer1-6,y
+        sta VRAM_Buffer-6,y
 NoZSup: ldx ObjectOffset          ;get enemy object buffer offset
         rts
 
@@ -5866,7 +5848,7 @@ UpdSte:    sta Block_State,x          ;store contents of A in block object state
 BlockObjMT_Updater:
             ldx #$01                  ;set offset to start with second block object
 UpdateLoop: stx ObjectOffset          ;set offset here
-            lda VRAM_Buffer1          ;if vram buffer already being used here,
+            lda VRAM_Buffer           ;if vram buffer already being used here,
             bne NextBUpd              ;branch to move onto next block object
             lda Block_RepFlag,x       ;if flag for block object already clear,
             beq NextBUpd              ;branch to move onto next block object
@@ -8541,12 +8523,9 @@ RemoveBridge:
          ldy BridgeCollapseOffset  ;get bridge collapse offset here
          lda BridgeCollapseData,y  ;load low byte of name table address and store here
          sta $04
-         ldy VRAM_Buffer1_Offset   ;increment vram buffer offset
-         iny
          ldx #$0c                  ;set offset for tile data for sub to draw blank metatile
          jsr RemBridge             ;do sub here to remove bowser's bridge metatiles
          ldx ObjectOffset          ;get enemy offset
-         jsr MoveVOffset           ;set new vram buffer offset
          lda #Sfx_Blast            ;load the fireworks/gunfire sound into the square 2 sfx
          sta Square2SoundQueue     ;queue while at the same time loading the brick
          lda #Sfx_BrickShatter     ;shatter sound into the noise sfx queue thus
@@ -9212,7 +9191,7 @@ DrawEraseRope:
          lda Enemy_Y_Speed,y         ;check to see if current platform is
          ora Enemy_Y_MoveForce,y     ;moving at all
          beq ExitRp                  ;if not, skip all of this and branch to leave
-         ldx VRAM_Buffer1_Offset     ;get vram buffer offset
+         ldx VRAM_Buffer_Offset      ;get vram buffer offset
          cpx #$20                    ;if offset beyond a certain point, go ahead
          bcs ExitRp                  ;and skip this, branch to leave
          lda Enemy_Y_Speed,y
@@ -9220,21 +9199,21 @@ DrawEraseRope:
          pha
          jsr SetupPlatformRope       ;do a sub to figure out where to put new bg tiles
          lda $01                     ;write name table address to vram buffer
-         sta VRAM_Buffer1,x          ;first the high byte, then the low
+         sta VRAM_Buffer,x           ;first the high byte, then the low
          lda $00
-         sta VRAM_Buffer1+1,x
+         sta VRAM_Buffer+1,x
          lda #$02                    ;set length for 2 bytes
-         sta VRAM_Buffer1+2,x
+         sta VRAM_Buffer+2,x
          lda Enemy_Y_Speed,y         ;if platform moving upwards, branch 
          bmi EraseR1                 ;to do something else
          lda #$68
-         sta VRAM_Buffer1+3,x        ;otherwise put tile numbers for left
+         sta VRAM_Buffer+3,x         ;otherwise put tile numbers for left
          lda #$69                    ;and right sides of rope in vram buffer
-         sta VRAM_Buffer1+4,x
+         sta VRAM_Buffer+4,x
          jmp OtherRope               ;jump to skip this part
 EraseR1: lda #$24                    ;put blank tiles in vram buffer
-         sta VRAM_Buffer1+3,x        ;to erase rope
-         sta VRAM_Buffer1+4,x
+         sta VRAM_Buffer+3,x         ;to erase rope
+         sta VRAM_Buffer+4,x
 
 OtherRope:
          lda Enemy_State,y           ;get offset of other platform from state
@@ -9243,27 +9222,27 @@ OtherRope:
          eor #$ff                    ;invert bits to reverse speed
          jsr SetupPlatformRope       ;do sub again to figure out where to put bg tiles  
          lda $01                     ;write name table address to vram buffer
-         sta VRAM_Buffer1+5,x        ;this time we're doing putting tiles for
+         sta VRAM_Buffer+5,x         ;this time we're doing putting tiles for
          lda $00                     ;the other platform
-         sta VRAM_Buffer1+6,x
+         sta VRAM_Buffer+6,x
          lda #$02
-         sta VRAM_Buffer1+7,x        ;set length again for 2 bytes
+         sta VRAM_Buffer+7,x         ;set length again for 2 bytes
          pla                         ;pull first copy of vertical speed from stack
          bpl EraseR2                 ;if moving upwards (note inversion earlier), skip this
          lda #$68
-         sta VRAM_Buffer1+8,x        ;otherwise put tile numbers for left
+         sta VRAM_Buffer+8,x         ;otherwise put tile numbers for left
          lda #$69                    ;and right sides of rope in vram
-         sta VRAM_Buffer1+9,x        ;transfer buffer
+         sta VRAM_Buffer+9,x         ;transfer buffer
          jmp EndRp                   ;jump to skip this part
 EraseR2: lda #$24                    ;put blank tiles in vram buffer
-         sta VRAM_Buffer1+8,x        ;to erase rope
-         sta VRAM_Buffer1+9,x
+         sta VRAM_Buffer+8,x         ;to erase rope
+         sta VRAM_Buffer+9,x
 EndRp:   lda #$00                    ;put null terminator at the end
-         sta VRAM_Buffer1+10,x
-         lda VRAM_Buffer1_Offset     ;add ten bytes to the vram buffer offset
+         sta VRAM_Buffer+10,x
+         lda VRAM_Buffer_Offset      ;add ten bytes to the vram buffer offset
          clc                         ;and store
          adc #10
-         sta VRAM_Buffer1_Offset
+         sta VRAM_Buffer_Offset
 ExitRp:  ldx ObjectOffset            ;get enemy object buffer offset and leave
          rts
 
@@ -9294,7 +9273,7 @@ GetLRp: pha                     ;save modified horizontal coordinate to stack
         adc #$08                ;add eight to vertical coordinate and
         tax                     ;save as X
 GetHRp: txa                     ;move vertical coordinate to A
-        ldx VRAM_Buffer1_Offset ;get vram buffer offset
+        ldx VRAM_Buffer_Offset  ;get vram buffer offset
         asl
         rol                     ;rotate d7 to d0 and d6 into carry
         pha                     ;save modified vertical coordinate to stack
@@ -13911,21 +13890,21 @@ InitScore:    sta ScoreAndCoinDisplay,x   ;clear player score and coin display
 ExitMenu:     rts
 
 MenuCursorTemplate:
-      .byte $06, $22, $6b, $83, $60, $24, $24, $00
+      .byte $06, $22, $4b, $83, $60, $24, $24, $00
 
 DrawMenuCursor:
               ldy #$07                  ;read eight bytes to be read by transfer routine
 CursorDataRead:
               lda MenuCursorTemplate,y  ;note that the default position is set for
-              sta VRAM_Buffer1-1,y      ;mario game
+              sta VRAM_Buffer-1,y       ;mario game
               dey
               bpl CursorDataRead
               lda SelectedPlayer        ;check selected player
               beq ExitCursor            ;if set to mario game, we're done
               lda #$24                  ;otherwise, load blank tile in mario game position
-              sta VRAM_Buffer1+3
+              sta VRAM_Buffer+3
               lda #$60                  ;then load shroom icon tile in luigi game position
-              sta VRAM_Buffer1+5
+              sta VRAM_Buffer+5
 ExitCursor:   rts
 
 DemoActionData:
@@ -13958,8 +13937,8 @@ ClearBuffersDrawIcon:
              lda OperMode               ;check game mode
              bne IncModeTask_B          ;if not attract mode, leave
              ldx #$00                   ;otherwise, clear buffer space
-TScrClear:   sta VRAM_Buffer1-1,x
-             sta VRAM_Buffer1-1+$100,x
+TScrClear:   sta VRAM_Buffer-1,x
+             sta VRAM_Buffer-1+$100,x
              dex
              bne TScrClear
              jsr DrawMenuCursor         ;draw player select cursor
@@ -13990,21 +13969,21 @@ TScrClear:   sta VRAM_Buffer1-1,x
 ;            lda #$09                 ;if we do, force the second line to only have 9 stars
 ;DrawLine:   ora #%01000000           ;add bit to indicate repeated tile
 ;            sta $01                  ;and store in temp variable
-;            ldx VRAM_Buffer1_Offset
+;            ldx VRAM_Buffer_Offset
 ;            lda #$20                 ;write proper address for title screen stars
-;            sta VRAM_Buffer1,x
+;            sta VRAM_Buffer,x
 ;            lda $00
-;            sta VRAM_Buffer1+1,x
+;            sta VRAM_Buffer+1,x
 ;            lda $01                  ;write how many stars to draw for this line
-;            sta VRAM_Buffer1+2,x
+;            sta VRAM_Buffer+2,x
 ;            lda #$29
-;            sta VRAM_Buffer1+3,x
+;            sta VRAM_Buffer+3,x
 ;            lda #$00                 ;put null terminator at the end
-;            sta VRAM_Buffer1+4,x
+;            sta VRAM_Buffer+4,x
 ;            txa                      ;move the buffer offset up by four bytes
 ;            clc
 ;            adc #$04
-;            sta VRAM_Buffer1_Offset
+;            sta VRAM_Buffer_Offset
 ;NoStars:    rts                      ;now we're done!
 
 ;-------------------------------------------------------------------------------------
@@ -14077,8 +14056,10 @@ PalPatch:  lda PlayerPaletteData,y   ;overwrite palette with the appropriate one
 
 ;-------------------------------------------------------------------------------------
 
-TitleScreenGfxData:
-       .incbin "titlescreen.bin"
+TitleScreenGfxData_SMB1:
+       .incbin "title_smb1.bin"
+TitleScreenGfxData_SMB2:
+       .incbin "title_smb2.bin"
 
 ;-------------------------------------------------------------------------------------------------
 ;$06 - used to store vertical length of pipe
@@ -14302,13 +14283,13 @@ PrintVictoryMsgsForWorld8:
          ldy MsgCounter
          cpy #$0a                   ;if message counter gone past a certain
          bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
-		 lda CurrentGame
-		 cmp #$01
-		 bne :+
-		 lda PrimaryHardMode
-		 beq :+
-		 lda #WorldD
-		 sta WorldNumber
+         lda CurrentGame
+         cmp #$01
+         bne :+
+         lda PrimaryHardMode
+         beq :+
+         lda #WorldD
+         sta WorldNumber
 :        lda WorldNumber            ;are we on world D?
          cmp #WorldD
          beq DoVicM                 ;yes, display the two extra lives lines
@@ -14404,13 +14385,13 @@ BlueUpdateTiming:
            bne ExFade
 BlueUpd:   ldx #$13
 BlueULoop: lda BlueTransPalette,x ;write palette to VRAM buffer
-           sta VRAM_Buffer1,x
+           sta VRAM_Buffer,x
            dex
            bpl BlueULoop
            ldx #$0c 
            ldy BlueColorOfs       ;get color offset
 NextBlue:  lda BlueTints,y        ;set background color based on color offset
-           sta VRAM_Buffer1+3,x
+           sta VRAM_Buffer+3,x
            dex                    ;be sure to set the same background color
            dex                    ;in all four palettes (even though only the first
            dex                    ;one is acknowledged)
@@ -14426,7 +14407,7 @@ ExFade:    rts
 EraseLivesLines:
      ldx #$08                  ;erase bottom two lines (TO-DO: Fix this, not working currently)
 ELL: lda TwoBlankRows,x
-     sta VRAM_Buffer1,x
+     sta VRAM_Buffer,x
      dex
      bpl ELL
      inc OperMode_Task
@@ -14977,8 +14958,12 @@ NMIHandler:
    sei
    lda #MainBank             ;load in main bank for this NMI handler
    jsr TempSwitch16KBank
-   lda NMIAckFlag            ;if lag frame, do not update VRAM
-   bne SkipVRAMUpdate
+   lda NMIAckFlag            ;is NMI flag already set (lag frame)?
+   beq ProcessVRAMBuffer     ;if not, update VRAM contents
+   lda #$00                  ;otherwise, reset scroll here
+   jsr InitScroll
+   jmp SkipVRAMUpdate        ;and skip ahead to process sound
+ProcessVRAMBuffer:
    lda $00                   ;also preserve $00 and $01 since we use them
    pha
    lda $01
@@ -15009,17 +14994,10 @@ ScrnSwch:
    lda VRAM_AddrTable,x
    sta $01
    jsr UpdateScreen          ;now update the screen with it
-   ldy #$00
-   ldx VRAM_Buffer_AddrCtrl
-   cpx #$06                  ;if pointer number was set to 6 (for
-   bne InitVRAMVars          ;second VRAM buffer), increment Y to get
-   iny                       ;offset for second VRAM buffer
-InitVRAMVars:
-   ldx VRAM_Buffer_Offset,y  ;get pointer to correct buffer offset
    lda #$00                  ;erase the VRAM buffer offset, init first VRAM buffer
-   sta VRAM_Buffer1_Offset,x ;by writing end terminator at the first byte, and
-   sta VRAM_Buffer1,x        ;init address control to point at first VRAM buffer
-   sta VRAM_Buffer_AddrCtrl
+   sta VRAM_Buffer_Offset    ;by writing end terminator at the first byte, and
+   sta VRAM_Buffer           ;init address control to point at first VRAM buffer
+   sta VRAM_Buffer_AddrCtrl  ;(TO-DO: Skip this if a transfer from ROM was done instead)
    lda Mirror_PPU_MASK
    sta PPU_MASK              ;dump PPU control register 2
    pla                       ;restore zero page RAM
@@ -15092,6 +15070,7 @@ VBlank:
 	sta MMC3_Mirroring          ;vertical mirroring
       sta Mirror_PPU_CTRL         ;workaround for hacky GFX loader
       sta Mirror_PPU_MASK
+      sta LevelSet
 	lda #%10000000
 	sta MMC3_PRGRAMProtect      ;enable PRG-RAM
 	jsr InitCHRBanks            ;set up CHR bank registers
