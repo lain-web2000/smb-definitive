@@ -1,7 +1,7 @@
 .org $6000
 
 SaveDataHeader:
-	.byte "SMB-COMP"
+	.byte "MARIO COMPLETE", $00, $00
 
 SaveData:
 GamesBeatenCount:
@@ -51,6 +51,9 @@ FontSelection:
 
 TilesetSelection:
     .byte $00
+
+AnimatedTiles:
+	.byte $00
 SaveData_End:
 
 CurrentGame:

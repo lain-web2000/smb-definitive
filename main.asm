@@ -3566,7 +3566,9 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr RunGameTimer           ;count down the game timer
               jsr ColorRotation          ;cycle one of the background colors
               jsr SimulateWind           ;otherwise, simulate wind where needed
-NoWind:       lda WaterAnimTimer
+NoWind:       lda AnimatedTiles
+              beq NoWAnim
+              lda WaterAnimTimer
               bne NoWAnim
               ldy AreaType
               lda WaterAnimIntervals,y
@@ -8721,7 +8723,6 @@ ProcessBowserHalf:
       sta Enemy_BoundBoxCtrl,x  ;set bounding box size control
       jsr GetEnemyBoundBox      ;get bounding box coordinates
       jmp PlayerEnemyCollision  ;do player-to-enemy collision detection
-
 
 ;-------------------------------------------------------------------------------------
 ;$00 - used to hold movement force and tile number
@@ -14658,10 +14659,10 @@ ThanksForPlayingMsg:
 .res $F000 - *, $FF
 
 SaveHeader:
-        .byte "SMB-COMP"
+        .byte "MARIO COMPLETE", $00, $00
 
 CheckSaveData:
-        ldx #$07                ;init counter
+        ldx #$0f                ;init counter
 SChkLp: lda SaveHeader,x        ;check all bytes of the save data header
         cmp SaveDataHeader,x    ;and see if it is identical to what it should be
         bne InitializeSaveData  ;if any byte does not match, wipe existing save data
@@ -14675,7 +14676,7 @@ ClrSLp: lda #$00
         sta SaveData,x
         dex
         bpl ClrSLp  
-        ldx #$07
+        ldx #$0f
 SaveLp: lda SaveHeader,x        ;write save data header
         sta SaveDataHeader,x
         dex
@@ -15038,6 +15039,38 @@ BootIntoGame:
 		jsr Switch16KBank           ;switch PRG banks
 		jsr CheckSaveData           ;check validity of save data
 		jmp Start                   ;now start the game!
+;-------------------------------------------------------------------------------------
+
+;NINTENDO HEADER (NON-FUNCTIONAL)
+.res $FFE0 - *, $FF
+
+;TITLE
+	.byte "  MARIO COMPLETE"
+	
+;PRG CHECKSUM
+	.byte $31, $A9
+	
+;CHR CHECKSUM (Not needed since we are using CHR-RAM)
+	.res $02, $00
+	
+;DATA SIZE & TYPE
+	.byte %00111000	;128K PRG-ROM, CHR-RAM, 8K CHR
+	
+;BOARD TYPE
+	.byte %10000100 ;Vertical Arrangement, MMC3 mapper
+	
+;TITLE ENCODING
+	.byte $01
+	
+;TITLE LENGTH
+	.byte 13
+	
+;LICENSEE CODE
+	.byte $00
+
+;HEADER VALIDATION BYTE
+	.byte $36
+	
 ;-------------------------------------------------------------------------------------
 ;INTERRUPT VECTORS
 
