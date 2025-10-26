@@ -42,7 +42,22 @@
 .org $8000
 ;-------------------------------------------------------------------------------------
 
-Start:
+Start:      lda #%00010000               ;init PPU control register 1
+            sta PPU_CTRL
+            lda #$00
+            sta PPU_MASK
+            bit $2002
+            lda #%00001010
+@CLK_IRQ:   sta PPU_ADDRESS              ;clock MMC3 IRQ correctly (thank you TakuikaNinja)
+            sta PPU_ADDRESS
+            asl a
+            bcc @CLK_IRQ		
+            ldx #$ff                     ;reset stack pointer
+            txs
+VBlank1:    lda PPU_STATUS               ;wait two frames
+            bpl VBlank1
+VBlank2:    lda PPU_STATUS
+            bpl VBlank2
             lda WorldNumber             ;get world number and save it temporarily
             pha
             ldy #ColdBootOffset         ;load default cold boot pointer
