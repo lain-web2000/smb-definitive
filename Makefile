@@ -2,8 +2,8 @@ AS = ca65
 CC = cc65
 LD = ld65
 
-INCS = inc/wram.inc 
-	   
+INCS = inc/wram.inc
+
 .PHONY: clean
 build: smb-complete.nes
 
@@ -15,10 +15,10 @@ inc/wram.inc: wram.asm wram.map
 
 wram.map: wram.asm
 	$(AS) -l wram.map wram.asm -o wram.o
-	
+
 smb-complete.nes: $(INCS) layout main.o
 	$(LD) --dbgfile $@.dbg -C layout main.o -o $@
-	
+
 clean:
 	rm -f smb-complete*.nes *.o *.o.bin *.o.dep *.nes.dbg
 

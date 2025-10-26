@@ -55,7 +55,7 @@ CopyFireMarioPaletteData:
 		tay
 		ldx #$03
 CopyFireMarioPalette:
-		lda FireFlowerPaletteData,y   ;overwrite palette with the appropriate one
+		lda FireMarioPaletteData,y   ;overwrite palette with the appropriate one
 		sta PlayerFireColors,x
 		dey
 		dex
@@ -67,7 +67,7 @@ CopyFireLuigiPaletteData:
 		tay
 		ldx #$03
 CopyFireLuigiPalette:
-		lda FireFlowerPaletteData,y   ;overwrite palette with the appropriate one
+		lda FireLuigiPaletteData,y   ;overwrite palette with the appropriate one
 		sta PlayerFireColors+4,x
 		dey
 		dex
@@ -86,30 +86,30 @@ MarioPaletteOffsets:
 		.byte $03, $07, $0B	;note that offsets point to last byte
  
 LuigiPaletteOffsets:
-		.byte $03, $07, $03	;note that offsets point to last byte
+		.byte $03, $07, $0B, $03 ;note that offsets point to last byte
 
 FireMarioPaletteOffsets:
-		.byte $03, $03, $03	;note that offsets point to last byte
+		.byte $03, $07, $03	;note that offsets point to last byte
 
 FireLuigiPaletteOffsets:
-		.byte $03, $07, $0B	;note that offsets point to last byte
+		.byte $03, $07, $0B, $0F ;note that offsets point to last byte
 		
 MarioPaletteData:
       .byte $22, $16, $27, $18 ;mario's normal colors
-	  .byte $22, $16, $36, $11 ;mario's prototype colors
-	  .byte $22, $16, $27, $11 ;mario's other prototype colors
+	  .byte $22, $16, $36, $02 ;mario's first prototype colors
+	  .byte $22, $16, $27, $11 ;mario's second prototype colors
 	  
 LuigiPaletteData:
       .byte $22, $30, $27, $19 ;luigi's normal colors
+      .byte $22, $1b, $36, $18 ;luigi's disk writer colors
 	  .byte $22, $1a, $27, $18 ;luigi's smbdx colors
 	  
-FireFlowerPaletteData:
+FireMarioPaletteData:
       .byte $22, $37, $27, $16 ;mario's colors after grabbing fire flower
+	  .byte $22, $27, $36, $16 ;custom fire palette to accompany prototype colors
+	  
+FireLuigiPaletteData:
+      .byte $22, $37, $27, $16 ;mario's colors after grabbing fire flower
+	  .byte $22, $27, $36, $16 ;custom fire palette to accompany prototype colors
       .byte $22, $30, $27, $19 ;luigi's smbdx colors after grabbing fire flower
       .byte $22, $29, $27, $16 ;luigi's smm2 colors after grabbing fire flower
-	  
-Default_PlayerColors:
-      .byte $22, $16, $27, $18 ;mario's normal colors
-      .byte $22, $30, $27, $19 ;luigi's normal colors
-      .byte $22, $37, $27, $16 ;mario's colors after grabbing fire flower
-      .byte $22, $37, $27, $16 ;luigi's colors after grabbing fire flower

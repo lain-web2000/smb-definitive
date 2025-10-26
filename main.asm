@@ -8,9 +8,9 @@
   .byte $4E,$45,$53,$1A                           ;  magic signature
   .byte 8                                         ;  PRG ROM size in 16384 byte units
   .byte 0                                         ;  CHR
-  .byte $43                                       ;  mirroring type and mapper number lower nibble
-  .byte $00                                       ;  mapper number upper nibble
-  .byte $00,$00,$00,$00,$00,$00,$00,$00
+  .byte $42                                       ;  mirroring type and mapper number lower nibble
+  .byte $08                                       ;  mapper number upper nibble
+  .byte $00,$00,$70,$07,$00,$00,$00,$01
 
 .segment "UNUSEDPRG"
 .org $8000
@@ -489,21 +489,29 @@ FloateyNumTileData:
       .byte $6f, $6b ; "5000"
       .byte $70, $6b ; "8000"
       .byte $00, $01 ; "1-UP"
+      .byte $70, $6b ; "8000"
 
 ;high nybble is digit number, low nybble is number to
 ;add to the digit of the player's score
 ScoreUpdateData:
       .byte $ff ;dummy
       .byte $41, $42, $44, $45, $48
-      .byte $31, $32, $34, $35, $38, $00
+      .byte $31, $32, $34, $35, $38, $00, $38
 
 FloateyNumbersRoutine:
               lda FloateyNum_Control,x     ;load control for floatey number
               beq EndExit                  ;if zero, branch to leave
+              ldy DifficultyFlag
+			  cpy #$01
+			  bne @HardMode
               cmp #$0b                     ;if less than $0b, branch
               bcc ChkNumTimer
               lda #$0b                     ;otherwise set to $0b, thus keeping
-              sta FloateyNum_Control,x     ;it in range
+			  bne :+
+@HardMode:    cmp #$0c                     ;if less than $0b, branch
+              bcc ChkNumTimer
+              lda #$0c                     ;otherwise set to $0b, thus keeping
+:             sta FloateyNum_Control,x     ;it in range
 ChkNumTimer:  tay                          ;use as Y
               lda FloateyNum_Timer,x       ;check value here
               bne DecNumTimer              ;if nonzero, branch ahead
