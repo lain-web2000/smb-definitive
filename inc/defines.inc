@@ -672,9 +672,10 @@ GameMode              = 1
 VictoryMode           = 2
 GameOverMode          = 3
 
-CHRBank               = 6
-SoundBank             = 8
-LevelsBank            = 10
+CHRBank               = 4
+SoundBank             = 6
+LevelsBank            = 8
+LoaderBank            = 10
 MainBank              = 12
 FixedBank             = 14
 

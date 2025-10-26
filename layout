@@ -1,10 +1,11 @@
 MEMORY
 {
 	INES:		start =     0, size =    $10, fill=yes, fillval=$00, type = rw;
-	UNUSEDPRG:	start = $8000, size =  $C000, fill=yes, fillval=$FF, type = ro;
+	UNUSEDPRG:	start = $8000, size =  $8000, fill=yes, fillval=$FF, type = ro;
 	CHRBANK:	start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
 	SOUNDPRG:	start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
 	LEVELPRG:  	start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
+	LOADER:		start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
 	SM2MAIN:	start = $8000, size =  $8000, fill=yes, fillval=$FF, type = ro;
 }
 
@@ -15,5 +16,6 @@ SEGMENTS
 	CHRBANK:	load = CHRBANK, type = ro;
 	SOUNDPRG:   load = SOUNDPRG, type = ro;
 	LEVELPRG:   load = LEVELPRG, type = ro;
+	LOADER:		load = LOADER,	type = ro;
 	SM2MAIN:    load = SM2MAIN, type = ro;
 }

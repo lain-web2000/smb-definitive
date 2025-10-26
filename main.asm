@@ -17,8 +17,6 @@
 .res $c000 - *, $ff
 .org $8000
 .res $c000 - *, $ff
-.org $8000
-.res $c000 - *, $ff
 
 .segment "CHRBANK"
 .org $8000
@@ -35,7 +33,10 @@
 .include "levels.asm"
 .res $c000 - *, $ff
 
-.segment "PAD"
+.segment "LOADER"
+.org $8000
+.include "loader.asm"
+.res $c000 - *, $ff
 
 .segment "SM2MAIN"
 .org $8000
@@ -72,7 +73,6 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             jsr InitializeNameTables
             inc DisableScreenFlag
             cli
-            jsr PatchLuigiPhys
             lda Mirror_PPU_CTRL
             ora #%10000000
             jsr WritePPUReg1
@@ -651,12 +651,6 @@ BGColorCtrl_Addr:
 BackgroundColors:
       .byte $22, $22, $0f, $0f ;used by area type if bg color ctrl not set
       .byte $0f, $22, $0f, $0f ;used by background color control if set
-
-PlayerColors:
-      .byte $22, $16, $27, $18 ;mario's normal colors
-      .byte $22, $30, $27, $19 ;luigi's normal colors
-      .byte $22, $37, $27, $16 ;mario's colors after grabbing fire flower
-      .byte $22, $29, $27, $16 ;luigi's colors after grabbing fire flower	
 
 GetBackgroundColor:
            ldy BackgroundColorCtrl   ;check background color control
@@ -4285,9 +4279,6 @@ LuigiFallMForceData:
 
 MarioFrictionData:
       .byte $e4, $98, $d0
-
-LuigiFrictionData_FDS:
-      .byte $b4, $68, $a0
 	  
 PlayerYSpdData:
       .byte $fc, $fc, $fc, $fb, $fb, $fe, $ff
@@ -13793,30 +13784,7 @@ ISCont: sta ScoreAndCoinDisplay,y   ;reset score
         dey
         bpl ISCont
         inc Hidden1UpFlag           ;allow 1-up to be found again
-        jmp ContinueGame
-
-;-------------------------------------------------------------------------------------
-
-; 00 = FDS, 01 = SNES
-
-PatchLuigiPhys:
-	lda LuigiPhysics
-	beq PatchPhysics_FDS
-	ldx #$02
-PatchPhysics_SNES:
-	lda MarioFrictionData,x
-	sta LuigiFrictionData,x
-	dex
-	bpl PatchPhysics_SNES
-	rts
-PatchPhysics_FDS:
-	ldx #$02
-FDSLoop:
-	lda LuigiFrictionData_FDS,x
-	sta LuigiFrictionData,x
-	dex
-	bpl FDSLoop
-	rts		   
+        jmp ContinueGame 
 	
 ;-------------------------------------------------------------------------------------
 		   
@@ -14028,31 +13996,6 @@ PrimaryGameSetup:
 :     sta NumberofLives           ;give each player five lives
 GoToSecondary:
       jmp SecondaryGameSetup
-
-;-------------------------------------------------------------------------------------
-
-PlayerPaletteData:
-  .byte $22, $16, $27, $18 ;MARIO
-  .byte $22, $30, $27, $19 ;LUIGI (FDS) + FIRE (DX)
-  .byte $22, $1a, $27, $18 ;LUIGI (DX)
-
-PlayerNameOffsets:
-  .byte $04, $09                       ;note that offsets point to last byte
-
-PatchPlayerNamePal:
-           ldy SelectedPlayer        ;get offset based on selected player
-           lda PlayerNameOffsets,y
-           pha
-           iny
-           sty $00                   ;save player + 1 temporarily (mario = 1, luigi = 2)
-           tay
-           ldx #$03
-PalPatch:  lda PlayerPaletteData,y   ;overwrite palette with the appropriate one
-           sta PlayerColors,x
-           dey
-           dex
-           bpl PalPatch
-           rts
 
 ;-------------------------------------------------------------------------------------
 
@@ -14951,77 +14894,77 @@ NMI_Stub:
       rti
 
 NMIHandler:
-   lda Mirror_PPU_CTRL       ;alter name table address to be $2000
-   and #%01111110            ;and disable another NMI
-   sta Mirror_PPU_CTRL       ;from interrupting this one
-   sta PPU_CTRL              ;(TO-DO: Prevent reentrant NMI with software flag)
-   sei
-   lda #MainBank             ;load in main bank for this NMI handler
-   jsr TempSwitch16KBank
-   lda NMIAckFlag            ;is NMI flag already set (lag frame)?
-   beq ProcessVRAMBuffer     ;if not, update VRAM contents
-   lda #$00                  ;otherwise, reset scroll here
-   jsr InitScroll
-   jmp SkipVRAMUpdate        ;and skip ahead to process sound
+      lda Mirror_PPU_CTRL       ;alter name table address to be $2000
+      and #%01111110            ;and disable another NMI
+      sta Mirror_PPU_CTRL       ;from interrupting this one
+      sta PPU_CTRL              ;(TO-DO: Prevent reentrant NMI with software flag)
+      sei
+      lda #MainBank             ;load in main bank for this NMI handler
+      jsr TempSwitch16KBank
+      lda NMIAckFlag            ;is NMI flag already set (lag frame)?
+      beq ProcessVRAMBuffer     ;if not, update VRAM contents
+      lda #$00                  ;otherwise, reset scroll here
+      jsr InitScroll
+      jmp SkipVRAMUpdate        ;and skip ahead to process sound
 ProcessVRAMBuffer:
-   lda $00                   ;also preserve $00 and $01 since we use them
-   pha
-   lda $01
-   pha
-   inc NMIAckFlag
-   lda Mirror_PPU_MASK
-   and #%11100110            ;disable OAM and background display by default
-   ldy DisableScreenFlag     ;if screen disabled, skip this
-   bne ScrnSwch
-   lda Mirror_PPU_MASK       ;otherwise reenable bits and save them
-   ora #%00011110
+      lda $00                   ;also preserve $00 and $01 since we use them
+      pha
+      lda $01
+      pha
+      inc NMIAckFlag
+      lda Mirror_PPU_MASK
+      and #%11100110            ;disable OAM and background display by default
+      ldy DisableScreenFlag     ;if screen disabled, skip this
+      bne ScrnSwch
+      lda Mirror_PPU_MASK       ;otherwise reenable bits and save them
+      ora #%00011110
 ScrnSwch:
-   sta Mirror_PPU_MASK
-   and #%11100111            ;turn screen off regardless of mirror reg
-   sta PPU_MASK
-   ldx PPU_STATUS
-   lda #$00
-   jsr InitScroll
-   sta PPU_SPR_ADDR
-   lda #$02                  ;dump OAM data to PPU's sprite RAM
-   sta SPR_DMA
-   lda VRAM_Buffer_AddrCtrl
-   asl
-   tax
-   lda VRAM_AddrTable,x      ;get pointer to VRAM data
-   sta $00
-   inx
-   lda VRAM_AddrTable,x
-   sta $01
-   jsr UpdateScreen          ;now update the screen with it
-   lda #$00                  ;erase the VRAM buffer offset, init first VRAM buffer
-   sta VRAM_Buffer_Offset    ;by writing end terminator at the first byte, and
-   sta VRAM_Buffer           ;init address control to point at first VRAM buffer
-   sta VRAM_Buffer_AddrCtrl  ;(TO-DO: Skip this if a transfer from ROM was done instead)
-   lda Mirror_PPU_MASK
-   sta PPU_MASK              ;dump PPU control register 2
-   pla                       ;restore zero page RAM
-   sta $01
-   pla
-   sta $00
+      sta Mirror_PPU_MASK
+      and #%11100111            ;turn screen off regardless of mirror reg
+      sta PPU_MASK
+      ldx PPU_STATUS
+      lda #$00
+      jsr InitScroll
+      sta PPU_SPR_ADDR
+      lda #$02                  ;dump OAM data to PPU's sprite RAM
+      sta SPR_DMA
+      lda VRAM_Buffer_AddrCtrl
+      asl
+      tax
+      lda VRAM_AddrTable,x      ;get pointer to VRAM data
+      sta $00
+      inx
+      lda VRAM_AddrTable,x
+      sta $01
+      jsr UpdateScreen          ;now update the screen with it
+      lda #$00                  ;erase the VRAM buffer offset, init first VRAM buffer
+      sta VRAM_Buffer_Offset    ;by writing end terminator at the first byte, and
+      sta VRAM_Buffer           ;init address control to point at first VRAM buffer
+      sta VRAM_Buffer_AddrCtrl  ;(TO-DO: Skip this if a transfer from ROM was done instead)
+      lda Mirror_PPU_MASK
+      sta PPU_MASK              ;dump PPU control register 2
+      pla                       ;restore zero page RAM
+      sta $01
+      pla
+      sta $00
 SkipVRAMUpdate:
-   cli
-   lda IRQUpdateFlag
-   beq SkipIRQ
-   lda #31                   ;count 31 scanlines (plus the pre-render scanline)
-   sta MMC3_IRQLatch
-   sta MMC3_IRQReload
-   sta MMC3_IRQEnable
-   inc IRQAckFlag            ;reset flag to wait for next IRQ
+      cli
+      lda IRQUpdateFlag
+      beq SkipIRQ
+      lda #31                   ;count 31 scanlines (plus the pre-render scanline)
+      sta MMC3_IRQLatch
+      sta MMC3_IRQReload
+      sta MMC3_IRQEnable
+      inc IRQAckFlag            ;reset flag to wait for next IRQ
 SkipIRQ:
-   jsr RunSoundEngine        ;run sound engine every frame
-   lda PPU_STATUS            ;reset flip-flop
-   lda Mirror_PPU_CTRL       ;reenable NMIs 
-   ora #$80
-   sta Mirror_PPU_CTRL
-   sta PPU_CTRL
-   lda PPU_STATUS
-   rts
+      jsr RunSoundEngine        ;run sound engine every frame
+      lda PPU_STATUS            ;reset flip-flop
+      lda Mirror_PPU_CTRL       ;reenable NMIs 
+      ora #$80
+      sta Mirror_PPU_CTRL
+      sta PPU_CTRL
+      lda PPU_STATUS
+      rts
 
 IRQHandler:
       pha                      ;save accumulator and Y
@@ -15037,52 +14980,56 @@ DelS: dey
       lda HorizontalScroll
       sta PPU_SCROLL           ;set scroll position for the screen under the status bar
       lda PPU_STATUS           ;reset flip-flop
-	lda #$00
-	sta MMC3_IRQDisable      ;disable IRQs for the rest of the frame
-	sta IRQAckFlag           ;indicate IRQ was acknowledged
+      lda #$00
+      sta MMC3_IRQDisable      ;disable IRQs for the rest of the frame
+      sta IRQAckFlag           ;indicate IRQ was acknowledged
       pla                      ;restore accumulator and Y, then leave
       tay
       pla
       rti
 
 Reset:
-	sei                        ;replicate init code present in FDS BIOS
-	lda #$10
-	sta PPU_CTRL
-	cld
-	lda #$06
-	sta PPU_MASK
-	ldx #$02
+      sei                        ;replicate init code present in FDS BIOS
+      lda #$10
+      sta PPU_CTRL
+      cld
+      lda #$06
+      sta PPU_MASK
+      ldx #$02
 VBlank:
-	lda PPU_STATUS
-	bpl VBlank
-	dex
-	bne VBlank
-	stx JOYPAD_PORT1
-	stx SND_DELTA_REG
-	lda #$c0
-	sta JOYPAD_PORT2
-	lda #$0f
-	sta SND_MASTERCTRL_REG
-	ldx #$ff
-	txs
-	lda #$00
-	sta MMC3_Mirroring          ;vertical mirroring
+      lda PPU_STATUS
+      bpl VBlank
+      dex
+      bne VBlank
+      stx JOYPAD_PORT1
+      stx SND_DELTA_REG
+      lda #$c0
+      sta JOYPAD_PORT2
+      lda #$0f
+      sta SND_MASTERCTRL_REG
+      ldx #$ff
+      txs
+      lda #$00
+      sta MMC3_Mirroring          ;vertical mirroring
       sta Mirror_PPU_CTRL         ;workaround for hacky GFX loader
       sta Mirror_PPU_MASK
       sta LevelSet
-	lda #%10000000
-	sta MMC3_PRGRAMProtect      ;enable PRG-RAM
-	jsr InitCHRBanks            ;set up CHR bank registers
-      ldx #BG_MAIN_INDEX          ;load universal CHR data
-      lda #SPR_MAIN_INDEX
-      jsr FetchCHRPacket_AX
-      jsr LoadGameTileset         ;load game-appropiate CHR data
-      lda #MainBank
-	jsr Switch16KBank           ;switch PRG banks
-	jsr CheckSaveData           ;check validity of save data
-	jmp Start                   ;now start the game!
-
+      lda #%10000000
+      sta MMC3_PRGRAMProtect      ;enable PRG-RAM
+      jsr InitCHRBanks            ;set up CHR bank registers
+      lda #LoaderBank
+      jsr Switch16KBank           ;switch PRG banks
+      jmp StartLoader             ;now start the game!
+	  
+BootIntoGame:
+		ldx #BG_MAIN_INDEX          ;load universal CHR data
+		lda #SPR_MAIN_INDEX
+		jsr FetchCHRPacket_AX
+		jsr LoadGameTileset         ;load game-appropiate CHR data
+		lda #MainBank
+		jsr Switch16KBank           ;switch PRG banks
+		jsr CheckSaveData           ;check validity of save data
+		jmp Start                   ;now start the game!
 ;-------------------------------------------------------------------------------------
 ;INTERRUPT VECTORS
 

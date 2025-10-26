@@ -22,6 +22,15 @@ SavedCompletedWorlds:
 DifficultyFlag:
 	.byte $00
 	
+;$00 - Standard SMB1 Palette
+;$01 - Protoype #1 Palette
+;$02 - Protoype #2 Palette
+MarioPalette:
+	.byte $00
+	
+;$00 - Standard SMB1 Palette
+;$01 - Super Mario Bros. DX Palette
+;$02 - Super Mario Maker 2 Palette
 LuigiPalette:
 	.byte $00
 
@@ -68,9 +77,14 @@ LeavesYPosCopy:
 LuigiFrictionData:
 	.byte $b4, $68, $a0
 	  
-WRAM_PlayerColors:
-      .byte $22, $16, $27, $18 ;player's normal colors, may be overwritten
-      .byte $22, $37, $27, $16 ;player's colors after grabbing fire flower, may be overwritten
+PlayerColors:
+      .byte $22, $16, $27, $18 ;mario's normal colors
+      .byte $22, $30, $27, $19 ;luigi's normal colors
+PlayerFireColors:
+      .byte $22, $37, $27, $16 ;mario's colors after grabbing fire flower
+      .byte $22, $29, $27, $16 ;luigi's colors after grabbing fire flower
+	  
+	  
 	  
 AreaDataCopy:
 	.res $100, $00
