@@ -96,7 +96,7 @@ FireLuigiPaletteOffsets:
 		
 MarioPaletteData:
       .byte $22, $16, $27, $18 ;mario's normal colors
-	  .byte $22, $16, $36, $02 ;mario's first prototype colors
+	  .byte $22, $16, $35, $02 ;mario's first prototype colors
 	  .byte $22, $16, $27, $11 ;mario's second prototype colors
 	  
 LuigiPaletteData:
