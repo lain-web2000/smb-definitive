@@ -426,14 +426,14 @@ IncMsgCounter: lda MsgFractional
                sta MsgCounter
                cmp #$06                 ;check message counter one more time
 SetEndTimer:   bcc ExitMsgs             ;if not reached 6 yet, branch to leave
-               lda #$94
+               lda #$08
                sta WorldEndTimer        ;otherwise set world end timer
 IncModeTask_A: inc OperMode_Task        ;move onto next task in mode
-ExitMsgs:      rts                 
+ExitMsgs:      rts                     
 
 EndCastleAward:
    lda WorldEndTimer      ;if world end timer has not yet reached a certain point
-   cmp #$6a               ;then go ahead and skip all of this
+   cmp #$06               ;then go ahead and skip all of this
    bcs ExEWA
    lda GameTimerDisplay   ;if game timer points not all awarded, skip this part
    ora GameTimerDisplay+1
@@ -443,7 +443,7 @@ EndCastleAward:
 SetWorldEndTimer:
    lda #$30
    sta SelectTimer        ;set select timer (used for world 8 ending only)
-   lda #$7E
+   lda #$06
    sta WorldEndTimer      ;another short delay, then on to the next task
    inc OperMode_Task
 ExEWA:
@@ -1000,7 +1000,7 @@ ResetSpritesAndScreenTimer:
          jsr MoveAllSpritesOffscreen ;otherwise reset sprites now
 
 ResetScreenTimer:
-         lda #$93                    ;reset timer again
+         lda #$07                    ;reset timer again
          sta ScreenTimer
          inc ScreenRoutineTask       ;move onto next task
 NoReset: rts
@@ -2093,7 +2093,7 @@ RunGameOver:
        lda GameOverMsgFlag   ;if message flag set, branch to end the game
        bne WDEnd
        jmp GameOverMenu      ;otherwise run game over menu
-WDEnd: lda SpecialTimer
+WDEnd: lda ScreenTimer
        bne ExRGO
 
 TerminateGame:
@@ -2101,7 +2101,7 @@ TerminateGame:
        sta EventMusicQueue
        lda #$00
        sta OperMode_Task     ;reset to attract mode and leave
-       sta SpecialTimer
+       sta ScreenTimer
        sta OperMode
        sta GameOverMsgFlag   ;reset game over message flag
 ExRGO: rts
@@ -8995,8 +8995,8 @@ DSFLoop: lda Enemy_Rel_YPos         ;get relative vertical coordinate
 
 DrawFlagSetTimer:
       jsr DrawStarFlag          ;do sub to draw star flag
-      lda #$69
-      sta WorldEndTimer  		;set interval timer here
+      lda #$06
+      sta EnemyIntervalTimer,x  ;set interval timer here
 
 IncrementSFTask2:
       inc StarFlagTaskControl   ;move onto next task
@@ -9004,7 +9004,7 @@ IncrementSFTask2:
 
 DelayToAreaEnd:
       jsr DrawStarFlag          ;do sub to draw star flag
-      lda WorldEndTimer  		;if interval timer set in previous task
+      lda EnemyIntervalTimer,x  ;if interval timer set in previous task
       bne StarFlagExit2         ;not yet expired, branch to leave
       lda EventMusicBuffer      ;if event music buffer empty,
       beq IncrementSFTask2      ;branch to increment task
@@ -10679,8 +10679,6 @@ FlagpoleCollision:
       lda GameEngineSubroutine
       cmp #$05                  ;check for end-of-level routine running
       beq PutPlayerOnVine       ;if running, branch to end of climbing code
-      lda #$01
-      sta PlayerFacingDir       ;set player's facing direction to right
       inc ScrollLock            ;set scroll lock flag
       lda GameEngineSubroutine
       cmp #$04                  ;check for flagpole slide routine running
@@ -13719,7 +13717,7 @@ VMDelay:
       rts
 
 StartVMDelay:
-      lda #$40           ;start world end delay
+      lda #$04           ;start world end delay
       sta WorldEndTimer
       bne VMDelay
 
@@ -14238,7 +14236,7 @@ DemoResetOrGameOver:
        cmp #GameOverMode
        bne GoToDemoReset
        lda #$20
-       sta SpecialTimer
+       sta ScreenTimer
        lda #$1e                  ;set VRAM pointer to print special game over message
        sta VRAM_Buffer_AddrCtrl
        inc OperMode_Task         ;move on to next task
@@ -14291,7 +14289,7 @@ IncVMC:  lda MsgFractional
          rts
 
 EndVictoryMessages:
-        lda #$FC                   ;set interval timer, then move onto next task
+        lda #$0c                   ;set interval timer, then move onto next task
         sta WorldEndTimer
 ExAEL:  inc OperMode_Task
 
