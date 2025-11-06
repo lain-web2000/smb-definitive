@@ -3617,6 +3617,9 @@ NoWAnim:      lda Player_Y_HighPos
               bne NoChgMus               ;if not yet at a certain point, continue
               lda IntervalTimerControl   ;if interval timer not yet expired,
               bne NoChgMus               ;branch ahead, don't bother with the music
+			  lda EventMusicBuffer
+			  cmp #EndOfLevelMusic       ;if we have already completed the level
+			  beq NoChgMus               ;branch ahead, don't bother with the music
               jsr GetAreaMusic           ;to re-attain appropriate level music
 NoChgMus:     ldy StarInvincibleTimer    ;get invincibility timer
               lda FrameCounter           ;get frame counter
@@ -9904,6 +9907,7 @@ ExInjColRoutines:
       rts
 
 KillPlayer:
+      ldx #$00
       stx Player_X_Speed   ;halt player's horizontal movement by initializing speed
       stx WindFlag         ;disable wind
       inx
