@@ -879,10 +879,12 @@ LoadTriCtrlReg:
         sta SND_TRIANGLE_REG      ;save final contents of A into control reg for triangle
 
 HandleNoiseMusic:
+		lda LevelSet
+		beq :+
         lda EventMusicBuffer      ;check if playing victory music
         cmp #VictoryMusic
         beq PlayNoiseMusic        ;if so, play noise
-        lda AreaMusicBuffer       ;check if playing underground or castle music
+:       lda AreaMusicBuffer       ;check if playing underground or castle music
         and #%11110011
         beq ExitMusicHandler      ;if so, skip the noise routine
 PlayNoiseMusic:
