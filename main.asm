@@ -161,8 +161,8 @@ VRAM_AddrTable:
    .word CastlePaletteData, TitleScreenGfxData_SMB1, VRAM_Buffer, TitleScreenGfxData_SMB2
    .word BowserPaletteData, DaySnowPaletteData, NightSnowPaletteData, MushroomPaletteData
    .word MarioThankYouMsg, LuigiThankYouMsg, MushroomRetainerMsg, FinalRoomPalette
-   .word MarioThankYouMsgFinal, PeaceIsPavedMsg, WithKingdomSavedMsg, MarioHurrahMsg
-   .word OurOnlyHeroMsg, ThisEndsYourTripMsg, OfALongFriendshipMsg, PointsAddedMsg
+   .word MarioThankYouMsgFinal, PeaceIsPavedMsg, WithKingdomSavedMsg, OurOnlyHeroMsg
+   .word MarioHurrahMsg, ThisEndsYourTripMsg, OfALongFriendshipMsg, PointsAddedMsg
    .word ForEachPlayerLeftMsg, LuigiThankYouMsgFinal, LuigiHurrahMsg, DiskScreenPalette
    .word PrincessPeachsRoom, FantasyWorld9Msg, ThanksForPlayingMsg
 
@@ -14572,34 +14572,33 @@ LuigiThankYouMsgFinal:
     .byte $00
 
 PeaceIsPavedMsg:
-    .byte $25, $09, $0e
-    .byte $19, $0e, $0a, $0c, $0e, $24, $12, $1c, $24
-    .byte $19, $0a, $1f, $0e, $0d
+    .byte $25, $08, $10
+    .byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
+    .byte $16, $0a, $1b, $12, $18, $27
 
     .byte $27, $d0, $58, $aa
     .byte $00
 
 WithKingdomSavedMsg:
-    .byte $25, $47, $12
-    .byte $20, $12, $1d, $11, $24, $14, $12, $17, $10, $0d, $18, $16, $24
+    .byte $25, $46, $14
+    .byte $1d, $11, $0e, $24, $14, $12, $17, $10, $0d, $18, $16, $24, $12, $1C, $24
     .byte $1c, $0a, $1f, $0e, $0d
     .byte $00
 
+OurOnlyHeroMsg:
+    .byte $25, $87, $13
+    .byte $11, $1e, $1b, $1b, $0a, $11, $24, $1d, $18, $24
+	.byte $18, $1e, $1b, $24, $11, $0e, $1b, $18, $2a
+    .byte $00
+	
 MarioHurrahMsg:
-    .byte $25, $89, $0f
-    .byte $11, $1e, $1b, $1b, $0a, $11, $24, $1d, $18, $24, $16, $0a, $1b
-    .byte $12, $18
+    .byte $25, $ce, $06
+    .byte $16, $0a, $1b, $12, $18, $27
     .byte $00
 
 LuigiHurrahMsg:
-    .byte $25, $89, $0f
-    .byte $11, $1e, $1b, $1b, $0a, $11, $24, $1d, $18, $24, $15, $1e, $12
-    .byte $10, $12
-    .byte $00
-
-OurOnlyHeroMsg:
-    .byte $25, $ca, $0d
-    .byte $18, $1e, $1b, $24, $18, $17, $15, $22, $24, $11, $0e, $1b, $18
+    .byte $25, $ce, $06
+    .byte $15, $1e, $12, $10, $12, $27
     .byte $00
 
 ThisEndsYourTripMsg:
