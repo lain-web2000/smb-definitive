@@ -6,3 +6,4 @@
 *.map
 *.bak
 inc/wram.inc
+*.deb
