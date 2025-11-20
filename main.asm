@@ -478,6 +478,9 @@ NextWorld_Complete:
 ChkHardF:  ldy HardWorldFlag         ;have we already toggled worlds A-D flag?
            bne StoreWNum             ;if not, branch ahead
            inc HardWorldFlag         ;otherwise go ahead and set the flag
+		   lda DifficultyFlag
+		   cmp #$02
+		   beq ChkHardM
            bne StoreWNum             ;(TO-DO: Replace with conditional based on setting)
 ChkHardM:  ldy PrimaryHardMode       ;have we already set primary hard mode?
            bne StoreWNum             ;yes, branch ahead
@@ -4991,9 +4994,12 @@ PosJSpr:   lda Jumpspring_FixedYPos,x  ;get permanent vertical position
            cpy #World7
            beq GreenJS
            cpy #WorldB                 ;(TO-DO: Add setting for red springs in world B)
-           beq GreenJS
+           beq :+
            cpy #WorldC                 ;otherwise use red jumpspring force
            bne SetJSF
+:          ldy DifficultyFlag
+           cpy #$02
+		   beq SetJSF 
 GreenJS:   lda #$e0
 SetJSF:    sta JumpspringForce         ;otherwise write new jumpspring force here
            pla
@@ -6617,9 +6623,12 @@ InitHammerBro:
        sta Enemy_X_Speed,x
        lda LevelSet                ;playing SMB1 levels?
        beq HBI                     ;skip world check, always have walk delay
+	   lda DifficultyFlag
+	   cmp #$02
+	   beq :+
        lda HardWorldFlag           ;if on worlds A-D, always have walk delay
        bne HBI
-       lda WorldNumber             ;if on world 7-9 of SMB2J, branch to skip the walk delay
+:      lda WorldNumber             ;if on world 7-9 of SMB2J, branch to skip the walk delay
        cmp #World7
        bcs NoHBI
 HBI:   ldy SecondaryHardMode       ;get secondary hard mode flag
@@ -12261,9 +12270,12 @@ CheckForJumpspring:
        cpy #World7
        beq GrnJS
        cpy #WorldB
-       beq GrnJS                    ;otherwise use alternate attributes
+       beq :+                       ;otherwise use alternate attributes
        cpy #WorldC                  ;to get the green superhigh jumpsprings
        bne RedJS
+:      ldy DifficultyFlag
+       cpy #$02
+	   beq RedJS
 GrnJS: lsr
 RedJS: sta $04
        ldy #$03                     ;set enemy state -2 MSB here for jumpspring object
@@ -13836,6 +13848,10 @@ GameMenuRoutine:
               cmp #WorldA
               bcc @num_worlds
               inc HardWorldFlag
+			  lda DifficultyFlag
+			  cmp #$02
+			  bne @num_worlds
+			  inc PrimaryHardMode
 @num_worlds:  lda SavedLevelSet
               sta LevelSet
               lda SavedCompletedWorlds
