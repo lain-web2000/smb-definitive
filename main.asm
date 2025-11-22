@@ -8,8 +8,8 @@
   .byte $4E,$45,$53,$1A                           ;  magic signature
   .byte 8                                         ;  PRG ROM size in 16384 byte units
   .byte 0                                         ;  CHR
-  .byte $42                                       ;  mirroring type and mapper number lower nibble
-  .byte $08                                       ;  mapper number upper nibble
+  .byte $52                                       ;  mirroring type and mapper number lower nibble
+  .byte $48                                       ;  mapper number upper nibble
   .byte $00,$00,$70,$07,$00,$00,$00,$01
 
 .segment "UNUSEDPRG"
@@ -14731,25 +14731,15 @@ SaveLp: lda SaveHeader,x        ;write save data header
         rts                     ;otherwise we have reset save data, leave
 
 InitCHRBanks:
-		ldx #$00          ;Set up for MMC3 registers.
-		lda #$01          ;Bit 0 is ignored for 2K modes so this is good.
-@chrloop1:                    ;A12 inversion bit = 0 so $0000 to $0FFF = 2K banks
-		stx $8000         ;Select CHR address to set up bank number.
-		sta $8001         ;Switch to that CHR bank.
-		inx               ;Increment bank select number.
-		asl               ;Multiply by 2 since we are dealing with 2K banks.
-		cmp #$04          ;Have we reached CHR bank 4?
-		bne @chrloop1     ;If not, initialise next CHR bank.
-		tay               ;We need to transfer to Y since we want to increment by 1 now.
-@chrloop2:                    ;A12 inversion bit = 0 so $1000 to $1FFF = 1K banks
-		stx $8000         ;Select CHR address to set up bank number.
-		sty $8001         ;Switch to that CHR bank.
-		inx               ;Increment bank select number.
-		iny               ;Increment CHR bank number.
-		cpy #$08          ;Have we initialised CHR bank 7?
-		bne @chrloop2     ;If not, initialise next CHR bank.
-		rts
-
+        ldx #$00                ;set all CHR banks
+CHRBankLoop:        
+        stx FME7Command
+        stx FME7Parameter
+        inx
+        cpx #$08
+        bcc CHRBankLoop
+        rts
+		
 LoadGameTileset:
       ; load font based on menu selection
       lda #FONT_SMB1_INDEX
@@ -14889,30 +14879,30 @@ LoadMainBank:
 	lda #MainBank
 ;call to switch bank and save in shadow register
 Switch16KBank:
-      sta ShadowPRGBank
+	sta ShadowPRGBank
 ;call to switch bank without saving in shadow register
 TempSwitch16KBank:
-      ;bankswitch $8000-$9FFF region
+	;bankswitch $8000-$9FFF region
 	pha
-	lda #%00000110
-	sta MMC3_BankSelect
+	lda #$09
+	sta FME7Command
 	pla
-	sta MMC3_BankData
-      ;bankswitch $A000-$BFFF region
+	sta FME7Parameter
+	;bankswitch $A000-$BFFF region
 	clc
-      adc #$01
+	adc #$01
 	pha
-	lda #%00000111
-	sta MMC3_BankSelect
+	lda #$0a
+	sta FME7Command
 	pla
-	sta MMC3_BankData
+	sta FME7Parameter
 	rts
 
 RunSoundEngine:
 	lda #SoundBank        ;switch bank
 	jsr TempSwitch16KBank
 	jsr SoundEngine       ;run relevant routine
-      lda #MainBank
+	lda #MainBank
 	jmp TempSwitch16KBank ;and return to main bank
 
 RunLoadAreaPointer:
@@ -14950,14 +14940,27 @@ NMI_Stub:
       rti
 
 NMIHandler:
+      lda IRQUpdateFlag         ;skip this code if IRQs are disabled
+      beq SkipIRQ
+      lda #FME7_IRQTimer_Low
+      sta FME7Command
+      lda #$de ;i
+      sta FME7Parameter         ;set FDS IRQ timer to occur at the end of the status bar
+      lda #FME7_IRQTimer_High
+      sta FME7Command
+      lda #$16
+      sta FME7Parameter
+      lda #FME7_IRQTimer_Ctrl
+      sta FME7Command
+      lda #$81
+      sta FME7Parameter         ;enable it
+      inc IRQAckFlag            ;reset flag to wait for next IRQ
+SkipIRQ:            
       lda Mirror_PPU_CTRL       ;alter name table address to be $2000
-      and #%01111110            ;and disable another NMI
-      sta Mirror_PPU_CTRL       ;from interrupting this one
-      sta PPU_CTRL              ;(TO-DO: Prevent reentrant NMI with software flag)
-      sei
-      lda #MainBank             ;load in main bank for this NMI handler
-      jsr TempSwitch16KBank
-      lda NMIAckFlag            ;is NMI flag already set (lag frame)?
+      and #%01111100
+      sta Mirror_PPU_CTRL
+      sta PPU_CTRL
+      lda NMIAckFlag            ;is NMI flag already set?
       beq ProcessVRAMBuffer     ;if not, update VRAM contents
       lda #$00                  ;otherwise, reset scroll here
       jsr InitScroll
@@ -15006,31 +15009,18 @@ ScrnSwch:
       pla
       sta $00
 SkipVRAMUpdate:
-      cli
-      lda IRQUpdateFlag
-      beq SkipIRQ
-      lda #31                   ;count 31 scanlines (plus the pre-render scanline)
-      sta MMC3_IRQLatch
-      sta MMC3_IRQReload
-      sta MMC3_IRQEnable
-      inc IRQAckFlag            ;reset flag to wait for next IRQ
-SkipIRQ:
       jsr RunSoundEngine        ;run sound engine every frame
       lda PPU_STATUS            ;reset flip-flop
       lda Mirror_PPU_CTRL       ;reenable NMIs
       ora #$80
       sta Mirror_PPU_CTRL
       sta PPU_CTRL
-      lda PPU_STATUS
       rts
 
 IRQHandler:
       pha                      ;save accumulator and Y
       tya
       pha
-      ldy #$09                 ;delay for right part of scanline 31
-DelS: dey
-      bne DelS
       lda Mirror_PPU_CTRL
       ora NameTableSelect      ;set appropiate nametable for rendering
       sta Mirror_PPU_CTRL      ;update the register and its mirror
@@ -15039,7 +15029,10 @@ DelS: dey
       sta PPU_SCROLL           ;set scroll position for the screen under the status bar
       lda PPU_STATUS           ;reset flip-flop
       lda #$00
-      sta MMC3_IRQDisable      ;disable IRQs for the rest of the frame
+      lda #FME7_IRQTimer_Ctrl	 ;disable IRQ timer for the rest of the frame
+	  sta FME7Command
+	  lda #$00
+	  sta FME7Parameter
       sta IRQAckFlag           ;indicate IRQ was acknowledged
       pla                      ;restore accumulator and Y, then leave
       tay
@@ -15067,13 +15060,21 @@ VBlank:
       sta SND_MASTERCTRL_REG
       ldx #$ff
       txs
+      lda #$0b                    ;set up $C000-$DFFF bank
+      sta FME7Command
+      lda #FixedBank-1
+      sta FME7Parameter
+      lda #$0c                    ;set vertical mirroring
+      sta FME7Command
       lda #$00
-      sta MMC3_Mirroring          ;vertical mirroring
+      sta FME7Parameter
       sta Mirror_PPU_CTRL         ;workaround for hacky GFX loader
       sta Mirror_PPU_MASK
       sta LevelSet
-      lda #%10000000
-      sta MMC3_PRGRAMProtect      ;enable PRG-RAM
+      lda #$08                    ;enable PRG-RAM
+      sta FME7Command
+      lda #%11000000
+      sta FME7Parameter
       jsr InitCHRBanks            ;set up CHR bank registers
       lda #LoaderBank
       jsr Switch16KBank           ;switch PRG banks

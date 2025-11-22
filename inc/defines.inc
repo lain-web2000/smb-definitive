@@ -675,17 +675,14 @@ SoundBank             = 6
 LevelsBank            = 8
 LoaderBank            = 10
 MainBank              = 12
-FixedBank             = 14
+FixedBank             = 15
 
-MMC3_BankSelect		  = $8000
-MMC3_BankData		  = $8001
-MMC3_Mirroring		  = $a000
-MMC3_PRGRAMProtect    = $a001
+FME7Command           = $8000
+FME7Parameter         = $a000
 
-MMC3_IRQLatch		  = $c000
-MMC3_IRQReload		  = $c001
-MMC3_IRQDisable		  = $e000
-MMC3_IRQEnable		  = $e001
+FME7_IRQTimer_Low	  = $0e
+FME7_IRQTimer_High	  = $0f
+FME7_IRQTimer_Ctrl	  = $0d
 
 WaterAnimCurrentTile  = $013a
 WaterAnimTimer		  = $0788
