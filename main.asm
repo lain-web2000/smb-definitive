@@ -4996,6 +4996,7 @@ PosJSpr:   lda Jumpspring_FixedYPos,x  ;get permanent vertical position
            cpy #WorldB                 ;(TO-DO: Add setting for red springs in world B)
            beq :+
            cpy #WorldC                 ;otherwise use red jumpspring force
+		   beq GreenJS
            bne SetJSF
 :          ldy DifficultyFlag
            cpy #$02
@@ -12272,6 +12273,7 @@ CheckForJumpspring:
        cpy #WorldB
        beq :+                       ;otherwise use alternate attributes
        cpy #WorldC                  ;to get the green superhigh jumpsprings
+	   beq GrnJS
        bne RedJS
 :      ldy DifficultyFlag
        cpy #$02
