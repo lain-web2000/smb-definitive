@@ -690,16 +690,10 @@ WaterAnimTimer		  = $0788
 PrincessGfxOffset     = $1760
 TitleScreenGfxOffset  = $0f30
 
-FONT_SMB1_INDEX       = 0
-BG_SMB1_INDEX         = 1
-SPR_SMB1_INDEX        = 2
-FONT_SMB2_INDEX       = 3
-BG_SMB2_INDEX         = 4
-SPR_SMB2_INDEX        = 5
-BG_MAIN_INDEX         = 6
-SPR_MAIN_INDEX        = 7
-TITLE_INDEX           = 8
-BORDER_INDEX          = 9
+CHR_MENU              = 0
+CHR_MAIN              = 1
+CHR_SMB1              = 2
+CHR_SMB2              = 3
 
 ; convert ascii to smb charset
 .charmap '0',$00

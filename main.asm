@@ -42,18 +42,17 @@
 .org $8000
 ;-------------------------------------------------------------------------------------
 
-Start:      lda #%00010000               ;init PPU control register 1
-            sta PPU_CTRL
-            lda #$00
-            sta PPU_MASK
-            bit PPU_STATUS
-            lda #%00001010
-@CLK_IRQ:   sta PPU_ADDRESS              ;clock MMC3 IRQ correctly (thank you TakuikaNinja)
-            sta PPU_ADDRESS
-            asl a
-            bcc @CLK_IRQ
-            lda WorldNumber             ;get world number and save it temporarily
-            pha
+Start:      ldx #$00                    ;disable NMIs and rendering
+		stx PPU_CTRL
+		stx PPU_MASK
+		dex
+		txs                         ;reset stack pointer
+;            bit PPU_STATUS
+;            lda #%00001010
+;@CLK_IRQ:   sta PPU_ADDRESS              ;clock MMC3 IRQ correctly (thank you TakuikaNinja)
+;            sta PPU_ADDRESS
+;            asl a
+;            bcc @CLK_IRQ
             ldy #ColdBootOffset         ;load default cold boot pointer
             ldx #$05
 WBootCheck: lda TopScoreDisplay,x       ;first checkpoint, check each score digit
@@ -66,68 +65,60 @@ WBootCheck: lda TopScoreDisplay,x       ;first checkpoint, check each score digi
             bne ColdBoot
             ldy #WarmBootOffset         ;if passed both, load warm boot pointer
 ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
-            sta SND_DELTA_REG+1
-            sta OperMode                ;now manually reset some other stuff
-            sta DiskIOTask
-            pla
-            sta WorldNumber
+            sta SND_DELTA_REG+1         ;reset DMC output level
+            sta DiskIOTask              ;reset disk IO task
             lda #$a5                    ;set warm boot flag in case the player hits reset
             sta WarmBootValidation
             sta PseudoRandomBitReg      ;set seed for pseudorandom register
-            lda #%00001111
-            sta SND_MASTERCTRL_REG      ;enable all sound channels except dmc
-            lda #%00000110
-            sta PPU_MASK                ;turn off clipping for OAM and background
             jsr MoveAllSpritesOffscreen
             jsr InitializeNameTables
-            inc DisableScreenFlag
-            cli
-            lda Mirror_PPU_CTRL
-            ora #%10000000
-            jsr WritePPUReg1
-
-WaitForNMI: lda NMIAckFlag            ;spin until NMI routine has concluded
+            inc DisableScreenFlag       ;tell NMI to keep rendering disabled
+            lda #%10001000              ;set up pattern table arrangment
+            jsr WritePPUReg1            ;and enable NMIs
+WaitForNMI: lda NMIAckFlag              ;spin until NMI routine has executed
             beq WaitForNMI
+            lda RawJoypadBits           ;copy controller 1 inputs over to
+            sta SavedJoypadBits         ;temp address that may be modified
             jsr PauseRoutine
             jsr UpdateTopScore
-            lda GamePauseStatus       ;check d0 of game pause flags
-            lsr                       ;if set, branch to skip
+            lda GamePauseStatus         ;check d0 of game pause flags
+            lsr                         ;if set, branch to skip
             bcs SeedLFSR
-            lda TimerControl          ;if master timer control not set, branch
-            beq CheckIntervalTC       ;to decrement frame and interval timers
-            dec TimerControl          ;otherwise count this timer down
+            lda TimerControl            ;if master timer control not set, branch
+            beq CheckIntervalTC         ;to decrement frame and interval timers
+            dec TimerControl            ;otherwise count this timer down
             bne IncFrameCntr
 CheckIntervalTC:
-            ldx #$14                  ;set offset to decrement only frame timers
-            dec IntervalTimerControl  ;if interval timer control not expired, branch
-            bpl DecrTheTimers         ;to skip and thus decrement only frame timers
+            ldx #$14                    ;set offset to decrement only frame timers
+            dec IntervalTimerControl    ;if interval timer control not expired, branch
+            bpl DecrTheTimers           ;to skip and thus decrement only frame timers
             lda #$14
-            sta IntervalTimerControl  ;otherwise reset interval timer control to 20 frames
-            ldx #$23                  ;and load offset to decrement frame and interval timers
+            sta IntervalTimerControl    ;otherwise reset interval timer control to 20 frames
+            ldx #$23                    ;and load offset to decrement frame and interval timers
 DecrTheTimers:
-            lda Timers,x              ;if current timer is already expired, skip it
-            beq DTTLoop               ;otherwise decrement it
+            lda Timers,x                ;if current timer is already expired, skip it
+            beq DTTLoop                 ;otherwise decrement it
             dec Timers,x
-DTTLoop:    dex                       ;loop until all timers that need to be counted down are
+DTTLoop:    dex                         ;loop until all timers that need to be counted down are
             bpl DecrTheTimers
 IncFrameCntr:
             inc FrameCounter
 SeedLFSR:   ldx #$00
             ldy #$07
-            lda PseudoRandomBitReg    ;get d1 of first byte
+            lda PseudoRandomBitReg      ;get d1 of first byte
             and #$02
             sta $00
-            lda PseudoRandomBitReg+1  ;get d1 of second byte, XOR it with the first byte
+            lda PseudoRandomBitReg+1    ;get d1 of second byte, XOR it with the first byte
             and #$02
             eor $00
             clc
-            beq RotateLFSR            ;prepare to rotate the result in
+            beq RotateLFSR              ;prepare to rotate the result in
             sec
-RotateLFSR: ror PseudoRandomBitReg,x  ;basically, rotate the operation result into d7
-            inx                       ;then rotate the entire LFSR
+RotateLFSR: ror PseudoRandomBitReg,x    ;basically, rotate the operation result into d7
+            inx                         ;then rotate the entire LFSR
             dey
             bne RotateLFSR
-            lda GamePauseStatus       ;if d0 of game pause flag is set, skip this part
+            lda GamePauseStatus         ;if d0 of game pause flag is set, skip this part
             lsr
             bcs WaitForIRQ
             lda IRQUpdateFlag
@@ -317,10 +308,12 @@ VMExit:  rts
 DrawTitleScreen:
     lda OperMode       ;if not in attract mode, do not draw title screen
     bne IncModeTask    ;yes, this routine is run in other modes
-    lda #$05
+    lda #$1f
     ldy CurrentGame
-    cpy #$02
-    bne :+
+    beq :+
+    lda #$05
+    dey
+    beq :+
     lda #$07
 :   jmp SetVRAMAddr_B  ;otherwise set up VRAM address controller accordingly
 
@@ -1505,13 +1498,14 @@ MushroomRetainerMsg:
 
 ;status bar name table offset and length data
 StatusBarData:
-      .byte $ef, $06 ; top score display on title screen
-      .byte $62, $06 ; player score
-      .byte $6d, $02 ; coin tally
-      .byte $7a, $03 ; game timer
+      .byte $22, $ef, $06 ; top score display on title screen
+      .byte $20, $62, $06 ; player score
+      .byte $20, $6d, $02 ; coin tally
+      .byte $20, $7a, $03 ; game timer
+      .byte $23, $0f, $06 ; top score display on title screen (complete mode)
 
 StatusBarOffset:
-      .byte $06, $0c, $12, $18
+      .byte $06, $0c, $12, $18, $06
 
 PrintStatusBarNumbers:
       sta $00            ;store player-specific offset
@@ -1523,23 +1517,21 @@ PrintStatusBarNumbers:
       lsr
 
 OutputNumbers:
-             clc                      ;add 1 to low nybble
-             adc #$01
              and #%00001111           ;mask out high nybble
              cmp #$06
              bcs ExitOutputN
              pha                      ;save incremented value to stack for now and
-             asl                      ;multiply by 2 to use as offset
+             sta $01                  ;multiply by 3 to use as offset
+             asl
+             clc
+             adc $01
              tay
              ldx VRAM_Buffer_Offset   ;get current buffer pointer
-             lda #$20                 ;put at top of screen by default
-             cpy #$00                 ;are we writing top score on title screen?
-             bne SetupNums
-             lda #$22                 ;if so, put further down on the screen
-SetupNums:   sta VRAM_Buffer,x
-             lda StatusBarData,y      ;write vram address low and length of thing
+SetupNums:   lda StatusBarData,y      ;write vram address high
+             sta VRAM_Buffer,x
+             lda StatusBarData+1,y    ;write vram address low and length of thing
              sta VRAM_Buffer+1,x      ;we're printing to the buffer
-             lda StatusBarData+1,y
+             lda StatusBarData+2,y
              sta VRAM_Buffer+2,x
              sta $03                  ;save length byte in counter
              stx $02                  ;and buffer pointer elsewhere for now
@@ -1547,7 +1539,7 @@ SetupNums:   sta VRAM_Buffer,x
              tax
              lda StatusBarOffset,x    ;load offset to value we want to write
              sec
-             sbc StatusBarData+1,y    ;subtract from length byte we read before
+             sbc StatusBarData+2,y    ;subtract from length byte we read before
              tay                      ;use value as offset to display digits
              ldx $02
 DigitPLoop:  lda DisplayDigits,y      ;write digits to the buffer
@@ -3455,9 +3447,9 @@ NoWAnim:      lda Player_Y_HighPos
               bne NoChgMus               ;if not yet at a certain point, continue
               lda IntervalTimerControl   ;if interval timer not yet expired,
               bne NoChgMus               ;branch ahead, don't bother with the music
-			  lda EventMusicBuffer
-			  cmp #EndOfLevelMusic       ;if we have already completed the level
-			  beq NoChgMus               ;branch ahead, don't bother with the music
+              lda EventMusicBuffer
+              cmp #EndOfLevelMusic       ;if we have already completed the level
+              beq NoChgMus               ;branch ahead, don't bother with the music
               jsr GetAreaMusic           ;to re-attain appropriate level music
 NoChgMus:     ldy StarInvincibleTimer    ;get invincibility timer
               lda FrameCounter           ;get frame counter
@@ -4614,7 +4606,7 @@ ResGTCtrl: lda #24                    ;reset game timer control
            lda #$ff                   ;set value to decrement game timer digit
            sta DigitModifier+5
            jsr DigitsMathRoutine      ;do sub to decrement game timer slowly
-           lda #$a2                   ;set status nybbles to update game timer display
+           lda #$a3                   ;set status nybbles to update game timer display
            jmp PrintStatusBarNumbers  ;do sub to update the display
 TimeUpOn:  jsr KillPlayer             ;do sub to kill the player
            inc GameTimerExpiredFlag   ;set game timer expiration flag
@@ -5313,7 +5305,7 @@ AddToScore:
       jsr DigitsMathRoutine  ;update the score internally with value in digit modifier
 
 WriteScoreAndCoinTally:
-        lda #$01
+        lda #$12
 WriteDigits:
         jsr PrintStatusBarNumbers ;print status bar numbers
         ldy VRAM_Buffer_Offset
@@ -8807,7 +8799,7 @@ NoTTick: ldy #$17               ;set offset here to subtract from game timer's l
 EndAreaPoints:
          ldy #$0b               ;load offset for score, then jump to handle the awarding
          jsr DigitsMathRoutine
-         lda #$02               ;now update the score on the screen
+         lda #$13               ;now update the score on the screen
          jmp WriteDigits
 
 RaiseFlagSetoffFWorks:
@@ -13706,7 +13698,7 @@ GameMenuRoutine:
               lda SavedCompletedWorlds
               sta CompletedWorlds
 StG:          jmp StartGame
-ExitGame:     jmp Reset                   ;(TO-DO: More elegant approach than just resetting)
+ExitGame:     jmp ReturnToLoader
 ChkSelect:    lda PressedJoypadBits       ;branch if pressing up, down or select
               and #Up_Dir+Down_Dir+Select_Button
               bne SelectLogic
@@ -13771,7 +13763,11 @@ CursorDataRead:
               sta VRAM_Buffer+3
               lda #$60                  ;then load shroom icon tile in luigi game position
               sta VRAM_Buffer+5
-ExitCursor:   rts
+ExitCursor:   lda CurrentGame           ;if complete mode move shroom down
+              bne :+
+              lda #$8b
+              sta VRAM_Buffer+1
+:             rts
 
 DemoActionData:
       .byte $01, $80, $02, $81, $41, $80, $01
@@ -13855,8 +13851,11 @@ TScrClear:   sta VRAM_Buffer-1,x
 ;-------------------------------------------------------------------------------------
 
 WriteTopScore:
-               lda #$fa                    ;run display routine to display top score on title
-               jsr WriteDigits
+               lda #$0a                    ;run display routine to display top score on title
+               ldy CurrentGame
+               bne :+
+               lda #$4a
+:              jsr WriteDigits
 IncModeTask_B: jmp IncModeTask
 
 InitializeGame:
@@ -13869,6 +13868,7 @@ InitializeGame:
 		bne :+
 		lda #$01
 :           sta LevelSet
+            jsr LoadGameTileset      ;load game-appropiate CHR data
             ldy #$6f                 ;clear all memory as in initialization procedure,
             jsr InitializeMemory     ;but this time, clear only as far as $076f
             ldy #$1f
@@ -13897,6 +13897,8 @@ GoToSecondary:
 
 ;-------------------------------------------------------------------------------------
 
+TitleScreenGfxData_Complete:
+       .incbin "title_complete.bin"
 TitleScreenGfxData_SMB1:
        .incbin "title_smb1.bin"
 TitleScreenGfxData_SMB2:
@@ -14622,8 +14624,7 @@ InitATLoop:   sta PPU_DATA
 
 ;------------------------------------------------------------------------------------
 
-ReadJoypads:
-; taken from https://www.nesdev.org/wiki/Controller_reading_code
+ReadJoypads: ; taken from https://www.nesdev.org/wiki/Controller_reading_code
     lda RawJoypad1Bits ; save inputs from previous frame
     tax
     lda RawJoypad2Bits
@@ -14734,6 +14735,48 @@ SkipByte:     dey
 
 ;-------------------------------------------------------------------------------------
 
+; A: max option index
+; $00-$01: pointer to selection index
+; Returns with carry set if user backed out of menu or made selection,
+; returns with carry clear if not.
+MenuSelectionLogic:
+        sta $02
+        lda PressedJoypadBits
+        and #Start_Button+B_Button+A_Button
+        bne CloseMenu
+        ldy #$00
+        lda ($00),y
+        tay
+        lda PressedJoypadBits
+        and #Down_Dir+Select_Button
+        beq :+
+        iny
+        bne CheckValidSelection
+:       lda PressedJoypadBits
+        and #Up_Dir
+        beq NoMenuAction
+        dey
+CheckValidSelection:
+        lda $02
+        cpy #$00
+        bmi UpdateSelection
+        inc $02
+        lda #$00
+        cpy $02
+        bcs UpdateSelection
+        tya
+UpdateSelection:
+        ldy #$00
+        sta ($00),y
+NoMenuAction:
+        clc
+        rts
+CloseMenu:
+        sec
+        rts
+
+;-------------------------------------------------------------------------------------
+
 SaveHeader:
         .byte "MARIO COMPLETE", $00, $00
 
@@ -14759,35 +14802,29 @@ SaveLp: lda SaveHeader,x        ;write save data header
         bpl SaveLp              ;loop back if we're not done
         rts                     ;otherwise we have reset save data, leave
 
-InitCHRBanks:
-        ldx #$00                ;set all CHR banks
-CHRBankLoop:        
-        stx FME7Command
-        stx FME7Parameter
-        inx
-        cpx #$08
-        bcc CHRBankLoop
-        rts
+;-------------------------------------------------------------------------------------
 		
-LoadGameTileset:
+LoadFontTileset:
       ; load font based on menu selection
-      lda #FONT_SMB1_INDEX
+      lda #$00
       ldy FontSelection
       bne @static_fonts
-      ldy LevelSet
+      ldy CurrentGame
+      cpy #$01
       beq @write_font
-      bne @smb2_fonts
+      bne @smb2_font
 @static_fonts:
       cpy #$01
       beq @write_font
-@smb2_fonts:
-      lda #FONT_SMB2_INDEX
+@smb2_font:
+      lda #$03
 @write_font:
-      jsr FetchCHRPacket
+      jmp FetchCHRPacket
+
+LoadGameTileset:
       ; load tileset based on menu selection
       ; if per-game, tilset depends on levels played
-      ldx #BG_SMB1_INDEX
-      lda #SPR_SMB1_INDEX
+      lda #CHR_SMB1
       ldy TilesetSelection
       bne @static_tileset
       ldy LevelSet
@@ -14797,35 +14834,64 @@ LoadGameTileset:
       cpy #$01
       beq @write_tileset
 @smb2_tileset:
-      ldx #BG_SMB2_INDEX
-      lda #SPR_SMB2_INDEX
+      lda #CHR_SMB2
 @write_tileset:
-      jmp FetchCHRPacket_AX
+      jmp FetchCHRPacketGroup
+
+;-------------------------------------------------------------------------------------
+
+CHRPacketGroups:
+      .word CHR_MENU_PACKETS
+      .word CHR_MAIN_PACKETS
+      .word CHR_SMB1_PACKETS
+      .word CHR_SMB2_PACKETS
+
+CHR_MENU_PACKETS:
+      .byte $03, $05, $06, $07, $08, $09, $ff  ; MENU BG and SPR
+CHR_MAIN_PACKETS:
+      .byte $06, $07, $08, $ff  ; MAIN BG and SPR
+CHR_SMB1_PACKETS:
+      .byte $01, $02, $ff ; SMB1 BG and SPR
+CHR_SMB2_PACKETS:
+      .byte $04, $05, $ff  ; SMB2 BG and SPR
+
+FetchCHRPacketGroup:
+            asl
+            tax
+            lda CHRPacketGroups,x
+            sta $04
+            lda CHRPacketGroups+1,x
+            sta $05
+            lda #$00
+            sta $06
+:           ldy $06
+            lda ($04),y
+            cmp #$ff
+            beq :+
+            jsr FetchCHRPacket
+            inc $06
+            bne :-
+:           rts
 
 CHRPacket_Src:
       .word font_smb1, bg_smb1, spr_smb1
       .word font_smb2, bg_smb2, spr_smb2
-      .word bg_main, spr_main
-      .word title, border
+      .word bg_main, bg_title, spr_main
+      .word bg_border
 CHRPacket_Len:
       .word $02c0, $0300, $00e0
       .word $02c0, $0300, $00e0
-      .word $0a40, $0f20
-      .word $0310, $0060
+      .word $0730, $0310, $0f20
+      .word $0060
 CHRPacket_Dest:
       .word $0000, $02c0, $1000
       .word $0000, $02c0, $1000
-      .word $05c0, $10e0
-      .word $0cf0, $0c90
+      .word $05c0, $0cf0, $10e0
+      .word $0c90
 
 ;$00-$01: source address
 ;$02-$03: size of packet
 ;X,Y: destination address
-FetchCHRPacket_AX:
-            pha
-            txa
-            jsr FetchCHRPacket
-            pla
 FetchCHRPacket:
             asl
             tay
@@ -14923,6 +14989,14 @@ RunGetAreaPointer:
 	jsr GetAreaPointer    ;run relevant routine
 	jmp LoadMainBank      ;and return to main bank
 
+BootIntoGame:
+		lda #CHR_MAIN
+		jsr FetchCHRPacketGroup
+		lda #MainBank
+		jsr Switch16KBank           ;switch PRG banks
+		jsr CheckSaveData           ;check validity of save data
+		jmp Start                   ;now start the game!
+
 ;------------------------------------------------------------------------------------
 ; INTERRUPT HANDLERS
 
@@ -14934,7 +15008,20 @@ VRAM_AddrTable:
    .word MarioThankYouMsgFinal, PeaceIsPavedMsg, WithKingdomSavedMsg, OurOnlyHeroMsg
    .word MarioHurrahMsg, ThisEndsYourTripMsg, OfALongFriendshipMsg, PointsAddedMsg
    .word ForEachPlayerLeftMsg, LuigiThankYouMsgFinal, LuigiHurrahMsg, DiskScreenPalette
-   .word PrincessPeachsRoom, FantasyWorld9Msg, ThanksForPlayingMsg
+   .word PrincessPeachsRoom, FantasyWorld9Msg, ThanksForPlayingMsg, TitleScreenGfxData_Complete
+   .word MainMenuPalette
+
+MainMenuPalette: ; (TO-DO: Find better way to handle this)
+      .byte $3f,$00,$20
+      .byte $0f,$30,$12,$0c
+      .byte $0f,$36,$17,$07
+      .byte $0f,$0f,$0f,$0f
+      .byte $0f,$27,$17,$07
+      .byte $0f,$16,$27,$18
+      .byte $0f,$1a,$30,$27
+      .byte $0f,$16,$30,$27
+      .byte $0f,$0f,$30,$10
+      .byte $00
 
 NMIHandler:
       pha                       ;preserve accumulator, X and Y registers
@@ -15007,8 +15094,6 @@ ScrnSwch:
       lda Mirror_PPU_MASK
       sta PPU_MASK              ;dump PPU control register 2
       jsr ReadJoypads
-      lda RawJoypadBits         ;copy controller 1 inputs over to
-      sta SavedJoypadBits       ;temp address that may be modified
       pla                       ;restore zero page RAM
       sta $01
       pla
@@ -15028,6 +15113,57 @@ SkipVRAMJoypad:
       tax
       pla
       rti
+
+RESETHandler:
+      ; Init NES/Famicom
+      sei
+      cld
+      ldx #$00
+      stx PPU_CTRL                ;disable NMIs
+      stx PPU_MASK                ;disable rendering
+      stx SND_DELTA_REG           ;disable DMC IRQs
+      stx SND_DELTA_REG+1         ;reset DMC output level
+      stx JOYPAD_PORT1            ;disable joypad strobing
+      lda #%00001111
+      sta SND_MASTERCTRL_REG      ;enable audio channels
+      lda #%11000000
+      sta JOYPAD_PORT2            ;disable APU frame IRQs
+      inx
+WaitForVBLANK:
+      lda PPU_STATUS              ;wait for two frames
+      bpl WaitForVBLANK
+      dex
+      bpl WaitForVBLANK
+      txs                         ;reset stack pointer
+
+      ; Init FME7
+      ldx #$07                    ;set up CHR bank registers
+CHRBankLoop:        
+      stx FME7Command
+      stx FME7Parameter
+      dex
+      bpl CHRBankLoop
+      lda #$08                    ;enable PRG-RAM
+      sta FME7Command
+      lda #%11000000
+      sta FME7Parameter
+      lda #$0b                    ;set up $C000-$DFFF bank (16K + 16K fixed arrangement)
+      sta FME7Command
+      lda #FixedBank-1
+      sta FME7Parameter
+      lda #$0c                    ;set horizontal nametable arrangement
+      sta FME7Command
+      lda #$00
+      sta FME7Parameter
+      lda #FME7_IRQTimer_Ctrl	    ;disable FME7 IRQ counter
+      sta FME7Command
+      lda #$00
+      sta FME7Parameter
+      cli                         ;enable IRQs
+ReturnToLoader:
+      lda #LoaderBank             ;switch to loader bank
+      jsr Switch16KBank
+      jmp StartLoader             ;now start the game!
 
 IRQHandler:
       pha                      ;save accumulator and Y
@@ -15051,56 +15187,6 @@ IRQHandler:
       pla
       rti
 
-Reset:
-      sei                        ;replicate init code present in FDS BIOS
-      lda #%00010000
-      sta PPU_CTRL
-      cld
-      lda #%00000110
-      sta PPU_MASK
-      ldx #$02
-VBlank:
-      lda PPU_STATUS
-      bpl VBlank
-      dex
-      bne VBlank
-      stx JOYPAD_PORT1
-      stx SND_DELTA_REG
-      lda #$c0
-      sta JOYPAD_PORT2
-      lda #$0f
-      sta SND_MASTERCTRL_REG
-      ldx #$ff
-      txs
-      lda #$0b                    ;set up $C000-$DFFF bank
-      sta FME7Command
-      lda #FixedBank-1
-      sta FME7Parameter
-      lda #$0c                    ;set vertical mirroring
-      sta FME7Command
-      lda #$00
-      sta FME7Parameter
-      sta Mirror_PPU_CTRL         ;workaround for hacky GFX loader
-      sta Mirror_PPU_MASK
-      sta LevelSet
-      lda #$08                    ;enable PRG-RAM
-      sta FME7Command
-      lda #%11000000
-      sta FME7Parameter
-      jsr InitCHRBanks            ;set up CHR bank registers
-      lda #LoaderBank
-      jsr Switch16KBank           ;switch PRG banks
-      jmp StartLoader             ;now start the game!
-
-BootIntoGame:
-		ldx #BG_MAIN_INDEX          ;load universal CHR data
-		lda #SPR_MAIN_INDEX
-		jsr FetchCHRPacket_AX
-		jsr LoadGameTileset         ;load game-appropiate CHR data
-		lda #MainBank
-		jsr Switch16KBank           ;switch PRG banks
-		jsr CheckSaveData           ;check validity of save data
-		jmp Start                   ;now start the game!
 ;-------------------------------------------------------------------------------------
 
 ;NINTENDO HEADER (NON-FUNCTIONAL)
@@ -15140,5 +15226,5 @@ BootIntoGame:
 
 ;"VECTORS"
         .word NMIHandler
-        .word Reset
+        .word RESETHandler
         .word IRQHandler
