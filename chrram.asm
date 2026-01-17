@@ -17,6 +17,11 @@ spr_smb2:
 ;shared tile data
 bg_main:
 .incbin "chr/bg_main.chr"
+title:
 .incbin "chr/bg_title.chr"
 spr_main:
 .incbin "chr/spr_main.chr"
+
+; loader tile data
+border:
+.incbin "chr/border.chr"

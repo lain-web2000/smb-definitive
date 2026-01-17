@@ -46,18 +46,12 @@ Start:      lda #%00010000               ;init PPU control register 1
             sta PPU_CTRL
             lda #$00
             sta PPU_MASK
-            bit $2002
+            bit PPU_STATUS
             lda #%00001010
 @CLK_IRQ:   sta PPU_ADDRESS              ;clock MMC3 IRQ correctly (thank you TakuikaNinja)
             sta PPU_ADDRESS
             asl a
             bcc @CLK_IRQ
-            ldx #$ff                     ;reset stack pointer
-            txs
-VBlank1:    lda PPU_STATUS               ;wait two frames
-            bpl VBlank1
-VBlank2:    lda PPU_STATUS
-            bpl VBlank2
             lda WorldNumber             ;get world number and save it temporarily
             pha
             ldy #ColdBootOffset         ;load default cold boot pointer
@@ -91,11 +85,9 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             lda Mirror_PPU_CTRL
             ora #%10000000
             jsr WritePPUReg1
+
 WaitForNMI: lda NMIAckFlag            ;spin until NMI routine has concluded
             beq WaitForNMI
-            jsr ReadJoypads
-            lda RawJoypadBits         ;copy controller 1 inputs over to
-            sta SavedJoypadBits       ;temp address that may be modified
             jsr PauseRoutine
             jsr UpdateTopScore
             lda GamePauseStatus       ;check d0 of game pause flags
@@ -153,18 +145,6 @@ WaitForIRQ: lda IRQAckFlag            ;wait for IRQ (TO-DO: is this necessary?)
             bne WaitForIRQ
             sta NMIAckFlag            ;clear NMI flag and wait for next NMI
             jmp WaitForNMI
-
-;-------------------------------------------------------------------------------------
-
-VRAM_AddrTable:
-   .word VRAM_Buffer, WaterPaletteData, GroundPaletteData, UndergroundPaletteData
-   .word CastlePaletteData, TitleScreenGfxData_SMB1, VRAM_Buffer, TitleScreenGfxData_SMB2
-   .word BowserPaletteData, DaySnowPaletteData, NightSnowPaletteData, MushroomPaletteData
-   .word MarioThankYouMsg, LuigiThankYouMsg, MushroomRetainerMsg, FinalRoomPalette
-   .word MarioThankYouMsgFinal, PeaceIsPavedMsg, WithKingdomSavedMsg, OurOnlyHeroMsg
-   .word MarioHurrahMsg, ThisEndsYourTripMsg, OfALongFriendshipMsg, PointsAddedMsg
-   .word ForEachPlayerLeftMsg, LuigiThankYouMsgFinal, LuigiHurrahMsg, DiskScreenPalette
-   .word PrincessPeachsRoom, FantasyWorld9Msg, ThanksForPlayingMsg
 
 ;-------------------------------------------------------------------------------------
 
@@ -257,23 +237,6 @@ OperModeExecutionTree:
 
 ;-------------------------------------------------------------------------------------
 
-MoveAllSpritesOffscreen:
-              ldy #$00                ;this routine moves all sprites off the screen
-              .byte $2c               ;BIT instruction opcode
-
-MoveSpritesOffscreen:
-              ldy #$04                ;this routine moves all but sprite 0
-              lda #$f8                ;off the screen
-SprInitLoop:  sta Sprite_Y_Position,y ;write 248 into OAM data's Y coordinate
-              iny                     ;which will move it off the screen
-              iny
-              iny
-              iny
-              bne SprInitLoop
-VMExit:       rts
-
-;-------------------------------------------------------------------------------------
-
 VictoryModeMain:
           jsr VictoryModeSubroutines ;run victory mode subroutines in order
           lda OperMode_Task          ;if running bridge collapse subroutine
@@ -346,8 +309,8 @@ SkipCompletedWorlds:
          sta EventMusicQueue     ;play win castle music
 
 IncModeTask:
-    inc OperMode_Task
-    rts
+         inc OperMode_Task
+VMExit:  rts
 
 ;-------------------------------------------------------------------------------------
 
@@ -1536,114 +1499,6 @@ MushroomRetainerMsg:
   .byte $00
 
 ;------------------------------------------------------------------------------------
-
-JumpEngine:
-       asl          ;shift bit from contents of A
-       tay
-       pla          ;pull saved return address from stack
-       sta $04      ;save to indirect
-       pla
-       sta $05
-       iny
-       lda ($04),y  ;load pointer from indirect
-       sta $06      ;note that if an RTS is performed in next routine
-       iny          ;it will return to the execution before the sub
-       lda ($04),y  ;that called this routine
-       sta $07
-       jmp ($0006)  ;jump to the address we loaded
-
-;------------------------------------------------------------------------------------
-
-InitializeNameTables:
-              lda PPU_STATUS            ;reset flip-flop
-              lda Mirror_PPU_CTRL       ;load mirror of first ppu control reg
-              ora #%00001000            ;set background for first 4k and sprites for second 4k
-              and #%11101000            ;clear rest of lower nybble, leave higher alone
-              jsr WritePPUReg1
-              lda #$24                  ;set vram address to start of name table 1
-              jsr WriteNTAddr
-              lda #$20                  ;and then set it to name table 0
-WriteNTAddr:  sta PPU_ADDRESS
-              lda #$00
-              sta PPU_ADDRESS
-              ldx #$04                  ;clear name table with blank tile $24
-              ldy #$c0
-              lda #$24
-InitNTLoop:   sta PPU_DATA              ;count out exactly 768 tiles
-              dey
-              bne InitNTLoop
-              dex
-              bne InitNTLoop
-              ldy #64                   ;now to clear the attribute table (with zero this time)
-              txa
-              sta VRAM_Buffer_Offset    ;init vram buffer offset
-              sta VRAM_Buffer           ;init vram buffer
-InitATLoop:   sta PPU_DATA
-              dey
-              bne InitATLoop
-              sta HorizontalScroll      ;reset scroll variables
-              sta VerticalScroll
-              jmp InitScroll            ;initialize scroll registers to zero
-
-;------------------------------------------------------------------------------------
-
-WriteBufferToScreen:
-               sta PPU_ADDRESS           ;store high byte of vram address
-               iny
-               lda ($00),y               ;load next byte (second)
-               sta PPU_ADDRESS           ;store low byte of vram address
-               iny
-               ldx #%00001000
-               lda ($00),y               ;load next byte (third)
-               bpl SetupWrite
-               ldx #%00001100
-SetupWrite:    stx PPU_CTRL
-               and #%01111111
-               cmp #%01000000
-               bcc LiteralData
-               and #%00111111
-               tax
-               iny                       ;otherwise increment Y to load next byte
-               lda ($00),y               ;load more data from buffer and write to vram
-RepeatByte:    sta PPU_DATA
-               dex                       ;done writing?
-               bne RepeatByte
-               beq UpdateAddr
-LiteralData:   and #%00111111
-               tax
-NextByte:      iny                       ;otherwise increment Y to load next byte
-               lda ($00),y
-               sta PPU_DATA
-               dex
-               bne NextByte
-UpdateAddr:    sec
-               tya
-               adc $00                   ;add end length plus one to the indirect at $00
-               sta $00                   ;to allow this routine to read another set of updates
-               lda #$00
-               adc $01
-               sta $01
-               lda #$3f                  ;sets vram address to palette memory
-               sta PPU_ADDRESS
-               lda #$00
-               sta PPU_ADDRESS
-               sta PPU_ADDRESS           ;then reinitializes it for some reason
-               sta PPU_ADDRESS
-UpdateScreen:  ldy #$00                  ;load first byte from indirect as a pointer
-               lda ($00),y
-               bne WriteBufferToScreen   ;if byte is zero we have no further updates to make here
-InitScroll:    sta PPU_SCROLL            ;store contents of A into scroll registers
-               sta PPU_SCROLL            ;and end whatever subroutine led us here
-               rts
-
-;------------------------------------------------------------------------------------
-
-WritePPUReg1:
-              sta PPU_CTRL              ;write contents of A to PPU register 1
-              sta Mirror_PPU_CTRL       ;and its mirror
-              rts
-
-;------------------------------------------------------------------------------------
 ;$00 - used to store status bar nybbles
 ;$02 - used as temp vram offset
 ;$03 - used to store length of status bar number
@@ -1864,26 +1719,6 @@ ShufAmtLoop: lda DefaultSprOffsets,x
              inc IRQUpdateFlag
              inc OperMode_Task
              rts
-;-------------------------------------------------------------------------------------
-
-InitializeMemory:
-              ldx #$07          ;set initial high byte to $0700-$07ff
-              lda #$00          ;set initial low byte to start of page (at $00 of page)
-              sta $06
-InitPageLoop: stx $07
-InitByteLoop: cpx #$01          ;check to see if we're on the stack ($0100-$01ff)
-              bne InitByte      ;if not, go ahead anyway
-              cpy #$60          ;otherwise, check to see if we're at $0160-$01ff
-              bcs SkipByte      ;if so, skip write
-              cpy #$09          ;otherwise, check to see if we're at $0100-$0108
-              bcc SkipByte      ;if so, skip write
-InitByte:     sta ($06),y       ;otherwise, initialize memory
-SkipByte:     dey
-              cpy #$ff          ;do this until all bytes in page have been erased
-              bne InitByteLoop
-              dex               ;go onto the next page
-              bpl InitPageLoop  ;do this until all desired pages of memory have been erased
-              rts
 
 ;-------------------------------------------------------------------------------------
 
@@ -13776,17 +13611,26 @@ GameOverMenu:
             lda PressedJoypadBits        ;if player pressed the start button
             and #Start_Button            ;then either continue or start over
             bne ContinueOrRetry
+            ldy ContinueMenuSelect       ;load menu option index into Y
             lda PressedJoypadBits
-            and #Select_Button           ;if player pressed the select button
-            beq ChgSel                   ;then do not branch ahead
-            lda #Sfx_Fireball            ;play sound effect when moving cursor
+            and #Down_Dir+Select_Button  ;if player pressed down or select
+            beq ChkUpDir                 ;then move to next menu option
+            iny
+            bne MoveSel
+ChkUpDir:   lda PressedJoypadBits        ;if player pressed up move to
+            and #Up_Dir                  ;previous menu option
+            beq ChgSel
+            dey
+MoveSel:    lda #Sfx_Fireball            ;play sound effect when moving cursor
             sta Square1SoundQueue
-            inc ContinueMenuSelect       ;move cursor to the next menu option
-            lda ContinueMenuSelect       ;check if we're past the last option
-            cmp #$03
-            bcc ChgSel                   ;if not, branch ahead
-            lda #$00                     ;otherwise move cursor back to the top
-            sta ContinueMenuSelect
+            lda #$02                     ;keep menu option in range
+            cpy #$00
+            bmi SetSel
+            lda #$00
+            cpy #$03
+            bcs SetSel
+            tya
+SetSel:     sta ContinueMenuSelect
 ChgSel:     ldy #$02
 ChgSelLoop: lda GameOverCursorData,y     ;set up cursor sprite tile, attribute
             sta Sprite_Data+1,y          ;and X position in sprite OAM data
@@ -13835,6 +13679,9 @@ ISCont: sta ScoreAndCoinDisplay,y   ;reset score
 ;-------------------------------------------------------------------------------------
 
 GameMenuRoutine:
+              lda PressedJoypadBits       ;check to see if the player pressed B
+              and #B_Button
+              bne ExitGame                ;if so, return to game selection menu
               lda PressedJoypadBits       ;check to see if the player pressed start
               and #Start_Button
               beq ChkSelect               ;if not, branch to check other buttons
@@ -13850,18 +13697,19 @@ GameMenuRoutine:
               cmp #WorldA
               bcc @num_worlds
               inc HardWorldFlag
-			  lda DifficultyFlag
-			  cmp #$02
-			  bne @num_worlds
-			  inc PrimaryHardMode
+              lda DifficultyFlag
+              cmp #$02
+              bne @num_worlds
+              inc PrimaryHardMode
 @num_worlds:  lda SavedLevelSet
               sta LevelSet
               lda SavedCompletedWorlds
               sta CompletedWorlds
 StG:          jmp StartGame
-ChkSelect:    lda PressedJoypadBits
-              cmp #Select_Button          ;branch if pressing select
-              beq SelectLogic
+ExitGame:     jmp Reset                   ;(TO-DO: More elegant approach than just resetting)
+ChkSelect:    lda PressedJoypadBits       ;branch if pressing up, down or select
+              and #Up_Dir+Down_Dir+Select_Button
+              bne SelectLogic
               ldx DemoTimer
               bne NullJoypad
               sta SelectedPlayer          ;run demo after a certain period of time
@@ -14707,6 +14555,185 @@ ThanksForPlayingMsg:
 ; FIXED BANK
 .res $F000 - *, $FF
 
+MoveAllSpritesOffscreen:
+              ldy #$00                ;this routine moves all sprites off the screen
+              .byte $2c               ;BIT instruction opcode
+
+MoveSpritesOffscreen:
+              ldy #$04                ;this routine moves all but sprite 0
+              lda #$f8                ;off the screen
+SprInitLoop:  sta Sprite_Y_Position,y ;write 248 into OAM data's Y coordinate
+              iny                     ;which will move it off the screen
+              iny
+              iny
+              iny
+              bne SprInitLoop
+              rts
+
+;-------------------------------------------------------------------------------------
+
+JumpEngine:
+       asl          ;shift bit from contents of A
+       tay
+       pla          ;pull saved return address from stack
+       sta $04      ;save to indirect
+       pla
+       sta $05
+       iny
+       lda ($04),y  ;load pointer from indirect
+       sta $06      ;note that if an RTS is performed in next routine
+       iny          ;it will return to the execution before the sub
+       lda ($04),y  ;that called this routine
+       sta $07
+       jmp ($0006)  ;jump to the address we loaded
+
+;------------------------------------------------------------------------------------
+
+InitializeNameTables:
+              lda PPU_STATUS            ;reset flip-flop
+              lda Mirror_PPU_CTRL       ;load mirror of first ppu control reg
+              ora #%00001000            ;set background for first 4k and sprites for second 4k
+              and #%11101000            ;mask out bits to set correct pattern tables
+              jsr WritePPUReg1
+              lda #$24                  ;set vram address to start of name table 1
+              jsr WriteNTAddr
+              lda #$20                  ;and then set it to name table 0
+WriteNTAddr:  sta PPU_ADDRESS
+              lda #$00
+              sta PPU_ADDRESS
+              ldx #$04                  ;clear name table with blank tile $24
+              ldy #$c0
+              lda #$24
+InitNTLoop:   sta PPU_DATA              ;count out exactly 768 tiles
+              dey
+              bne InitNTLoop
+              dex
+              bne InitNTLoop
+              ldy #64                   ;now to clear the attribute table (with zero this time)
+              txa
+              sta VRAM_Buffer_Offset    ;init vram buffer offset
+              sta VRAM_Buffer           ;init vram buffer
+InitATLoop:   sta PPU_DATA
+              dey
+              bne InitATLoop
+              sta HorizontalScroll      ;reset scroll variables
+              sta VerticalScroll
+              jmp InitScroll            ;initialize scroll registers to zero
+
+;------------------------------------------------------------------------------------
+
+ReadJoypads:
+; taken from https://www.nesdev.org/wiki/Controller_reading_code
+    lda RawJoypad1Bits ; save inputs from previous frame
+    tax
+    lda RawJoypad2Bits
+    tay
+    lda #$01
+    sta JOYPAD_PORT1
+    sta RawJoypad2Bits ; player 2's buttons double as a ring counter
+    lsr a
+    sta JOYPAD_PORT1
+:   lda JOYPAD_PORT1
+    and #%00000011
+    cmp #$01
+    rol RawJoypad1Bits
+    lda JOYPAD_PORT2
+    and #%00000011
+    cmp #$01
+    rol RawJoypad2Bits
+    bcc :-
+    ; newly pressed buttons: not held last frame, and held now
+    txa
+    eor #%11111111
+    and RawJoypad1Bits
+    sta PressedJoypad1Bits
+    tya
+    eor #%11111111
+    and RawJoypad2Bits
+    sta PressedJoypad2Bits
+    rts
+
+;------------------------------------------------------------------------------------
+
+WriteBufferToScreen:
+               sta PPU_ADDRESS           ;store high byte of vram address
+               iny
+               lda ($00),y               ;load next byte (second)
+               sta PPU_ADDRESS           ;store low byte of vram address
+               iny
+               ldx #%00001000
+               lda ($00),y               ;load next byte (third)
+               bpl SetupWrite
+               ldx #%00001100
+SetupWrite:    stx PPU_CTRL
+               and #%01111111
+               cmp #%01000000
+               bcc LiteralData
+               and #%00111111
+               tax
+               iny                       ;otherwise increment Y to load next byte
+               lda ($00),y               ;load more data from buffer and write to vram
+RepeatByte:    sta PPU_DATA
+               dex                       ;done writing?
+               bne RepeatByte
+               beq UpdateAddr
+LiteralData:   and #%00111111
+               tax
+NextByte:      iny                       ;otherwise increment Y to load next byte
+               lda ($00),y
+               sta PPU_DATA
+               dex
+               bne NextByte
+UpdateAddr:    sec
+               tya
+               adc $00                   ;add end length plus one to the indirect at $00
+               sta $00                   ;to allow this routine to read another set of updates
+               lda #$00
+               adc $01
+               sta $01
+               lda #$3f                  ;sets vram address to palette memory
+               sta PPU_ADDRESS
+               lda #$00
+               sta PPU_ADDRESS
+               sta PPU_ADDRESS           ;then reinitializes it for some reason
+               sta PPU_ADDRESS
+UpdateScreen:  ldy #$00                  ;load first byte from indirect as a pointer
+               lda ($00),y
+               bne WriteBufferToScreen   ;if byte is zero we have no further updates to make here
+InitScroll:    sta PPU_SCROLL            ;store contents of A into scroll registers
+               sta PPU_SCROLL            ;and end whatever subroutine led us here
+               rts
+
+;------------------------------------------------------------------------------------
+
+WritePPUReg1:
+              sta PPU_CTRL              ;write contents of A to PPU register 1
+              sta Mirror_PPU_CTRL       ;and its mirror
+              rts
+
+;------------------------------------------------------------------------------------
+
+InitializeMemory:
+              ldx #$07          ;set initial high byte to $0700-$07ff
+              lda #$00          ;set initial low byte to start of page (at $00 of page)
+              sta $06
+InitPageLoop: stx $07
+InitByteLoop: cpx #$01          ;check to see if we're on the stack ($0100-$01ff)
+              bne InitByte      ;if not, go ahead anyway
+              cpy #$60          ;otherwise, check to see if we're at $0160-$01ff
+              bcs SkipByte      ;if so, skip write
+              cpy #$09          ;otherwise, check to see if we're at $0100-$0108
+              bcc SkipByte      ;if so, skip write
+InitByte:     sta ($06),y       ;otherwise, initialize memory
+SkipByte:     dey
+              cpy #$ff          ;do this until all bytes in page have been erased
+              bne InitByteLoop
+              dex               ;go onto the next page
+              bpl InitPageLoop  ;do this until all desired pages of memory have been erased
+              rts
+
+;-------------------------------------------------------------------------------------
+
 SaveHeader:
         .byte "MARIO COMPLETE", $00, $00
 
@@ -14779,14 +14806,17 @@ CHRPacket_Src:
       .word font_smb1, bg_smb1, spr_smb1
       .word font_smb2, bg_smb2, spr_smb2
       .word bg_main, spr_main
+      .word title, border
 CHRPacket_Len:
       .word $02c0, $0300, $00e0
       .word $02c0, $0300, $00e0
       .word $0a40, $0f20
+      .word $0310, $0060
 CHRPacket_Dest:
       .word $0000, $02c0, $1000
       .word $0000, $02c0, $1000
       .word $05c0, $10e0
+      .word $0cf0, $0c90
 
 ;$00-$01: source address
 ;$02-$03: size of packet
@@ -14812,12 +14842,12 @@ FetchCHRPacket:
             sta $03
             lda CHRPacket_Dest,y
             tay
-            lda #CHRBank          ;switch bank
-            jsr Switch16KBank
 WriteCHRPacket:
             lda Mirror_PPU_CTRL   ;disable NMI while updating graphics
             and #%01111111        ;(TO-DO: Hacky, may want to move into NMI handler)
             sta PPU_CTRL
+            lda #CHRBank          ;switch bank
+            jsr TempSwitch16KBank
             lda Mirror_PPU_MASK
             and #%11100111
             sta PPU_MASK
@@ -14839,40 +14869,8 @@ WriteCHRPacket:
             bne @chklen
 @done:      lda Mirror_PPU_CTRL    ;re-enable NMI
             sta PPU_CTRL
-            jmp LoadMainBank       ;return to main bank
-
-;------------------------------------------------------------------------------------
-
-ReadJoypads:
-; taken from https://www.nesdev.org/wiki/Controller_reading_code
-    lda RawJoypad1Bits ; save inputs from previous frame
-    tax
-    lda RawJoypad2Bits
-    tay
-    lda #$01
-    sta JOYPAD_PORT1
-    sta RawJoypad2Bits ; player 2's buttons double as a ring counter
-    lsr a
-    sta JOYPAD_PORT1
-:   lda JOYPAD_PORT1
-    and #%00000011
-    cmp #$01
-    rol RawJoypad1Bits
-    lda JOYPAD_PORT2
-    and #%00000011
-    cmp #$01
-    rol RawJoypad2Bits
-    bcc :-
-    ; newly pressed buttons: not held last frame, and held now
-    txa
-    eor #%11111111
-    and RawJoypad1Bits
-    sta PressedJoypad1Bits
-    tya
-    eor #%11111111
-    and RawJoypad2Bits
-    sta PressedJoypad2Bits
-    rts
+            lda ShadowPRGBank      ;restore original bank
+            jmp TempSwitch16KBank
 
 ;------------------------------------------------------------------------------------
 
@@ -14925,23 +14923,25 @@ RunGetAreaPointer:
 	jsr GetAreaPointer    ;run relevant routine
 	jmp LoadMainBank      ;and return to main bank
 
-NMI_Stub:
+;------------------------------------------------------------------------------------
+; INTERRUPT HANDLERS
+
+VRAM_AddrTable:
+   .word VRAM_Buffer, WaterPaletteData, GroundPaletteData, UndergroundPaletteData
+   .word CastlePaletteData, TitleScreenGfxData_SMB1, VRAM_Buffer, TitleScreenGfxData_SMB2
+   .word BowserPaletteData, DaySnowPaletteData, NightSnowPaletteData, MushroomPaletteData
+   .word MarioThankYouMsg, LuigiThankYouMsg, MushroomRetainerMsg, FinalRoomPalette
+   .word MarioThankYouMsgFinal, PeaceIsPavedMsg, WithKingdomSavedMsg, OurOnlyHeroMsg
+   .word MarioHurrahMsg, ThisEndsYourTripMsg, OfALongFriendshipMsg, PointsAddedMsg
+   .word ForEachPlayerLeftMsg, LuigiThankYouMsgFinal, LuigiHurrahMsg, DiskScreenPalette
+   .word PrincessPeachsRoom, FantasyWorld9Msg, ThanksForPlayingMsg
+
+NMIHandler:
       pha                       ;preserve accumulator, X and Y registers
       txa
       pha
       tya
       pha
-      jsr NMIHandler
-      lda ShadowPRGBank         ;restore original bank
-      jsr TempSwitch16KBank
-      pla                       ;restore accumulator, X and Y registers
-      tay
-      pla
-      tax
-      pla
-      rti
-
-NMIHandler:
       lda IRQUpdateFlag         ;skip this code if IRQs are disabled
       beq SkipIRQ
       lda #FME7_IRQTimer_Low
@@ -14966,7 +14966,7 @@ SkipIRQ:
       beq ProcessVRAMBuffer     ;if not, update VRAM contents
       lda #$00                  ;otherwise, reset scroll here
       jsr InitScroll
-      jmp SkipVRAMUpdate        ;and skip ahead to process sound
+      jmp SkipVRAMJoypad        ;and skip ahead to process sound
 ProcessVRAMBuffer:
       lda $00                   ;also preserve $00 and $01 since we use them
       pha
@@ -14999,25 +14999,35 @@ ScrnSwch:
       sta $01
       jsr UpdateScreen          ;now update the screen with it
       lda #$00                  ;erase the VRAM buffer offset, init first VRAM buffer
-	  ldx VRAM_Buffer_AddrCtrl
-	  bne :+
+      ldx VRAM_Buffer_AddrCtrl
+      bne :+
       sta VRAM_Buffer_Offset    ;by writing end terminator at the first byte, and
       sta VRAM_Buffer           ;init address control to point at first VRAM buffer
-:     sta VRAM_Buffer_AddrCtrl  ;(TO-DO: Skip this if a transfer from ROM was done instead)
+:     sta VRAM_Buffer_AddrCtrl
       lda Mirror_PPU_MASK
       sta PPU_MASK              ;dump PPU control register 2
+      jsr ReadJoypads
+      lda RawJoypadBits         ;copy controller 1 inputs over to
+      sta SavedJoypadBits       ;temp address that may be modified
       pla                       ;restore zero page RAM
       sta $01
       pla
       sta $00
-SkipVRAMUpdate:
+SkipVRAMJoypad:
       jsr RunSoundEngine        ;run sound engine every frame
       lda PPU_STATUS            ;reset flip-flop
       lda Mirror_PPU_CTRL       ;reenable NMIs
       ora #$80
       sta Mirror_PPU_CTRL
       sta PPU_CTRL
-      rts
+      lda ShadowPRGBank         ;restore original bank
+      jsr TempSwitch16KBank
+      pla                       ;restore accumulator, X and Y registers
+      tay
+      pla
+      tax
+      pla
+      rti
 
 IRQHandler:
       pha                      ;save accumulator and Y
@@ -15032,9 +15042,9 @@ IRQHandler:
       lda PPU_STATUS           ;reset flip-flop
       lda #$00
       lda #FME7_IRQTimer_Ctrl	 ;disable IRQ timer for the rest of the frame
-	  sta FME7Command
-	  lda #$00
-	  sta FME7Parameter
+      sta FME7Command
+      lda #$00
+      sta FME7Parameter
       sta IRQAckFlag           ;indicate IRQ was acknowledged
       pla                      ;restore accumulator and Y, then leave
       tay
@@ -15043,10 +15053,10 @@ IRQHandler:
 
 Reset:
       sei                        ;replicate init code present in FDS BIOS
-      lda #$10
+      lda #%00010000
       sta PPU_CTRL
       cld
-      lda #$06
+      lda #%00000110
       sta PPU_MASK
       ldx #$02
 VBlank:
@@ -15129,6 +15139,6 @@ BootIntoGame:
 .res $FFFA - *, $FF
 
 ;"VECTORS"
-        .word NMI_Stub
+        .word NMIHandler
         .word Reset
         .word IRQHandler
