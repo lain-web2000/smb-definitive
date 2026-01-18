@@ -434,8 +434,8 @@ NextWorld_Complete:
 ChkHardF:  ldy HardWorldFlag         ;have we already toggled worlds A-D flag?
            bne StoreWNum             ;if not, branch ahead
            inc HardWorldFlag         ;otherwise go ahead and set the flag
-		   lda DifficultyFlag
-		   cmp #$02
+		   ldy DifficultyFlag
+		   cpy #$02
 		   beq ChkHardM
            bne StoreWNum             ;(TO-DO: Replace with conditional based on setting)
 ChkHardM:  ldy PrimaryHardMode       ;have we already set primary hard mode?
