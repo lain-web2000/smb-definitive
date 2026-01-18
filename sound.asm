@@ -879,8 +879,8 @@ LoadTriCtrlReg:
         sta SND_TRIANGLE_REG      ;save final contents of A into control reg for triangle
 
 HandleNoiseMusic:
-		lda LevelSet
-		beq :+
+        lda LevelSet
+        beq :+
         lda EventMusicBuffer      ;check if playing victory music
         cmp #VictoryMusic
         beq PlayNoiseMusic        ;if so, play noise
@@ -981,14 +981,14 @@ LoadEnvelopeData:
         lda EventMusicBuffer           ;check secondary buffer for victory music
         cmp #VictoryMusic
         bne LoadEndOfCastleMusEnvData
-		lda LevelSet
-		bne SMB2Vic
+        lda LevelSet
+        bne SMB2Vic
 SMB1Vic:
-		lda SMB1_VictoryMusEnvData,y        ;load data from offset for victory music
+        lda SMB1_VictoryMusEnvData,y        ;load data from offset for victory music
         rts
 SMB2Vic:
-		lda VictoryMusEnvData,y
-		rts
+        lda VictoryMusEnvData,y
+        rts
 LoadEndOfCastleMusEnvData:
         and #EndOfCastleMusic          ;check secondary buffer for win castle music
         beq LoadUsualEnvData
@@ -1468,12 +1468,12 @@ VictoryMusEnvData:
       .byte $97, $98, $9a, $9b, $9b, $9a, $9a, $99
       .byte $99, $98, $98, $97, $97, $96, $96, $95
       .byte $02 ;needed to produce correct sound
-	 
+
 SMB1_VictoryMusEnvData:
       .byte $96, $96, $96, $96, $96, $96, $96, $96
       .byte $96, $96, $96, $96, $95, $95, $94, $93
       .byte $12
-	  
+
 EndOfCastleMusicEnvData:
       .byte $98, $99, $9a, $9b
 

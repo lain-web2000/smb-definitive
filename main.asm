@@ -43,10 +43,10 @@
 ;-------------------------------------------------------------------------------------
 
 Start:      ldx #$00                    ;disable NMIs and rendering
-		stx PPU_CTRL
-		stx PPU_MASK
-		dex
-		txs                         ;reset stack pointer
+            stx PPU_CTRL
+            stx PPU_MASK
+            dex
+            txs                         ;reset stack pointer
 ;            bit PPU_STATUS
 ;            lda #%00001010
 ;@CLK_IRQ:   sta PPU_ADDRESS              ;clock MMC3 IRQ correctly (thank you TakuikaNinja)
@@ -480,12 +480,12 @@ FloateyNumbersRoutine:
               lda FloateyNum_Control,x     ;load control for floatey number
               beq EndExit                  ;if zero, branch to leave
               ldy DifficultyFlag
-			  cpy #$01
-			  bne @HardMode
+              cpy #$01
+              bne @HardMode
               cmp #$0b                     ;if less than $0b, branch
               bcc ChkNumTimer
               lda #$0b                     ;otherwise set to $0b, thus keeping
-			  bne :+
+              bne :+
 @HardMode:    cmp #$0c                     ;if less than $0b, branch
               bcc ChkNumTimer
               lda #$0c                     ;otherwise set to $0b, thus keeping
@@ -559,7 +559,7 @@ SetupNumSpr:  lda FloateyNum_Y_Pos,x       ;get vertical coordinate
 
 GiveExtraLife:
       lda DifficultyFlag
-	  beq NotMaxLives		 ;easy mode has infinite lives
+      beq NotMaxLives        ;easy mode has infinite lives
       inc NumberofLives      ;give the player an extra life
       lda NumberofLives      ;have we exceeded the maximum number of lives?
       cmp #99
@@ -761,7 +761,7 @@ DisplayIntermediate:
 PlayerInter:   jsr DrawPlayer_Intermediate  ;put player in appropriate place for
                lda #$01                     ;lives display, then output lives display to buffer
 OutputInter:   jsr OtherInter
-			   sta IntervalTimerControl	 	;clear framerule counter
+               sta IntervalTimerControl     ;clear framerule counter
                lda GameOverMsgFlag          ;if special message flag not set, do next task
                beq IncSubtask
                inc DisableScreenFlag        ;disable screen output
@@ -1802,7 +1802,7 @@ SetStPos: lda PlayerStarting_X_Pos,y  ;load appropriate horizontal position
           beq ChkOverR                ;if set to zero, branch (do not use dummy byte for this)
           lda FetchNewGameTimerFlag   ;do we need to set the game timer? if not, use
           beq ChkOverR                ;old game timer setting
-		  dey
+          dey
           lda GameTimerData,y         ;if game timer is set and game timer flag is also set,
           sta GameTimerDisplay        ;use value of game timer control for first digit of game timer
           lda GameTimerData+3,y
@@ -3373,7 +3373,7 @@ GameCoreRoutine:
       rts
 
 WaterAnimIntervals:              ;lookup table for water animation speed
-	  .byte 10, 16, 16, 16     ;10 frames for water area types, 16 frames for everything else
+        .byte 10, 16, 16, 16     ;10 frames for water area types, 16 frames for everything else
 
 WaterAnimOffsets:
         .byte WaterAnimFrame1-WaterAnimTiles
@@ -3384,16 +3384,16 @@ WaterAnimOffsets:
 WaterAnimTiles:
 WaterAnimFrame1:
         .byte $06, $a0, $10
-	  .incbin "chr/water_frame1.chr"
+        .incbin "chr/water_frame1.chr"
 WaterAnimFrame2:
         .byte $06, $a0, $10
-	  .incbin "chr/water_frame2.chr"
+        .incbin "chr/water_frame2.chr"
 WaterAnimFrame3:
         .byte $06, $a0, $10
-	  .incbin "chr/water_frame3.chr"
+        .incbin "chr/water_frame3.chr"
 WaterAnimFrame4:
         .byte $06, $a0, $10
-	  .incbin "chr/water_frame4.chr"
+        .incbin "chr/water_frame4.chr"
 
 GameEngine:
               jsr ProcFireball_Bubble    ;process fireballs and air bubbles
@@ -3680,16 +3680,16 @@ SaveJoyp:   lda SavedJoypadBits         ;otherwise store A and B buttons in $0a
             sta A_B_Buttons
             lda SavedJoypadBits         ;store left and right buttons in $0c
             and #%00000011
-			cmp #%00000011
-			bne :+
-			lda #$00
+            cmp #%00000011
+            bne :+
+            lda #$00
 :           sta Left_Right_Buttons
             lda SavedJoypadBits         ;store up and down buttons in $0b
             and #%00001100
-			cmp #%00001100
-			bne :+
-			lda #$00
-:			sta Up_Down_Buttons
+            cmp #%00001100
+            bne :+
+            lda #$00
+:           sta Up_Down_Buttons
             and #%00000100              ;check for pressing down
             beq SizeChk                 ;if not, branch
             lda Player_State            ;check player's state
@@ -4845,11 +4845,11 @@ PosJSpr:   lda Jumpspring_FixedYPos,x  ;get permanent vertical position
            cpy #WorldB                 ;(TO-DO: Add setting for red springs in world B)
            beq :+
            cpy #WorldC                 ;otherwise use red jumpspring force
-		   beq GreenJS
+           beq GreenJS
            bne SetJSF
 :          ldy DifficultyFlag
            cpy #$02
-		   beq SetJSF 
+           beq SetJSF 
 GreenJS:   lda #$e0
 SetJSF:    sta JumpspringForce         ;otherwise write new jumpspring force here
            pla
@@ -6473,9 +6473,9 @@ InitHammerBro:
        sta Enemy_X_Speed,x
        lda LevelSet                ;playing SMB1 levels?
        beq HBI                     ;skip world check, always have walk delay
-	   lda DifficultyFlag
-	   cmp #$02
-	   beq :+
+       lda DifficultyFlag
+       cmp #$02
+       beq :+
        lda HardWorldFlag           ;if on worlds A-D, always have walk delay
        bne HBI
 :      lda WorldNumber             ;if on world 7-9 of SMB2J, branch to skip the walk delay
@@ -10686,7 +10686,7 @@ ExPipeE:  rts                       ;leave!!!
 
 WarpZoneHandler:
           ldy LevelSet              ;are we in SMB1?
-          beq SMB1WarpZoneHandler	;if so, use all stars warp-zone handler
+          beq SMB1WarpZoneHandler   ;if so, use all stars warp-zone handler
           and #%00001111            ;mask bits
           asl
           asl                       ;multiply by four
@@ -10742,7 +10742,7 @@ CalculateWarpPipeOffset:
          cmp #$A0
          bcc GetWNum
          inx
-         bne GetWNum	;why did we waste all this code for an unconditional branch? idk.
+         bne GetWNum             ;why did we waste all this code for an unconditional branch? idk.
 
 ImpedePlayerMove:
        lda #$00                  ;initialize value here
@@ -12125,11 +12125,11 @@ CheckForJumpspring:
        cpy #WorldB
        beq :+                       ;otherwise use alternate attributes
        cpy #WorldC                  ;to get the green superhigh jumpsprings
-	   beq GrnJS
+       beq GrnJS
        bne RedJS
 :      ldy DifficultyFlag
        cpy #$02
-	   beq RedJS
+       beq RedJS
 GrnJS: lsr
 RedJS: sta $04
        ldy #$03                     ;set enemy state -2 MSB here for jumpspring object
@@ -13888,10 +13888,10 @@ InitializeGame:
             sta CompletedWorlds      ;clean slate player's progress (except for games beaten)
             sta HardWorldFlag
             sta SelectedPlayer
-		ldy CurrentGame
-		cpy #$02
-		bne :+
-		lda #$01
+            ldy CurrentGame
+            cpy #$02
+            bne :+
+            lda #$01
 :           sta LevelSet
             jsr LoadGameTileset      ;load game-appropiate CHR data
             ldy #$6f                 ;clear all memory as in initialization procedure,
@@ -14326,10 +14326,10 @@ BackToNormal:
     beq EndTheGame
     lda CurrentGame          ;if playing SMB1, don't bother with world 9
     cmp #$01
-	bne :+
-	lda PrimaryHardMode
-	beq GoToNextWorld
-	bne EndTheGame
+    bne :+
+    lda PrimaryHardMode
+    beq GoToNextWorld
+    bne EndTheGame
 :   lda CompletedWorlds      ;if completed all worlds without skipping over any
     cmp #$ff                 ;then branch elsewhere (note warping backwards may
     beq GoToNextWorld        ;allow player to complete skipped worlds)
@@ -14344,15 +14344,15 @@ EndTheGame:
     sta ContinueWorld        ;reset saved progress
     sta SavedLevelSet
     sta SavedCompletedWorlds
-	lda CurrentGame
-	bne :+
+    lda CurrentGame
+    bne :+
     lda #GameOverMode        ;set game over mode
     sta OperMode
     inc GameOverMsgFlag      ;increment flag for special message
     jmp GameOverSubs         ;jump to game over mode routines
-:	lda #AttractMode
-	sta OperMode
-	jmp AttractModeSubs
+:   lda #AttractMode
+    sta OperMode
+    jmp AttractModeSubs
 
 FlashMRSpriteDataOfs:
     .byte $50, $b0, $e0, $68, $98, $c8
@@ -14481,9 +14481,9 @@ WithKingdomSavedMsg:
 OurOnlyHeroMsg:
     .byte $25, $87, $13
     .byte $11, $1e, $1b, $1b, $0a, $11, $24, $1d, $18, $24
-	.byte $18, $1e, $1b, $24, $11, $0e, $1b, $18, $2a
+    .byte $18, $1e, $1b, $24, $11, $0e, $1b, $18, $2a
     .byte $00
-	
+
 MarioHurrahMsg:
     .byte $25, $ce, $06
     .byte $16, $0a, $1b, $12, $18, $27
@@ -14854,7 +14854,7 @@ SaveLp: lda SaveHeader,x        ;write save data header
         rts                     ;otherwise we have reset save data, leave
 
 ;-------------------------------------------------------------------------------------
-		
+
 LoadFontTileset:
       ; load font based on menu selection
       lda #$00
@@ -14993,60 +14993,60 @@ WriteCHRPacket:
 
 ;call to switch to main game bank (TO-DO: Improve banking system)
 LoadMainBank:
-	lda #MainBank
+    lda #MainBank
 ;call to switch bank and save in shadow register
 Switch16KBank:
-	sta ShadowPRGBank
+    sta ShadowPRGBank
 ;call to switch bank without saving in shadow register
 TempSwitch16KBank:
-	;bankswitch $8000-$9FFF region
-	pha
-	lda #$09
-	sta FME7Command
-	pla
-	sta FME7Parameter
-	;bankswitch $A000-$BFFF region
-	clc
-	adc #$01
-	pha
-	lda #$0a
-	sta FME7Command
-	pla
-	sta FME7Parameter
-	rts
+    ;bankswitch $8000-$9FFF region
+    pha
+    lda #$09
+    sta FME7Command
+    pla
+    sta FME7Parameter
+    ;bankswitch $A000-$BFFF region
+    clc
+    adc #$01
+    pha
+    lda #$0a
+    sta FME7Command
+    pla
+    sta FME7Parameter
+    rts
 
 RunSoundEngine:
-	lda #SoundBank        ;switch bank
-	jsr TempSwitch16KBank
-	jsr SoundEngine       ;run relevant routine
-	lda #MainBank
-	jmp TempSwitch16KBank ;and return to main bank
+    lda #SoundBank        ;switch bank
+    jsr TempSwitch16KBank
+    jsr SoundEngine       ;run relevant routine
+    lda #MainBank
+    jmp TempSwitch16KBank ;and return to main bank
 
 RunLoadAreaPointer:
-	lda #LevelsBank       ;switch bank
-	jsr Switch16KBank
-	jsr LoadAreaPointer   ;run relevant routine
-	jmp LoadMainBank      ;and return to main bank
+    lda #LevelsBank       ;switch bank
+    jsr Switch16KBank
+    jsr LoadAreaPointer   ;run relevant routine
+    jmp LoadMainBank      ;and return to main bank
 
 RunGetAreaDataAddrs:
-	lda #LevelsBank       ;switch bank
-	jsr Switch16KBank
-	jsr GetAreaDataAddrs  ;run relevant routine
-	jmp LoadMainBank      ;and return to main bank
+    lda #LevelsBank       ;switch bank
+    jsr Switch16KBank
+    jsr GetAreaDataAddrs  ;run relevant routine
+    jmp LoadMainBank      ;and return to main bank
 
 RunGetAreaPointer:
-	lda #LevelsBank       ;switch bank
-	jsr Switch16KBank
-	jsr GetAreaPointer    ;run relevant routine
-	jmp LoadMainBank      ;and return to main bank
+    lda #LevelsBank       ;switch bank
+    jsr Switch16KBank
+    jsr GetAreaPointer    ;run relevant routine
+    jmp LoadMainBank      ;and return to main bank
 
 BootIntoGame:
-		lda #CHR_MAIN
-		jsr FetchCHRPacketGroup
-		lda #MainBank
-		jsr Switch16KBank           ;switch PRG banks
-		jsr CheckSaveData           ;check validity of save data
-		jmp Start                   ;now start the game!
+        lda #CHR_MAIN
+        jsr FetchCHRPacketGroup
+        lda #MainBank
+        jsr Switch16KBank           ;switch PRG banks
+        jsr CheckSaveData           ;check validity of save data
+        jmp Start                   ;now start the game!
 
 ;------------------------------------------------------------------------------------
 ; INTERRUPT HANDLERS
@@ -15206,7 +15206,7 @@ CHRBankLoop:
       sta FME7Command
       lda #$00
       sta FME7Parameter
-      lda #FME7_IRQTimer_Ctrl	    ;disable FME7 IRQ counter
+      lda #FME7_IRQTimer_Ctrl     ;disable FME7 IRQ counter
       sta FME7Command
       lda #$00
       sta FME7Parameter
@@ -15228,7 +15228,7 @@ IRQHandler:
       sta PPU_SCROLL           ;set scroll position for the screen under the status bar
       lda PPU_STATUS           ;reset flip-flop
       lda #$00
-      lda #FME7_IRQTimer_Ctrl	 ;disable IRQ timer for the rest of the frame
+      lda #FME7_IRQTimer_Ctrl  ;disable IRQ timer for the rest of the frame
       sta FME7Command
       lda #$00
       sta FME7Parameter
@@ -15244,31 +15244,31 @@ IRQHandler:
 .res $FFE0 - *, $FF
 
 ;TITLE
-	.byte "  MARIO COMPLETE"
+    .byte "  MARIO COMPLETE"
 
 ;PRG CHECKSUM
-	.byte $31, $A9
+    .byte $31, $A9
 
 ;CHR CHECKSUM (Not needed since we are using CHR-RAM)
-	.res $02, $00
+    .res $02, $00
 
 ;DATA SIZE & TYPE
-	.byte %00111000	;128K PRG-ROM, CHR-RAM, 8K CHR
+    .byte %00111000    ;128K PRG-ROM, CHR-RAM, 8K CHR
 
 ;BOARD TYPE
-	.byte %10000100 ;Vertical Arrangement, MMC3 mapper
+    .byte %10000100 ;Vertical Arrangement, MMC3 mapper
 
 ;TITLE ENCODING
-	.byte $01
+    .byte $01
 
 ;TITLE LENGTH
-	.byte 13
+    .byte 13
 
 ;LICENSEE CODE
-	.byte $00
+    .byte $00
 
 ;HEADER VALIDATION BYTE
-	.byte $36
+    .byte $36
 
 ;-------------------------------------------------------------------------------------
 ;INTERRUPT VECTORS
