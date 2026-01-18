@@ -152,12 +152,16 @@ ChkPauseTimer: lda GamePauseTimer     ;check if pause timer is still counting do
                beq ChkStart
                dec GamePauseTimer     ;if so, decrement and leave
                rts
-ChkStart:      lda SavedJoypadBits    ;check to see if start is pressed
+ChkStart:      lda PressedJoypadBits  ;check to see if select is pressed
+               and #Select_Button
+               beq :+
+               jmp ReturnToLoader     ;exit game if so
+:              lda PressedJoypadBits  ;check to see if start is pressed
                and #Start_Button
                beq ClrPauseTimer
                lda GamePauseStatus    ;check to see if timer flag is set
-               and #%10000000         ;and if so, do not reset timer (residual,
-               bne ExitPause          ;joypad reading routine makes this unnecessary)
+               and #%10000000         ;and if so, do not reset timer
+               bne ExitPause
                lda #$2b               ;set pause timer
                sta GamePauseTimer
                lda GamePauseStatus
@@ -434,9 +438,9 @@ NextWorld_Complete:
 ChkHardF:  ldy HardWorldFlag         ;have we already toggled worlds A-D flag?
            bne StoreWNum             ;if not, branch ahead
            inc HardWorldFlag         ;otherwise go ahead and set the flag
-		   ldy DifficultyFlag
-		   cpy #$02
-		   beq ChkHardM
+           ldy DifficultyFlag
+           cpy #$02
+           beq ChkHardM
            bne StoreWNum             ;(TO-DO: Replace with conditional based on setting)
 ChkHardM:  ldy PrimaryHardMode       ;have we already set primary hard mode?
            bne StoreWNum             ;yes, branch ahead
@@ -1615,7 +1619,7 @@ DefaultSprOffsets:
 
 InitializeArea:
                ldy #$4b                 ;clear all memory again, only as far as $074b
-               jsr InitializeMemory     ;this is only necessary in game mode
+               jsr ClearMemory     ;this is only necessary in game mode
                ldx #$21
                lda #$00
 ClrTimersLoop: sta Timers,x             ;clear out timer memory
@@ -1670,8 +1674,12 @@ CheckHalfway:  lda HalfwayPage
                beq DoneInitArea
                lda #$02                 ;if halfway page set, overwrite start position from header
                sta PlayerEntranceCtrl
-DoneInitArea:  lda #Silence             ;silence music
+DoneInitArea:  lda SilenceSuppression   ;if enabled, do not silence music between areas
+               bne :+
+               lda #Silence             ;silence music
                sta AreaMusicQueue
+:              lda #$00
+               sta SilenceSuppression
                lda #$01                 ;disable screen output
                sta DisableScreenFlag
                inc OperMode_Task        ;increment task for this mode
@@ -1735,6 +1743,8 @@ ChkAreaType: ldy AreaType           ;load area type as offset for music bit
              beq StoreMusic         ;check for cloud type override
              ldy #$04               ;select music for cloud type level if found
 StoreMusic:  lda MusicSelectData,y  ;otherwise select appropriate music for level type
+             cmp AreaMusicBuffer    ;leave if music to be queued is already playing
+             beq ExitGetM
              sta AreaMusicQueue     ;store in queue and leave
 ExitGetM:    rts
 
@@ -1854,8 +1864,8 @@ PlayerLoseLife:
              sta IRQUpdateFlag
              lda #Silence             ;silence music
              sta EventMusicQueue
-			 lda DifficultyFlag
-			 beq StillInGame
+             lda DifficultyFlag
+             beq StillInGame
              dec NumberofLives        ;take one life from player
              bpl StillInGame          ;if player still has lives, branch
              lda #$00
@@ -1864,10 +1874,10 @@ PlayerLoseLife:
              sta OperMode             ;and leave
              rts
 StillInGame: lda DifficultyFlag
-			 cmp #$02
-			 beq :+
-			 lda WorldNumber          ;retrieve world number for offset
-			 ldy LevelSet             ;check if playing 2J levels
+             cmp #$02
+             beq :+
+             lda WorldNumber          ;retrieve world number for offset
+             ldy LevelSet             ;check if playing 2J levels
              beq NrmlWorlds           ;if not, use world number as-is
              clc                      ;otherwise add nine for correct halfway pages
              adc #$09
@@ -3811,7 +3821,19 @@ ChgAreaPipe: dec ChangeAreaTimer       ;decrement timer for change of area
              bne ExitCAPipe
              sty AltEntranceControl    ;when timer expires set mode of alternate entry
 ChgAreaMode: inc DisableScreenFlag     ;set flag to disable screen output
-             lda #$00
+;             lda AreaPointer           ;if next area of same type, do not stop music
+;             rol
+;             rol
+;             rol
+;             rol
+;             and #%00000011
+;             cmp AreaType
+;             bne :+
+;             inc SilenceSuppression
+             lda WarpZoneControl
+             beq :+
+             jsr WarpZoneHandler
+:            lda #$00
              sta OperMode_Task         ;set secondary mode of operation
              sta IRQUpdateFlag         ;disable IRQ check
 ExitCAPipe:  rts                       ;leave
@@ -10656,8 +10678,13 @@ HandlePipeEntry:
           sta Square1SoundQueue     ;load pipedown/injury sound
           lda #%00100000
           sta Player_SprAttrib      ;set background priority bit in player's attributes
-          lda WarpZoneControl       ;check warp zone control
-          beq ExPipeE               ;branch to leave if none found
+          lda WarpZoneControl
+          beq ExPipeE
+          lda #Silence
+          sta EventMusicQueue       ;silence music
+ExPipeE:  rts                       ;leave!!!
+
+WarpZoneHandler:
           ldy LevelSet              ;are we in SMB1?
           beq SMB1WarpZoneHandler	;if so, use all stars warp-zone handler
           and #%00001111            ;mask bits
@@ -10677,8 +10704,6 @@ GetWNum:  lda WarpZoneNumbers,x
           sty WorldNumber           ;store as world number and offset
           jsr RunGetAreaPointer
           sty AreaPointer           ;store area offset here to be used to change areas
-          lda #Silence
-          sta EventMusicQueue       ;silence music
           lda #$00
           sta EntrancePage          ;initialize starting page number
           sta AreaNumber            ;initialize area number used for area address offset
@@ -10686,7 +10711,7 @@ GetWNum:  lda WarpZoneNumbers,x
           sta AltEntranceControl    ;initialize mode of entry
           inc Hidden1UpFlag         ;set flag for hidden 1-up blocks
           inc FetchNewGameTimerFlag ;set flag to load new game timer
-ExPipeE:  rts                       ;leave!!!
+          rts
 
 SMB1WarpZoneHandler:
          cmp #$04
@@ -14714,6 +14739,9 @@ WritePPUReg1:
 
 ;------------------------------------------------------------------------------------
 
+;$06 - RAM address low
+;$07 - RAM address high
+
 InitializeMemory:
               ldx #$07          ;set initial high byte to $0700-$07ff
               lda #$00          ;set initial low byte to start of page (at $00 of page)
@@ -14723,15 +14751,38 @@ InitByteLoop: cpx #$01          ;check to see if we're on the stack ($0100-$01ff
               bne InitByte      ;if not, go ahead anyway
               cpy #$60          ;otherwise, check to see if we're at $0160-$01ff
               bcs SkipByte      ;if so, skip write
-              cpy #$09          ;otherwise, check to see if we're at $0100-$0108
-              bcc SkipByte      ;if so, skip write
-InitByte:     sta ($06),y       ;otherwise, initialize memory
+InitByte:     sta ($06),y       ;otherwise, initialize byte with current low byte in Y
 SkipByte:     dey
               cpy #$ff          ;do this until all bytes in page have been erased
               bne InitByteLoop
               dex               ;go onto the next page
-              bpl InitPageLoop  ;do this until all desired pages of memory have been erased
+              bpl InitPageLoop  ;do this until all pages of memory have been erased
               rts
+
+; Skips over sound memory at $f0-$ff
+ClearMemory:
+              lda #$07
+              sta $07
+              lda #$00
+              sta $06
+ClearNextPage:
+              lda #$00
+              tax
+              jsr InitByteLoop
+              dec $07
+              beq PrepZeroPage
+              lda $07
+              cmp #$01
+              beq PrepStack
+              cmp #$00
+              bpl ClearNextPage
+              rts
+PrepStack:
+              ldy #$5f
+              bne ClearNextPage
+PrepZeroPage:
+              ldy #$ef
+              bne ClearNextPage
 
 ;-------------------------------------------------------------------------------------
 
@@ -15033,7 +15084,7 @@ NMIHandler:
       beq SkipIRQ
       lda #FME7_IRQTimer_Low
       sta FME7Command
-      lda #$de ;i
+      lda #$e7 ;i
       sta FME7Parameter         ;set FDS IRQ timer to occur at the end of the status bar
       lda #FME7_IRQTimer_High
       sta FME7Command

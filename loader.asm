@@ -114,6 +114,8 @@ RenderSubTilemap:
         lda #$00
 		sta DisableScreenFlag
         inc OperMode_Task
+		lda #SettingsMusic
+		sta AreaMusicQueue
         rts
 
 DoNothing:
