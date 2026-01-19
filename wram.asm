@@ -6,11 +6,22 @@ SaveDataHeader:
 SaveData:
 GamesBeatenCount:
 	.byte $00
+	.byte $00
+	.byte $00
 
 ContinueWorld:
 	.byte $00
-
+	.byte $00
+	.byte $00
+	
 ContinueLevel: ;only for easy mode
+	.byte $00
+	.byte $00
+	.byte $00
+
+ContinueArea: ;only for easy mode
+	.byte $00
+	.byte $00
 	.byte $00
 	
 SavedLevelSet:
@@ -18,9 +29,21 @@ SavedLevelSet:
 
 SavedCompletedWorlds:
 	.byte $00
+	.byte $00
+	.byte $00
 	
 DifficultyFlag:
 	.byte $00
+	
+ContinuePlayerStatus:
+	.byte $00
+	.byte $00
+	.byte $00
+
+ContinuePlayerSize:
+	.byte $00
+	.byte $00
+	.byte $00	
 	
 ;$00 - Standard SMB1 Palette
 ;$01 - Protoype #1 Palette

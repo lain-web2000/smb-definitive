@@ -417,6 +417,9 @@ NextWorld: lda #$01
            lsr
            sta AreaNumber            ;reset area/level numbers to start the next world
            sta LevelNumber
+		   ldy CurrentGame
+		   sta ContinueArea,y
+		   sta ContinueLevel,y
            sta OperMode_Task
            lda WorldNumber
            clc
@@ -446,6 +449,8 @@ ChkHardM:  ldy PrimaryHardMode       ;have we already set primary hard mode?
            bne StoreWNum             ;yes, branch ahead
            inc PrimaryHardMode       ;otherwise go ahead and set it
 StoreWNum: sta WorldNumber           ;update the world number
+           ldy CurrentGame
+           sta ContinueWorld,y
            jsr RunLoadAreaPointer    ;get pointer for the next area
            inc FetchNewGameTimerFlag ;and get a new game timer
 EndExit:   rts
@@ -3995,11 +4000,15 @@ ChkF10C:  lda CoinTallyFor1Ups      ;check third area coin tally for bonus 1-ups
           bcc NextArea              ;at least this number of coins, leave flag clear
 Set1UpF:  inc Hidden1UpFlag         ;otherwise set hidden 1-up box control flag
 NextArea: inc AreaNumber            ;increment area number used for address loader
+          lda AreaNumber
+		  ldy CurrentGame
+		  sta ContinueArea,y
           lda LevelNumber           ;go to next world if past level 4 of current world
           cmp #$04
           bcc NotEndW
           jmp NextWorld
-NotEndW:  jsr RunLoadAreaPointer    ;get new level pointer
+NotEndW:  sta ContinueLevel,y
+          jsr RunLoadAreaPointer    ;get new level pointer
           inc FetchNewGameTimerFlag ;set flag to load new game timer
           jsr ChgAreaMode           ;do sub to set secondary mode, disable screen and IRQ
           sta HalfwayPage           ;reset halfway page to 0 (beginning)
@@ -10701,13 +10710,19 @@ WarpZoneHandler:
 GetWNum:  lda WarpZoneNumbers,x
           tay
           dey                       ;decrement for use as world number
+		  ldx CurrentGame
+		  tya
           sty WorldNumber           ;store as world number and offset
+		  sta ContinueWorld,x
           jsr RunGetAreaPointer
           sty AreaPointer           ;store area offset here to be used to change areas
+		  ldy CurrentGame
           lda #$00
           sta EntrancePage          ;initialize starting page number
           sta AreaNumber            ;initialize area number used for area address offset
           sta LevelNumber           ;initialize level number used for world display
+		  sta ContinueArea,y
+		  sta ContinueLevel,y
           sta AltEntranceControl    ;initialize mode of entry
           inc Hidden1UpFlag         ;set flag for hidden 1-up blocks
           inc FetchNewGameTimerFlag ;set flag to load new game timer
@@ -13663,10 +13678,20 @@ ContinueOrRetry:
   beq Continue                 ;then branch to continue
   cmp #$01
   bne RetryGame                ;if not selected "save", don't save progress
+  ldx CurrentGame
   lda WorldNumber              ;otherwise save world number and worlds completed
-  sta ContinueWorld
+  sta ContinueWorld,x
+  lda CurrentGame
+  bne :+
   lda LevelSet
   sta SavedLevelSet
+: lda DifficultyFlag
+  cmp #$02
+  beq :+
+  lda LevelNumber
+  sta ContinueLevel,x
+  lda AreaNumber
+  sta ContinueArea,x
   lda CompletedWorlds
   sta SavedCompletedWorlds
 RetryGame:
@@ -13704,23 +13729,35 @@ GameMenuRoutine:
               beq ChkSelect               ;if not, branch to check other buttons
               lda #$00
               sta WorldNumber
+              sta LevelNumber
+              sta AreaNumber
               sta CompletedWorlds
               sta DiskIOTask
               lda SavedJoypadBits
               and #A_Button               ;check if the player pressed A + start
               beq StG                     ;if not, start the game as usual at world 1
-              lda ContinueWorld           ;otherwise load save data to start at previous world
+			  ldx CurrentGame
+              lda ContinueWorld, x        ;otherwise load save data to start at previous world
               sta WorldNumber
               cmp #WorldA
-              bcc @num_worlds
+              bcc :+
               inc HardWorldFlag
               lda DifficultyFlag
               cmp #$02
-              bne @num_worlds
+              bne :+
               inc PrimaryHardMode
-@num_worlds:  lda SavedLevelSet
+:			  lda DifficultyFlag
+			  cmp #$02
+			  beq @num_worlds
+			  lda ContinueLevel, x
+			  sta LevelNumber
+			  lda ContinueArea, x
+			  sta AreaNumber
+@num_worlds:  cpx #$00
+              bne :+
+              lda SavedLevelSet
               sta LevelSet
-              lda SavedCompletedWorlds
+:             lda SavedCompletedWorlds, x
               sta CompletedWorlds
 StG:          jmp StartGame
 ExitGame:     jmp ReturnToLoader
@@ -13761,12 +13798,8 @@ StartGame:
               lda DemoTimer
               beq ResetTitle
               inc OperMode_Task
-              lda #$00
-              sta LevelNumber
-              lda #$00
-              sta AreaNumber
+			  lda #$00
               ldx #$0b
-              lda #$00
 InitScore:    sta ScoreAndCoinDisplay,x   ;clear player score and coin display
               dex
               bpl InitScore
@@ -14340,10 +14373,13 @@ GoToNextWorld:
     jmp NextWorld            ;run the next world
 EndTheGame:
     lda #$00
+	ldx CurrentGame
     sta CompletedWorlds      ;init completed worlds flag
-    sta ContinueWorld        ;reset saved progress
+    sta ContinueWorld,x        ;reset saved progress
+	sta ContinueLevel,x
+	sta ContinueArea,x
     sta SavedLevelSet
-    sta SavedCompletedWorlds
+    sta SavedCompletedWorlds,x
     lda CurrentGame
     bne :+
     lda #GameOverMode        ;set game over mode
