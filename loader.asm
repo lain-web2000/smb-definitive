@@ -10,6 +10,7 @@ StartLoader:
         ldy #WarmBootOffset         ;clear memory up to $07D6
         jsr InitializeMemory
         sta ContinueMenuSelect      ;reset menu selection
+		jsr CheckSaveData
         lda #CHR_MENU               ;load CHR tiles for menu
         jsr FetchCHRPacketGroup
         lda #$20                    ;queue menu palette

@@ -766,7 +766,6 @@ DisplayIntermediate:
 PlayerInter:   jsr DrawPlayer_Intermediate  ;put player in appropriate place for
                lda #$01                     ;lives display, then output lives display to buffer
 OutputInter:   jsr OtherInter
-               sta IntervalTimerControl     ;clear framerule counter
                lda GameOverMsgFlag          ;if special message flag not set, do next task
                beq IncSubtask
                inc DisableScreenFlag        ;disable screen output
