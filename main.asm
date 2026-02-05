@@ -14864,7 +14864,7 @@ CloseMenu:
 ;-------------------------------------------------------------------------------------
 
 SaveHeader:
-        .byte "MARIO COMPLETE", $00, $00
+        .byte $4D, $41, $52, $49, $4F, $20, $43, $4F, $4D, $50, $4C, $45, $54, $45, $00, $00
 
 CheckSaveData:
         ldx #$0f                ;init counter
@@ -15279,7 +15279,7 @@ IRQHandler:
 .res $FFE0 - *, $FF
 
 ;TITLE
-    .byte "  MARIO COMPLETE"
+    .byte $20, $20, $4D, $41, $52, $49, $4F, $20, $43, $4F, $4D, $50, $4C, $45, $54, $45
 
 ;PRG CHECKSUM
     .byte $31, $A9
