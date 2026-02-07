@@ -220,7 +220,7 @@ RunSubmenu:
         sta $00
         lda #>ContinueMenuSelect
         sta $01
-        lda #$08
+        lda #$09
         jsr MenuSelectionLogic
         bcc DrawSubmenuCursor
         lda PressedJoypadBits
