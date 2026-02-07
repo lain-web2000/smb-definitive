@@ -13683,7 +13683,7 @@ ContinueOrRetry:
   sta SavedLevelSet
 : lda DifficultyFlag
   cmp #$02
-  beq :+
+  beq RetryGame
   lda LevelNumber
   sta ContinueLevel,x
   lda AreaNumber
