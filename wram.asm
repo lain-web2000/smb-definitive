@@ -69,6 +69,9 @@ SpinyEggBehavior:
 WarpZoneScroll:
 	.byte $00
 
+CountdownSpeed:
+	.byte $00
+
 FontSelection:
     .byte $00
 
@@ -77,6 +80,7 @@ TilesetSelection:
 
 AnimatedTiles:
 	.byte $00
+	
 SaveData_End:
 
 CurrentGame:

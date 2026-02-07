@@ -4627,9 +4627,8 @@ RunGameTimer:
            lda #TimeRunningOutMusic
            sta EventMusicQueue        ;otherwise load time running out music
 ResGTCtrl: lda #24                    ;reset game timer control
-           ldy DifficultyFlag
-           cpy #$02
-           bne :+
+           ldy CountdownSpeed
+           beq :+
            lda #21
 :          sta GameTimerCtrlTimer
            ldy #$17                   ;set offset for last digit

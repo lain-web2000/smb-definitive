@@ -132,6 +132,8 @@ DoSelection:
 ;-------------------------------------------------------------------------------------
 
 SubMenuSelections:
+		; header
+        .byte $20,$6a,12,"GAME OPTIONS"
         ; selection names
         .byte $20,$a6,10,"DIFFICULTY"
         .byte $20,$c6,13,"MARIO PALETTE"
@@ -139,10 +141,14 @@ SubMenuSelections:
         .byte $21,$06,13,"LUIGI PHYSICS"
         .byte $21,$26,18,"SPINY EGG BEHAVIOR"
         .byte $21,$46,16,"WARP ZONE SCROLL"
-        .byte $21,$66,14,"FONT SELECTION"
-        .byte $21,$86,17,"TILESET SELECTION"
-        .byte $21,$a6,14,"ANIMATED TILES"
+        .byte $21,$66,11,"TIMER SPEED"
+        .byte $21,$86,14,"FONT SELECTION"
+        .byte $21,$a6,17,"TILESET SELECTION"
+        .byte $21,$c6,14,"ANIMATED TILES"
         .byte $00
+		
+		;note to self - FIX THE BUFFER OVERFLOW!!!
+		
 SubMenuSelections_End:
 
 RenderSubTilemap:
@@ -153,7 +159,7 @@ RenderSubTilemap:
         ldy #4
         lda #22
         sta $00
-        lda #9
+        lda #10
         sta $01
         jsr DrawArbitraryTextbox
         ; copy selection names over
@@ -169,7 +175,7 @@ RenderSubTilemap:
         stx VRAM_Buffer_Offset
         ; draw option numbers
         ldy #$00
-        ldx #8*2
+        ldx #9*2
 :       txa
         pha
         lda SubMenuOptions,x
@@ -190,20 +196,22 @@ RenderSubTilemap:
         rts
 
 SubMenuCursorY:
-  .byte $27, $2f, $37, $3f, $47, $4f, $57, $5f, $67
+  .byte $27, $2f, $37, $3f, $47, $4f, $57, $5f, $67, $6f
 
 SubMenuCursorX:
-  .byte $27, $27, $27, $27, $27, $27, $27, $27, $27
+  .byte $27, $27, $27, $27, $27, $27, $27, $27, $27, $27
 
 SubMenuOptions:
   .word DifficultyFlag, MarioPalette, LuigiPalette
   .word LuigiPhysics, SpinyEggBehavior, WarpZoneScroll
-  .word FontSelection, TilesetSelection, AnimatedTiles
+  .word CountdownSpeed, FontSelection, TilesetSelection
+  .word AnimatedTiles
 
 SubMenuOptionCount:
   .byte 3, 3, 4
   .byte 2, 2, 2
-  .byte 3, 3, 2
+  .byte 2, 3, 3
+  .byte 2
 
 RunSubmenu:
         ; (TO-DO: Implement proper nesting of menus)
@@ -544,3 +552,14 @@ FireLuigiPaletteData:
       .byte $22, $27, $36, $16 ;custom fire palette to accompany prototype colors
       .byte $22, $30, $27, $19 ;luigi's smbdx colors after grabbing fire flower
       .byte $22, $29, $27, $16 ;luigi's smm2 colors after grabbing fire flower
+	  
+DifficultyPresets:
+      
+EasyPreset:
+      .byte $00, $00, $00, $01, $00, $00, $00, $00, $00, $01
+NormalPreset:
+      .byte $01, $00, $00, $01, $00, $00, $00, $00, $00, $01
+HardPreset:
+      .byte $02, $00, $00, $00, $00, $00, $01, $00, $00, $01
+ExpertPreset:
+      .byte $02, $00, $00, $00, $01, $01, $01, $00, $00, $01
