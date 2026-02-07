@@ -10,10 +10,10 @@ StartLoader:
         ldy #WarmBootOffset         ;clear memory up to $07D6
         jsr InitializeMemory
         sta ContinueMenuSelect      ;reset menu selection
-		jsr CheckSaveData
+        jsr CheckSaveData
         lda #CHR_MENU               ;load CHR tiles for menu
         jsr FetchCHRPacketGroup
-        lda #$20                    ;queue menu palette
+        lda #VRAM_PAL_MENU          ;queue menu palette
         sta VRAM_Buffer_AddrCtrl
         inc DisableScreenFlag       ;tell NMI to keep rendering disabled
         lda #%10001000              ;set up pattern table arrangment
@@ -132,7 +132,7 @@ DoSelection:
 ;-------------------------------------------------------------------------------------
 
 SubMenuSelections:
-		; header
+        ; header
         .byte $20,$6a,12,"GAME OPTIONS"
         ; selection names
         .byte $20,$a6,10,"DIFFICULTY"
@@ -146,9 +146,8 @@ SubMenuSelections:
         .byte $21,$a6,17,"TILESET SELECTION"
         .byte $21,$c6,14,"ANIMATED TILES"
         .byte $00
-		
-		;note to self - FIX THE BUFFER OVERFLOW!!!
-		
+
+        ;note to self - FIX THE BUFFER OVERFLOW!!!
 SubMenuSelections_End:
 
 RenderSubTilemap:

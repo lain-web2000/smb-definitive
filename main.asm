@@ -1,5 +1,6 @@
 .include "inc/defines.inc"
 .include "inc/wram.inc"
+.include "inc/charmap.inc"
 
 ;-------------------------------------------------------------------------------------
 ;"INESHDR"
@@ -82,8 +83,13 @@ WaitForNMI: lda NMIAckFlag              ;spin until NMI routine has executed
             jsr PauseRoutine
             jsr UpdateTopScore
             lda GamePauseStatus         ;check d0 of game pause flags
-            lsr                         ;if set, branch to skip
-            bcs SeedLFSR
+            lsr                         ;if not set, branch ahead
+            bcc CheckTimerControl
+            lda PressedJoypadBits       ;check to see if select is pressed
+            and #Select_Button
+            beq SeedLFSR                ;if not, branch to skip
+            jmp ReturnToLoader
+CheckTimerControl:
             lda TimerControl            ;if master timer control not set, branch
             beq CheckIntervalTC         ;to decrement frame and interval timers
             dec TimerControl            ;otherwise count this timer down
@@ -152,11 +158,7 @@ ChkPauseTimer: lda GamePauseTimer     ;check if pause timer is still counting do
                beq ChkStart
                dec GamePauseTimer     ;if so, decrement and leave
                rts
-ChkStart:      lda PressedJoypadBits  ;check to see if select is pressed
-               and #Select_Button
-               beq :+
-               jmp ReturnToLoader     ;exit game if so
-:              lda PressedJoypadBits  ;check to see if start is pressed
+ChkStart:      lda PressedJoypadBits  ;check to see if start is pressed
                and #Start_Button
                beq ClrPauseTimer
                lda GamePauseStatus    ;check to see if timer flag is set
@@ -295,11 +297,17 @@ SetupVictoryMode:
          stx DestinationPageLoc
          ldy WorldNumber
          cpy #World9             ;if world 9 or later, skip setting completed worlds bit
-         bcs SkipCompletedWorlds
+         bcs QueueEoCMusic
          lda WorldBits,y
          ora CompletedWorlds     ;set bit according to the world the player was in
          sta CompletedWorlds
-SkipCompletedWorlds:
+         cpy #World8             ;if not in world 8, branch to skip this
+         bne QueueEoCMusic
+         lda PrimaryHardMode     ;if not hard mode world 8, branch to skip this
+         beq QueueEoCMusic
+         lda #WorldD             ;otherwise force world D for ending sequence
+         sta WorldNumber
+QueueEoCMusic:
          lda #EndOfCastleMusic
          sta EventMusicQueue     ;play win castle music
 
@@ -312,13 +320,13 @@ VMExit:  rts
 DrawTitleScreen:
     lda OperMode       ;if not in attract mode, do not draw title screen
     bne IncModeTask    ;yes, this routine is run in other modes
-    lda #$1f
+    lda #VRAM_NT_COMPLETE
     ldy CurrentGame
     beq :+
-    lda #$05
+    lda #VRAM_NT_SMB1
     dey
     beq :+
-    lda #$07
+    lda #VRAM_NT_SMB2
 :   jmp SetVRAMAddr_B  ;otherwise set up VRAM address controller accordingly
 
 ;-------------------------------------------------------------------------------------
@@ -375,7 +383,7 @@ ChkPlayer:     lda SelectedPlayer       ;get selected player
                iny                      ;otherwise increment Y once for luigi
 PrintMsgs:     tya                      ;put primary message counter in A
                clc                      ;add 12 to counter, thus giving an appropriate value
-               adc #$0c
+               adc #VRAM_NT_TOAD
                sta VRAM_Buffer_AddrCtrl ;write message counter to vram address controller
 IncMsgCounter: lda MsgFractional
                clc
@@ -417,9 +425,9 @@ NextWorld: lda #$01
            lsr
            sta AreaNumber            ;reset area/level numbers to start the next world
            sta LevelNumber
-		   ldy CurrentGame
-		   sta ContinueArea,y
-		   sta ContinueLevel,y
+           ldy CurrentGame
+           sta ContinueArea,y
+           sta ContinueLevel,y
            sta OperMode_Task
            lda WorldNumber
            clc
@@ -625,7 +633,10 @@ SetupIntermediate:
       jmp IncSubtask           ;then move onto the next task
 
 AreaPalette:
-      .byte $01, $02, $03, $04
+      .byte VRAM_PAL_WATER
+      .byte VRAM_PAL_GROUND
+      .byte VRAM_PAL_UNDERGROUND
+      .byte VRAM_PAL_CASTLE
 
 GetAreaPalette:
                ldy AreaType             ;select appropriate palette to load
@@ -637,7 +648,10 @@ NextSubtask:   jmp IncSubtask           ;move onto next task
 ;$00 - used as temp counter in GetPlayerColors
 
 BGColorCtrl_Addr:
-      .byte $00, $09, $0a, $04
+      .byte VRAM_STANDARD ; night
+      .byte VRAM_PAL_SNOW ; day snow
+      .byte VRAM_PAL_SNOW ; night snow
+      .byte VRAM_PAL_CASTLE ; greyscale (e.g. smb1 6-3, smb2j 7-3)
 
 BackgroundColors:
       .byte $22, $22, $0f, $0f ;used by area type if bg color ctrl not set
@@ -694,7 +708,7 @@ GetAlternatePalette1:
                lda AreaStyle            ;check for mushroom level style
                cmp #$01
                bne NoAltPal
-               lda #$0b                 ;if found, load appropriate palette
+               lda #VRAM_PAL_MUSHROOM   ;if found, load appropriate palette
 SetVRAMAddr_B: sta VRAM_Buffer_AddrCtrl
 NoAltPal:      jmp IncSubtask           ;now onto the next task
 
@@ -793,49 +807,43 @@ OutputCol: rts
 
 GameText:
 TopStatusBarLine:
-  .byte $20, $43, $05, $16, $0a, $1b, $12, $18 ;"MARIO"
-  .byte $20, $52, $0b, $20, $18, $1b, $15, $0d ;"WORLD  TIME"
-  .byte $24, $24, $1d, $12, $16, $0e
-  .byte $20, $68, $05, $00, $24, $24, $5f, $26 ;score trailing digit and coin display
+  .byte $20, $43, 5, "MARIO"
+  .byte $20, $52, 11, "WORLD  TIME"
+  .byte $20, $68, 5, "0  ", $5f, "x" ;score trailing digit and coin display
   .byte $23, $c0, $7f, $aa ;attribute table data, clears name table 0 to palette 2
   .byte $23, $c2, $01, $ea ;attribute table data, used for coin icon in status bar
   .byte $ff ;end of data block
 
 WorldLivesDisplay:
-  .byte $21, $cf, $04, $26, $24, $24, $24 ;cross with spaces used on lives display
-  .byte $21, $4b, $09, $20, $18 ;"WORLD  - " used on lives display
-  .byte $1b, $15, $0d, $24, $24, $25, $24
+  .byte $21, $cf, 4, "x   " ;cross with spaces used on lives display
+  .byte $21, $4b, 9, "WORLD  - " ;"WORLD  - " used on lives display
   .byte $22, $0c, $47, $24 ;possibly used to clear time up
   .byte $23, $dc, $01, $ba ;attribute table data for crown
   .byte $ff
 
 TimeUp:
-  .byte $22, $0c, $07, $1d, $12, $16, $0e, $24, $1e, $19 ; "TIME UP"
+  .byte $22, $0c, 7, "TIME UP"
   .byte $ff
 
 GameOver:
-  .byte $21, $6b, $09, $10, $0a, $16, $0e, $24 ;"GAME OVER"
-  .byte $18, $1f, $0e, $1b
-  .byte $21, $eb, $08, $0c, $18, $17, $1d, $12, $17, $1e, $0e ;"CONTINUE"
+  .byte $21, $6b, 9, "GAME OVER"
+  .byte $21, $eb, 8, "CONTINUE"
   .byte $22, $0c, $47, $24
-  .byte $22, $4b, $04, $1c, $0a, $1f, $0e ;"SAVE"
-  .byte $22, $ab, $05, $1b, $0e, $1d, $1b, $22 ;"RETRY"
+  .byte $22, $4b, 4, "SAVE"
+  .byte $22, $ab, 5, "RETRY"
   .byte $ff
 
 WarpZone:
-  .byte $25, $84, $15
-  .byte $20, $0e, $15, $0c, $18, $16, $0e, $24, $1d, $18 ; "WELCOME TO WARP ZONE!"
-  .byte $24, $20, $0a, $1b, $19, $24, $23, $18, $17, $0e
-  .byte $27
-  .byte $26, $25, $01, $24         ; placeholder for left pipe
-  .byte $26, $2d, $01, $24         ; placeholder for middle pipe
-  .byte $26, $35, $01, $24         ; placeholder for right pipe
-  .byte $27, $d9, $46, $aa         ; attribute data
+  .byte $25, $84, 21, "WELCOME TO WARP ZONE!"
+  .byte $26, $25, $01, " " ; placeholder for left pipe
+  .byte $26, $2d, $01, " " ; placeholder for middle pipe
+  .byte $26, $35, $01, " " ; placeholder for right pipe
+  .byte $27, $d9, $46, $aa ; attribute data
   .byte $27, $e1, $45, $aa
   .byte $00
 
 LuigiName:
-  .byte $15, $1e, $12, $10, $12 ; "LUIGI", no address or length
+  .byte "LUIGI" ; no address or length
 
 WarpZoneNumbers:
   .byte $04, $03, $02, $00         ; warp zone numbers, note spaces on middle
@@ -1415,7 +1423,7 @@ WaterPaletteData:
   .byte $0f, $3a, $1a, $0f
   .byte $0f, $30, $12, $0f
   .byte $0f, $27, $12, $0f
-  .byte $22, $16, $27, $18
+  .byte $0f, $16, $27, $18
   .byte $0f, $1a, $30, $27
   .byte $0f, $16, $30, $27
   .byte $0f, $0f, $30, $10
@@ -1457,12 +1465,7 @@ CastlePaletteData:
   .byte $0f, $00, $30, $10
   .byte $00
 
-DaySnowPaletteData:
-  .byte $3f, $00, $04
-  .byte $22, $30, $00, $10
-  .byte $00
-
-NightSnowPaletteData:
+SnowPaletteData:
   .byte $3f, $00, $04
   .byte $0f, $30, $00, $10
   .byte $00
@@ -1478,25 +1481,20 @@ BowserPaletteData:
   .byte $00
 
 MarioThankYouMsg:
-  .byte $25, $48, $10
-  .byte $1d, $11, $0a, $17, $14, $24, $22, $18
-  .byte $1e, $24, $16, $0a, $1b, $12, $18, $27
+  .byte $25, $48, 16
+  .byte "THANK YOU MARIO!"
   .byte $00
 
 LuigiThankYouMsg:
-  .byte $25, $48, $10
-  .byte $1d, $11, $0a, $17, $14, $24, $22, $18
-  .byte $1e, $24, $15, $1e, $12, $10, $12, $27
+  .byte $25, $48, 16
+  .byte "THANK YOU LUIGI!"
   .byte $00
 
 MushroomRetainerMsg:
-  .byte $25, $c5, $16
-  .byte $0b, $1e, $1d, $24, $18, $1e, $1b, $24
-  .byte $19, $1b, $12, $17, $0c, $0e, $1c, $1c
-  .byte $24, $12, $1c, $24, $12, $17
-  .byte $26, $05, $0f
-  .byte $0a, $17, $18, $1d, $11, $0e, $1b, $24
-  .byte $0c, $0a, $1c, $1d, $15, $0e, $27
+  .byte $25, $c5, 22
+  .byte "BUT OUR PRINCESS IS IN"
+  .byte $26, $05, 15
+  .byte "ANOTHER CASTLE!"
   .byte $00
 
 ;------------------------------------------------------------------------------------
@@ -3048,7 +3046,7 @@ CastleBridgeObj:
       jmp ChainObj
 
 AxeObj:
-      lda #$08                  ;load bowser's palette into sprite portion of palette
+      lda #VRAM_PAL_BOWSER      ;load bowser's palette into sprite portion of palette
       sta VRAM_Buffer_AddrCtrl
 
 ChainObj:
@@ -4000,8 +3998,8 @@ ChkF10C:  lda CoinTallyFor1Ups      ;check third area coin tally for bonus 1-ups
 Set1UpF:  inc Hidden1UpFlag         ;otherwise set hidden 1-up box control flag
 NextArea: inc AreaNumber            ;increment area number used for address loader
           lda AreaNumber
-		  ldy CurrentGame
-		  sta ContinueArea,y
+          ldy CurrentGame
+          sta ContinueArea,y
           lda LevelNumber           ;go to next world if past level 4 of current world
           cmp #$04
           bcc NotEndW
@@ -10708,19 +10706,19 @@ WarpZoneHandler:
 GetWNum:  lda WarpZoneNumbers,x
           tay
           dey                       ;decrement for use as world number
-		  ldx CurrentGame
-		  tya
+          ldx CurrentGame
+          tya
           sty WorldNumber           ;store as world number and offset
-		  sta ContinueWorld,x
+          sta ContinueWorld,x
           jsr RunGetAreaPointer
           sty AreaPointer           ;store area offset here to be used to change areas
-		  ldy CurrentGame
+          ldy CurrentGame
           lda #$00
           sta EntrancePage          ;initialize starting page number
           sta AreaNumber            ;initialize area number used for area address offset
           sta LevelNumber           ;initialize level number used for world display
-		  sta ContinueArea,y
-		  sta ContinueLevel,y
+          sta ContinueArea,y
+          sta ContinueLevel,y
           sta AltEntranceControl    ;initialize mode of entry
           inc Hidden1UpFlag         ;set flag for hidden 1-up blocks
           inc FetchNewGameTimerFlag ;set flag to load new game timer
@@ -13725,16 +13723,17 @@ GameMenuRoutine:
               lda PressedJoypadBits       ;check to see if the player pressed start
               and #Start_Button
               beq ChkSelect               ;if not, branch to check other buttons
+              jsr SetCorrectLevel         ;test build level select logic
               lda #$00
-              sta WorldNumber
-              sta LevelNumber
-              sta AreaNumber
+              ;sta WorldNumber
+              ;sta LevelNumber
+              ;sta AreaNumber
               sta CompletedWorlds
               sta DiskIOTask
               lda SavedJoypadBits
               and #A_Button               ;check if the player pressed A + start
               beq StG                     ;if not, start the game as usual at world 1
-			  ldx CurrentGame
+              ldx CurrentGame
               lda ContinueWorld, x        ;otherwise load save data to start at previous world
               sta WorldNumber
               cmp #WorldA
@@ -13744,13 +13743,13 @@ GameMenuRoutine:
               cmp #$02
               bne :+
               inc PrimaryHardMode
-:			  lda DifficultyFlag
-			  cmp #$02
-			  beq @num_worlds
-			  lda ContinueLevel, x
-			  sta LevelNumber
-			  lda ContinueArea, x
-			  sta AreaNumber
+:             lda DifficultyFlag
+              cmp #$02
+              beq @num_worlds
+              lda ContinueLevel, x
+              sta LevelNumber
+              lda ContinueArea, x
+              sta AreaNumber
 @num_worlds:  cpx #$00
               bne :+
               lda SavedLevelSet
@@ -13762,6 +13761,7 @@ ExitGame:     jmp ReturnToLoader
 ChkSelect:    lda PressedJoypadBits       ;branch if pressing up, down or select
               and #Up_Dir+Down_Dir+Select_Button
               bne SelectLogic
+              jsr WorldLevelSelect        ;world and level select sub for test releases
               ldx DemoTimer
               bne NullJoypad
               sta SelectedPlayer          ;run demo after a certain period of time
@@ -13796,7 +13796,7 @@ StartGame:
               lda DemoTimer
               beq ResetTitle
               inc OperMode_Task
-			  lda #$00
+              lda #$00
               ldx #$0b
 InitScore:    sta ScoreAndCoinDisplay,x   ;clear player score and coin display
               dex
@@ -13824,6 +13824,122 @@ ExitCursor:   lda CurrentGame           ;if complete mode move shroom down
               lda #$8b
               sta VRAM_Buffer+1
 :             rts
+
+MaxWorldNumbers:
+      .byte World9, WorldD
+      .byte World8, World8
+      .byte WorldD
+
+WorldLevelSelect:
+             lda PressedJoypad2Bits
+             and #B_Button
+             bne IncWorldNum
+             lda PressedJoypad2Bits
+             and #A_Button
+             beq NoWorldLevelSel
+             ; increment level number
+             inc LevelNumber
+             lda LevelNumber
+             and #$03
+             sta LevelNumber
+             jmp DrawWorldLevel
+IncWorldNum: ; increment world number
+             inc WorldNumber
+             lda CurrentGame
+             asl
+             clc
+             adc HardWorldFlag
+             tay
+             lda WorldNumber
+             cmp MaxWorldNumbers,y
+             bcc DrawWorldLevel
+             beq DrawWorldLevel
+             ; keep world number in range
+             lda #$00
+             sta WorldNumber
+             lda CurrentGame
+             lsr
+             bne DrawWorldLevel
+             lda HardWorldFlag
+             eor #%00000001
+             sta HardWorldFlag
+DrawWorldLevel:
+             ; display the new world and level
+             ldy VRAM_Buffer_Offset
+             lda #$20
+             sta VRAM_Buffer,y
+             lda #$73
+             sta VRAM_Buffer+1,y
+             lda #$03
+             sta VRAM_Buffer+2,y
+             ldx WorldNumber
+             inx
+             txa
+             sta VRAM_Buffer+3,y
+             lda #$25
+             ldx HardWorldFlag
+             beq :+
+             lda #$29
+:            sta VRAM_Buffer+4,y
+             ldx LevelNumber
+             inx
+             txa
+             sta VRAM_Buffer+5,y
+             lda #$00
+             sta VRAM_Buffer+6,y
+             tya
+             clc
+             adc #$06
+             sta VRAM_Buffer_Offset
+NoWorldLevelSel:
+             rts
+
+LongWorlds_SMB1:
+      .byte World1, World2, World4, World7, $FF
+LongWorlds_SMB2:
+      .byte World1, World3, World5, World6, WorldA, WorldB, $FF
+
+SetCorrectLevel:
+             ldy HardWorldFlag
+             lda CurrentGame
+             lsr
+             bcs SetHardMode ; SMB1
+             beq SetLevelSet ; SMBC
+             ldy #$01
+SetLevelSet: sty LevelSet
+             ldy #$00
+SetHardMode: sty PrimaryHardMode
+             ldy #$00
+             lda WorldNumber
+             cmp #WorldA
+             bcc SetHWorlds
+             iny
+SetHWorlds:  sty HardWorldFlag
+             lda LevelNumber
+             sta AreaNumber
+             beq EndSetLevel
+             ldy #$00
+             lda LevelSet
+             bne Chk2JWorlds
+             lda #<LongWorlds_SMB1
+             sta $00
+             lda #>LongWorlds_SMB1
+             sta $01
+             bne ChkLongWorlds
+Chk2JWorlds: lda #<LongWorlds_SMB2
+             sta $00
+             lda #>LongWorlds_SMB2
+             sta $01
+ChkLongWorlds:
+             lda ($00),y
+             cmp #$FF
+             beq EndSetLevel
+             cmp WorldNumber
+             beq IncAreaNum
+             iny
+             bne ChkLongWorlds
+IncAreaNum:  inc AreaNumber
+EndSetLevel: rts
 
 DemoActionData:
       .byte $01, $80, $02, $81, $41, $80, $01
@@ -14171,7 +14287,7 @@ DemoResetOrGameOver:
        bne GoToDemoReset
        lda #$20
        sta ScreenTimer
-       lda #$1e                  ;set VRAM pointer to print special game over message
+       lda #VRAM_NT_CREDITS      ;set VRAM pointer to print special game over message
        sta VRAM_Buffer_AddrCtrl
        inc OperMode_Task         ;move on to next task
        rts
@@ -14180,39 +14296,47 @@ PrintVictoryMsgsForWorld8:
          lda MsgFractional          ;if fractional not looped to zero
          bne IncVMC                 ;then branch to increment it
          ldy MsgCounter
-         cpy #$0a                   ;if message counter gone past a certain
-         bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
-         lda CurrentGame
-         cmp #$01
-         bne :+
-         lda PrimaryHardMode
-         beq :+
-         lda #WorldD
-         sta WorldNumber
-:        lda WorldNumber            ;are we on world D?
+         lda WorldNumber            ;branch to alt sub if doing world D messages
          cmp #WorldD
-         beq DoVicM                 ;yes, display the two extra lives lines
-         cpy #$08                   ;otherwise we shouldn't display them
-         bcs EndVictoryMessages
-DoVicM:  iny
-         iny
-         iny                        ;add 3 to message counter to print the messages for world 8
-         cpy #$05                   ;for world 8 (as opposed to worlds 1-7)
-         bne PrintVM
+         beq PrintVictoryMsgsForWorldD
+         cpy #$04                   ;if message counter gone past a certain
+         bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
+         cpy #$01                   ;wait for specific message to start music
+         bne :+
          lda #VictoryMusic          ;residual code from original smb source, this will not
          sta EventMusicQueue        ;be checked due to alternate vector for sound engine
+:        cpy #$00
+         bne GetVMID
          lda SelectedPlayer         ;check selected player
+         beq GetVMID                ;if mario, use standard message offset
+         ldy #$04                   ;otherwise use alt offset for luigi
+GetVMID: tya
+         clc
+         adc #VRAM_NT_PEACH_1ST     ;get appropriate range for victory messages
+         jmp StoreVM                ;jump to set message ID and increment fractional
+
+PrintVictoryMsgsForWorldD:
+         cpy #$08                   ;if message counter gone past a certain
+         bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
+         cpy #$02                   ;wait for specific message to start music
+         bne :+
+         lda #VictoryMusic          ;residual code from original smb source, this will not
+         sta EventMusicQueue        ;be checked due to alternate vector for sound engine
+:        lda SelectedPlayer         ;check selected player
          beq PrintVM                ;if mario, use standard message offset
-         cpy #$04                   ;are we thanking the player?
-         bne HurrahM                ;if not, branch
-         ldy #$0d                   ;otherwise use alt offset for luigi
-HurrahM: cpy #$07                   ;are we printing the hurrah message?
-         bne PrintVM                ;if not, branch
-         ldy #$0e                   ;otherwise use alt offset for luigi
+         cpy #$01                   ;are we thanking the player?
+         bne :+
+         ldy #$08                   ;if so, use alt offset for luigi
+:        cpy #$02                   ;are we thanking the player?
+         bne :+
+         ldy #$09                   ;if so, use alt offset for luigi
+:        cpy #$05                   ;are we printing the hurrah message?
+         bne PrintVM
+         ldy #$0a                   ;if so, use alt offset for luigi
 PrintVM: tya
          clc
-         adc #$0c                   ;get appropriate range for victory messages
-         sta VRAM_Buffer_AddrCtrl
+         adc #VRAM_NT_PEACH_2ND     ;get appropriate range for victory messages
+StoreVM: sta VRAM_Buffer_AddrCtrl
 IncVMC:  lda MsgFractional
          clc
          adc #$04                   ;add four to counter's fractional
@@ -14371,11 +14495,11 @@ GoToNextWorld:
     jmp NextWorld            ;run the next world
 EndTheGame:
     lda #$00
-	ldx CurrentGame
+    ldx CurrentGame
     sta CompletedWorlds      ;init completed worlds flag
     sta ContinueWorld,x        ;reset saved progress
-	sta ContinueLevel,x
-	sta ContinueArea,x
+    sta ContinueLevel,x
+    sta ContinueArea,x
     sta SavedLevelSet
     sta SavedCompletedWorlds,x
     lda CurrentGame
@@ -14474,84 +14598,101 @@ NextMRet:
 
 ;-------------------------------------------------------------------------------------
 
+TheKingdomIsSavedMsg:
+    .byte $25, $c5, 21
+    .byte "THE KINGDOM IS SAVED!"
+    .byte $00
+
+NowTryAMoreMsg:
+    .byte $26, $05, 14
+    .byte "NOW TRY A MORE"
+    .byte $00
+
+DifficultQuestMsg:
+    .byte $26, $45, 18
+    .byte "DIFFICULT QUEST..."
+    .byte $00
+
 FinalRoomPalette:
     .byte $3f, $00, $10
     .byte $0f, $0f, $0f, $0f, $0f, $30, $10, $00
     .byte $0f, $21, $12, $02, $0f, $27, $17, $00
 
     .byte $23, $c0, $50, $55
+    .byte $27, $d0, $58, $aa
     .byte $00
 
 MarioThankYouMsgFinal:
-    .byte $24, $e8, $10
-    .byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
-    .byte $16, $0a, $1b, $12, $18, $27
+    .byte $24, $e8, 16
+    .byte "THANK YOU MARIO!"
 
     .byte $27, $c8, $48, $05
     .byte $00
 
 LuigiThankYouMsgFinal:
-    .byte $24, $e8, $10
-    .byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
-    .byte $15, $1e, $12, $10, $12, $27
+    .byte $24, $e8, 16
+    .byte "THANK YOU LUIGI!"
 
     .byte $27, $c8, $48, $05
     .byte $00
 
-PeaceIsPavedMsg:
-    .byte $25, $08, $10
-    .byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
-    .byte $16, $0a, $1b, $12, $18, $27
-
-    .byte $27, $d0, $58, $aa
+HurrahToOurHeroMsg:
+    .byte $26, $06, 19
+    .byte "HURRAH TO OUR HERO,"
     .byte $00
+
+PeaceIsPavedMsg:
+    ;.byte $25, $08, $10
+    ;.byte $1d, $11, $0a, $17, $14, $24, $22, $18, $1e, $24
+    ;.byte $16, $0a, $1b, $12, $18, $27
+
+    ;.byte $27, $d0, $58, $aa
+    ;.byte $00
 
 WithKingdomSavedMsg:
-    .byte $25, $46, $14
-    .byte $1d, $11, $0e, $24, $14, $12, $17, $10, $0d, $18, $16, $24, $12, $1C, $24
-    .byte $1c, $0a, $1f, $0e, $0d
-    .byte $00
+    ;.byte $25, $46, $14
+    ;.byte $1d, $11, $0e, $24, $14, $12, $17, $10, $0d, $18, $16, $24, $12, $1C, $24
+    ;.byte $1c, $0a, $1f, $0e, $0d
+    ;.byte $00
 
 OurOnlyHeroMsg:
-    .byte $25, $87, $13
-    .byte $11, $1e, $1b, $1b, $0a, $11, $24, $1d, $18, $24
-    .byte $18, $1e, $1b, $24, $11, $0e, $1b, $18, $2a
-    .byte $00
+    ;.byte $25, $87, $13
+    ;.byte $11, $1e, $1b, $1b, $0a, $11, $24, $1d, $18, $24
+    ;.byte $18, $1e, $1b, $24, $11, $0e, $1b, $18, $2a
+    ;.byte $00
 
 MarioHurrahMsg:
-    .byte $25, $ce, $06
-    .byte $16, $0a, $1b, $12, $18, $27
+    .byte $26, $4d, 6
+    .byte "MARIO!"
     .byte $00
 
 LuigiHurrahMsg:
-    .byte $25, $ce, $06
-    .byte $15, $1e, $12, $10, $12, $27
+    .byte $26, $4d, 6
+    .byte "LUIGI!"
     .byte $00
 
 ThisEndsYourTripMsg:
-    .byte $26, $07, $13
-    .byte $1d, $11, $12, $1c, $24, $0e, $17, $0d, $1c, $24, $22, $18, $1e
-    .byte $1b, $24, $1d, $1b, $12, $19
-    .byte $00
+    ;.byte $26, $07, $13
+    ;.byte $1d, $11, $12, $1c, $24, $0e, $17, $0d, $1c, $24, $22, $18, $1e
+    ;.byte $1b, $24, $1d, $1b, $12, $19
+    ;.byte $00
 
 OfALongFriendshipMsg:
-    .byte $26, $46, $14
-    .byte $18, $0f, $24, $0a, $24, $15, $18, $17, $10, $24, $0f, $1b, $12
-    .byte $0e, $17, $0d, $1c, $11, $12, $19
-    .byte $00
+    ;.byte $26, $46, $14
+    ;.byte $18, $0f, $24, $0a, $24, $15, $18, $17, $10, $24, $0f, $1b, $12
+    ;.byte $0e, $17, $0d, $1c, $11, $12, $19
+    ;.byte $00
 
 PointsAddedMsg:
-    .byte $26, $88, $10
-    .byte $01, $00, $00, $00, $00, $00, $24, $19, $1d, $1c, $28, $0a, $0d
-    .byte $0d, $0e, $0d
+    .byte $26, $88, 17
+    .byte "100000 PTS. ADDED"
 
     .byte $27, $e8, $48, $ff
     .byte $00
 
 ForEachPlayerLeftMsg:
-    .byte $26, $a6, $15
-    .byte $0f, $18, $1b, $24, $0e, $0a, $0c, $11, $24, $19, $15, $0a, $22
-    .byte $0e, $1b, $24, $15, $0e, $0f, $1d, $28
+    .byte $26, $a6, 21
+    .byte "FOR EACH PLAYER LEFT."
     .byte $00
 
 PrincessPeachsRoom:
@@ -14580,36 +14721,27 @@ FantasyWorld9Msg:
     ;.byte $00
 
 ThanksForPlayingMsg:
-    ;clears "CONTINUE" and "RETRY" text
+    ;clears "CONTINUE", "SAVE", and "RETRY" text
     .byte $21, $e0, $60, $24
     .byte $22, $40, $60, $24
+    .byte $22, $a0, $60, $24
 
-    ;"THANKS FOR PLAYING!"
-    .byte $21, $e6, $13
-    .byte $1d, $11, $0a, $17, $14, $1c, $24, $0f, $18, $1b, $24, $19, $15
-    .byte $0a, $22, $12, $17, $10, $27
+    ;"THANKS FOR PLAYING"
+    .byte $21, $e5, 21
+    .byte "THANK YOU FOR PLAYING"
+
+    ;"OUR FIRST DEMO!"
+    .byte $22, $25, 15
+    .byte "OUR FIRST DEMO!"
 
     ;"DEVELOPED BY:"
-    .byte $22, $26, $0d
-    .byte $0d, $0e, $1f, $0e, $15, $18, $19, $0e, $0d, $24, $0b, $22, $9a
+    .byte $22, $85, 20
+    .byte "DEVELOPED BY WEB2000"
 
     ;"-SIMPLISTIC6502"
-    .byte $22, $69, $0f
-    .byte $25, $1c, $12, $16, $19, $15, $12, $1c, $1d, $12, $0c, $06, $05
-    .byte $00, $02
+    .byte $22, $c5, 18
+    .byte "AND SIMPLISTIC6502"
 
-    ;"-WEB2000"
-    .byte $22, $a9, $08
-    .byte $25, $20, $0e, $0b, $02, $00, $00, $00
-
-    ;"SPECIAL THANKS:"
-    .byte $22, $e6, $0f
-    .byte $1c, $19, $0e, $0c, $12, $0a, $15, $24, $1d, $11, $0a, $17, $14
-    .byte $1c, $9a
-
-    ;"-THREECREEPIO"
-    .byte $23, $29, $0d
-    .byte $25, $1d, $11, $1b, $0e, $0e, $0c, $1b, $0e, $0e, $19, $12, $18
     .byte $00
 
 ;-------------------------------------------------------------------------------------
@@ -15083,17 +15215,55 @@ BootIntoGame:
         jmp Start                   ;now start the game!
 
 ;------------------------------------------------------------------------------------
-; INTERRUPT HANDLERS
+; VRAM TABLE AND DATA
 
 VRAM_AddrTable:
-   .word VRAM_Buffer, WaterPaletteData, GroundPaletteData, UndergroundPaletteData
-   .word CastlePaletteData, TitleScreenGfxData_SMB1, VRAM_Buffer, TitleScreenGfxData_SMB2
-   .word BowserPaletteData, DaySnowPaletteData, NightSnowPaletteData, MushroomPaletteData
-   .word MarioThankYouMsg, LuigiThankYouMsg, MushroomRetainerMsg, FinalRoomPalette
-   .word MarioThankYouMsgFinal, PeaceIsPavedMsg, WithKingdomSavedMsg, OurOnlyHeroMsg
-   .word MarioHurrahMsg, ThisEndsYourTripMsg, OfALongFriendshipMsg, PointsAddedMsg
-   .word ForEachPlayerLeftMsg, LuigiThankYouMsgFinal, LuigiHurrahMsg, DiskScreenPalette
-   .word PrincessPeachsRoom, FantasyWorld9Msg, ThanksForPlayingMsg, TitleScreenGfxData_Complete
+   ; general-use buffer in system RAM
+   .word VRAM_Buffer
+
+   ; level palettes
+   .word WaterPaletteData
+   .word GroundPaletteData
+   .word UndergroundPaletteData
+   .word CastlePaletteData
+   .word SnowPaletteData
+   .word MushroomPaletteData
+   .word BowserPaletteData
+
+   ; title screen tilemap data
+   .word TitleScreenGfxData_Complete
+   .word TitleScreenGfxData_SMB1
+   .word TitleScreenGfxData_SMB2
+
+   ; end-of-castle messages for toad
+   .word MarioThankYouMsg
+   .word LuigiThankYouMsg
+   .word MushroomRetainerMsg
+
+   ;end-of-castle messages for 1st princess
+   .word MarioThankYouMsg
+   .word TheKingdomIsSavedMsg
+   .word NowTryAMoreMsg
+   .word DifficultQuestMsg
+   .word LuigiThankYouMsg
+
+   ;end-of-castle messages for 2nd princess
+   .word FinalRoomPalette
+   .word MarioThankYouMsgFinal
+   .word MarioThankYouMsg
+   .word TheKingdomIsSavedMsg
+   .word HurrahToOurHeroMsg
+   .word MarioHurrahMsg
+   .word PointsAddedMsg
+   .word ForEachPlayerLeftMsg
+   .word LuigiThankYouMsgFinal
+   .word LuigiThankYouMsg
+   .word LuigiHurrahMsg
+
+   ; final ending screen
+   .word ThanksForPlayingMsg
+
+   ; main menu tilemap and palettes
    .word MainMenuPalette
 
 MainMenuPalette: ; (TO-DO: Find better way to handle this)
@@ -15107,6 +15277,9 @@ MainMenuPalette: ; (TO-DO: Find better way to handle this)
       .byte $0f,$16,$30,$27
       .byte $0f,$0f,$30,$10
       .byte $00
+
+;------------------------------------------------------------------------------------
+; INTERRUPT HANDLERS
 
 NMIHandler:
       pha                       ;preserve accumulator, X and Y registers

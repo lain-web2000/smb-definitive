@@ -696,48 +696,19 @@ CHR_MAIN              = 1
 CHR_SMB1              = 2
 CHR_SMB2              = 3
 
-; convert ascii to smb charset
-.charmap '0',$00
-.charmap '1',$01
-.charmap '2',$02
-.charmap '3',$03
-.charmap '4',$04
-.charmap '5',$05
-.charmap '6',$06
-.charmap '7',$07
-.charmap '8',$08
-.charmap '9',$09
-.charmap 'A',$0a
-.charmap 'B',$0b
-.charmap 'C',$0c
-.charmap 'D',$0d
-.charmap 'E',$0e
-.charmap 'F',$0f
-.charmap 'G',$10
-.charmap 'H',$11
-.charmap 'I',$12
-.charmap 'J',$13
-.charmap 'K',$14
-.charmap 'L',$15
-.charmap 'M',$16
-.charmap 'N',$17
-.charmap 'O',$18
-.charmap 'P',$19
-.charmap 'Q',$1a
-.charmap 'R',$1b
-.charmap 'S',$1c
-.charmap 'T',$1d
-.charmap 'U',$1e
-.charmap 'V',$1f
-.charmap 'W',$20
-.charmap 'X',$21
-.charmap 'Y',$22
-.charmap 'Z',$23
-.charmap ' ',$24
-.charmap '-',$25
-.charmap 'x',$26
-.charmap '!',$27
-.charmap '.',$28
-.charmap '*',$29
-.charmap ',',$2a
-.charmap 'c',$2b
+VRAM_STANDARD         = 0
+VRAM_PAL_WATER        = 1
+VRAM_PAL_GROUND       = 2
+VRAM_PAL_UNDERGROUND  = 3
+VRAM_PAL_CASTLE       = 4
+VRAM_PAL_SNOW         = 5
+VRAM_PAL_MUSHROOM     = 6
+VRAM_PAL_BOWSER       = 7
+VRAM_NT_COMPLETE      = 8
+VRAM_NT_SMB1          = 9
+VRAM_NT_SMB2          = 10
+VRAM_NT_TOAD          = 11
+VRAM_NT_PEACH_1ST     = 14
+VRAM_NT_PEACH_2ND     = 19
+VRAM_NT_CREDITS       = 30
+VRAM_PAL_MENU         = 31
