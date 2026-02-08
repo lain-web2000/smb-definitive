@@ -54,7 +54,7 @@ SubMenuStateMachine:
 ;-------------------------------------------------------------------------------------
 
 MainMenuSelections:
-        .byte $20,$a6,14,"MARIO COMPLETE"
+        .byte $20,$a6,20,"SUPER MARIO COMPLETE"
         .byte $20,$c6,19,"SUPER MARIO BROS. 1"
         .byte $20,$e6,19,"SUPER MARIO BROS. 2"
         .byte $21,$06,7,"OPTIONS"
@@ -442,7 +442,37 @@ LoadIntoGame:
         jsr LoadFontTileset
         jsr CopyFrictionData
         jsr CopyPaletteData
+        jsr CopyDemoData
         jmp BootIntoGame
+
+CopyDemoData:
+		lda CurrentGame
+		cmp #$02
+		beq isSMB2		
+isSMB1orComp:
+		ldx #DemoTimingDataEnd-DemoTimingData
+:		lda DemoTimingData_SMB1,x
+		sta DemoTimingData,x
+		dex 
+		bpl :-	
+		ldx #DemoActionDataEnd-DemoActionData
+:		lda DemoActionData_SMB1,x
+		sta DemoActionData,x
+		dex 
+		bpl :-
+		rts
+isSMB2:
+		ldx #DemoTimingDataEnd-DemoTimingData
+:		lda DemoTimingData_SMB2,x
+		sta DemoTimingData,x
+		dex 
+		bpl :-	
+		ldx #DemoActionDataEnd-DemoActionData
+:		lda DemoActionData_SMB2,x
+		sta DemoActionData,x
+		dex 
+		bpl :-
+		rts
 
 CopyFrictionData:
         lda LuigiPhysics
@@ -552,6 +582,26 @@ FireLuigiPaletteData:
       .byte $22, $30, $27, $19 ;luigi's smbdx colors after grabbing fire flower
       .byte $22, $29, $27, $16 ;luigi's smm2 colors after grabbing fire flower
 	  
+DemoActionData_SMB1:
+      .byte $01, $80, $02, $81, $41, $80, $01
+      .byte $42, $c2, $02, $80, $41, $c1, $41, $c1
+      .byte $01, $c1, $01, $02, $80, $00
+
+DemoTimingData_SMB1:
+      .byte $9b, $10, $20, $09, $34, $20, $24
+      .byte $15, $5a, $10, $20, $28, $30, $20, $18
+      .byte $50, $20, $30, $40, $03, $7f, $00
+	  
+DemoActionData_SMB2:
+      .byte $01, $81, $01, $81, $01, $81, $02, $01
+      .byte $81, $00, $81, $00, $80, $01, $81, $01
+      .byte $00, $00, $00, $00, $00
+
+DemoTimingData_SMB2:
+      .byte $b0, $10, $10, $10, $28, $10, $28, $06
+      .byte $10, $10, $0c, $80, $10, $28, $08, $90
+      .byte $ff, $00, $00, $00, $00, $00
+  
 DifficultyPresets:
       
 EasyPreset:

@@ -13941,16 +13941,6 @@ ChkLongWorlds:
 IncAreaNum:  inc AreaNumber
 EndSetLevel: rts
 
-DemoActionData:
-      .byte $01, $80, $02, $81, $41, $80, $01
-      .byte $42, $c2, $02, $80, $41, $c1, $41, $c1
-      .byte $01, $c1, $01, $02, $80, $00
-
-DemoTimingData:
-      .byte $9b, $10, $20, $09, $34, $20, $24
-      .byte $15, $5a, $10, $20, $28, $30, $20, $18
-      .byte $50, $20, $30, $40, $03, $7f, $00
-
 DemoEngine:
           ldx DemoAction         ;load current demo action
           lda DemoActionTimer    ;load current action timer
