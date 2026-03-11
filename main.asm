@@ -74,6 +74,10 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             jsr MoveAllSpritesOffscreen
             jsr InitializeNameTables
             inc DisableScreenFlag       ;tell NMI to keep rendering disabled
+            lda #$e7                    ;set IRQ timer value for scroll split
+            sta IRQTimer_Low
+            lda #$16
+            sta IRQTimer_High
             lda #%10001000              ;set up pattern table arrangment
             jsr WritePPUReg1            ;and enable NMIs
 WaitForNMI: lda NMIAckFlag              ;spin until NMI routine has executed
@@ -14946,6 +14950,7 @@ PrepZeroPage:
 ; $00-$01: pointer to selection index
 ; Returns with carry set if user backed out of menu or made selection,
 ; returns with carry clear if not.
+; Returns with A = 0x00 if user changed selection, A != 0x00 if not.
 MenuSelectionLogic:
         sta $02
         lda PressedJoypadBits
@@ -14975,10 +14980,12 @@ CheckValidSelection:
 UpdateSelection:
         ldy #$00
         sta ($00),y
+        lda #$01
 NoMenuAction:
         clc
         rts
 CloseMenu:
+        lda #$00
         sec
         rts
 
@@ -15281,11 +15288,11 @@ NMIHandler:
       beq SkipIRQ
       lda #FME7_IRQTimer_Low
       sta FME7Command
-      lda #$e7 ;i
+      lda IRQTimer_Low
       sta FME7Parameter         ;set FDS IRQ timer to occur at the end of the status bar
       lda #FME7_IRQTimer_High
       sta FME7Command
-      lda #$16
+      lda IRQTimer_High
       sta FME7Parameter
       lda #FME7_IRQTimer_Ctrl
       sta FME7Command

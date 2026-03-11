@@ -1,6 +1,9 @@
 .segment "LOADER"
 .org $8000
 
+NameTableDestination = $08
+TitleOffset = $0a
+
 StartLoader:
         ldx #$00                    ;disable NMIs and rendering
         stx PPU_CTRL
@@ -16,12 +19,18 @@ StartLoader:
         lda #VRAM_PAL_MENU          ;queue menu palette
         sta VRAM_Buffer_AddrCtrl
         inc DisableScreenFlag       ;tell NMI to keep rendering disabled
+        lda #$e7                    ;set IRQ timer value for scroll split
+        sta IRQTimer_Low
+        lda #$32
+        sta IRQTimer_High
         lda #%10001000              ;set up pattern table arrangment
         jsr WritePPUReg1            ;and enable NMIs
 @nmi_wait:
-        lda NMIAckFlag
+        lda NMIAckFlag              ;wait until NMI finishes
         beq @nmi_wait
-        jsr MenuStateMachine
+        inc FrameCounter            ;increment frame counter for flashing palette
+        jsr MenuStateMachine        ;run menu
+        jsr ChangePalette
         lda #$00                    ;clear NMI flag and wait for next NMI
         sta NMIAckFlag
         beq @nmi_wait
@@ -40,6 +49,7 @@ MainMenuStateMachine:
         jsr JumpEngine
 
         .word RenderMainTilemap
+        .word PrepMenu
         .word RunMenu
         .word LoadIntoGame
 
@@ -84,6 +94,14 @@ RenderMainTilemap:
         inc OperMode_Task
         rts
 
+PrepMenu:
+        lda #$00
+        sta DisableScreenFlag
+        jsr DrawMainMenuCursor
+        inc IRQUpdateFlag
+        inc OperMode_Task
+        rts
+
 MenuCursorData:
   .byte $04, $02
 
@@ -94,19 +112,23 @@ MenuCursorX:
   .byte $27, $27, $27, $27
 
 RunMenu:
-        lda #$00
-        sta DisableScreenFlag
+        lda SelectTimer
+        bne ScrollNewTitle
         lda #<ContinueMenuSelect
         sta $00
         lda #>ContinueMenuSelect
         sta $01
         lda #$03
         jsr MenuSelectionLogic
-        bcc DrawCursor
-        lda PressedJoypadBits
-        and #Start_Button+A_Button
-        bne DoSelection
-DrawCursor:
+        bcs CheckForSelection
+        bne UpdateMenuSelection
+        rts
+UpdateMenuSelection:
+        inc SelectTimer
+        lda NameTableDestination
+        eor #%00000001
+        sta NameTableDestination
+DrawMainMenuCursor:
         ldy #$01
 :       lda MenuCursorData,y     ;set up cursor sprite tile, attribute
         sta Sprite_Data+1,y      ;and X position in sprite OAM data
@@ -118,8 +140,15 @@ DrawCursor:
         lda MenuCursorX,y        ;set X position based on the selection
         sta Sprite_Data+3
         rts
+
+CheckForSelection:
+        lda PressedJoypadBits
+        and #Start_Button+A_Button
+        bne DoSelection
+        rts
 DoSelection:
         inc DisableScreenFlag
+        dec IRQUpdateFlag
         lda ContinueMenuSelect
         cmp #$03
         bne :+
@@ -128,6 +157,212 @@ DoSelection:
         sta OperMode_Task
 :       inc OperMode_Task
         rts
+
+ScrollNewTitle:
+        lda HorizontalScroll
+        clc
+        adc #$08
+        sta HorizontalScroll
+        bne :+
+        lda NameTableSelect
+        eor #%00000001
+        sta NameTableSelect
+:       lda ContinueMenuSelect
+        asl
+        tax
+        lda GameTitlePointers,x
+        clc
+        adc TitleOffset
+        sta $00
+        lda GameTitlePointers+1,x
+        adc TitleOffset+1
+        sta $01
+
+        ldy #$00
+        lda ($00),y
+        sta $02
+        clc
+        adc TitleOffset
+        sta TitleOffset
+        lda TitleOffset+1
+        adc #0
+        sta TitleOffset+1
+        lda $02
+        cmp #1
+        beq NoColumn
+        iny
+        ldx VRAM_Buffer_Offset
+        stx $03
+:       lda ($00),y
+        sta VRAM_Buffer,x
+        inx
+        iny
+        cpy $02
+        bcc :-
+        lda #$00
+        sta VRAM_Buffer,x
+        stx VRAM_Buffer_Offset
+        ldx $03
+        lda NameTableDestination
+        asl
+        asl
+        sta $03
+        lda VRAM_Buffer,x
+        ora $03
+        sta VRAM_Buffer,x
+
+NoColumn:
+        inc SelectTimer
+        lda SelectTimer
+        cmp #33
+        bne :+
+        lda #$00
+        sta TitleOffset
+        sta TitleOffset+1
+:       sta SelectTimer
+        rts
+
+GameTitlePointers:
+        .word SMBCompleteTitle
+        .word SMB1Title
+        .word SMB2Title
+        .word OptionsGraphic
+
+SMBCompleteTitle:
+        .byte 5, $23, $d8, $40+32, $55
+        .byte 1
+        .byte 1
+        .byte 5, $21, $84, $c0+15, $24
+        .byte 19, $21, $85, $80+15, $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4
+        .byte 19, $21, $86, $80+15, $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9
+        .byte 19, $21, $87, $80+15, $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $ef, $e8, $eb, $e8, $db
+        .byte 19, $21, $88, $80+15, $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9
+        .byte 19, $21, $89, $80+15, $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $ef, $df, $f2, $e7, $da
+        .byte 19, $21, $8a, $80+15, $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $ef, $de, $e9, $e9, $d7
+        .byte 19, $21, $8b, $80+15, $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $f6, $f2, $e9, $d7
+        .byte 19, $21, $8c, $80+15, $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $ef, $df, $f2, $e9, $d7
+        .byte 19, $21, $8d, $80+15, $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $ef, $ec, $e9, $e9, $d7
+        .byte 19, $21, $8e, $80+15, $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $e4, $df, $e7, $f0, $d5
+        .byte 19, $21, $8f, $80+15, $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $e5, $e6, $e9, $e2, $d9
+        .byte 19, $21, $90, $80+15, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e8, $db
+        .byte 19, $21, $91, $80+15, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9
+        .byte 19, $21, $92, $80+15, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $f0, $e8, $ea, $e8, $db
+        .byte 19, $21, $93, $80+15, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $ec, $fb, $fd, $dc
+        .byte 19, $21, $94, $80+15, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $ef, $e8, $fc, $fe, $dd
+        .byte 19, $21, $95, $80+15, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $e4, $de, $e9, $e2, $d9
+        .byte 19, $21, $96, $80+15, $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $e5, $e8, $ea, $e8, $db
+        .byte 19, $21, $97, $80+15, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $e4, $5d, $5d, $5d, $d5
+        .byte 19, $21, $98, $80+15, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $e5, $5d, $5d, $5d, $d5
+        .byte 19, $21, $99, $80+15, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $ef, $5d, $5d, $5d, $d5
+        .byte 19, $21, $9a, $80+15, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6
+        .byte 5, $21, $9b, $c0+15, $24
+        .byte 5, $21, $9c, $c0+15, $24
+        .byte 1
+        .byte 1
+        .byte 1
+        .byte 1
+
+SMB1Title:
+        .byte 5, $23, $d8, $40+32, $55
+        .byte 1
+        .byte 1
+        .byte 5, $21, $84, $c0+15, $24
+        .byte 19, $21, $85, $80+15, $24, $24, $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4, $24, $24
+        .byte 19, $21, $86, $80+15, $24, $24, $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $87, $80+15, $24, $24, $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $88, $80+15, $24, $24, $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $89, $80+15, $24, $24, $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $d7, $24, $24
+        .byte 19, $21, $8a, $80+15, $24, $24, $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $d7, $24, $24
+        .byte 19, $21, $8b, $80+15, $24, $24, $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $8c, $80+15, $24, $24, $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $d7, $24, $24
+        .byte 19, $21, $8d, $80+15, $24, $24, $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $8e, $80+15, $24, $24, $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $d9, $24, $24
+        .byte 19, $21, $8f, $80+15, $24, $24, $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $da, $24, $24
+        .byte 19, $21, $90, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24
+        .byte 19, $21, $91, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $92, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $d8, $24, $24
+        .byte 19, $21, $93, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $94, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $d7, $24, $24
+        .byte 19, $21, $95, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $d9, $24, $24
+        .byte 19, $21, $96, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $da, $24, $24
+        .byte 19, $21, $97, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $d9, $24, $24
+        .byte 19, $21, $98, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $da, $24, $24
+        .byte 19, $21, $99, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $d7, $24, $24
+        .byte 19, $21, $9a, $80+15, $24, $24, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6, $24, $24
+        .byte 5, $21, $9b, $c0+15, $24
+        .byte 5, $21, $9c, $c0+15, $24
+        .byte 1
+        .byte 1
+        .byte 1
+        .byte 1
+
+SMB2Title:
+        .byte 36, $23, $d8, 32, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $d5, $55, $55, $55, $55, $55, $55, $55, $dd, $55, $55, $55, $55, $55, $55, $55, $55, $55
+        .byte 1
+        .byte 1
+        .byte 19, $21, $84, $80+15, $24, $24, $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4, $24, $24
+        .byte 19, $21, $85, $80+15, $24, $24, $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $86, $80+15, $24, $24, $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $87, $80+15, $24, $24, $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $88, $80+15, $24, $24, $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $d7, $24, $24
+        .byte 19, $21, $89, $80+15, $24, $24, $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $d7, $24, $24
+        .byte 19, $21, $8a, $80+15, $24, $24, $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $8b, $80+15, $24, $24, $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $d7, $24, $24
+        .byte 19, $21, $8c, $80+15, $24, $24, $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $8d, $80+15, $24, $24, $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $d9, $24, $24
+        .byte 19, $21, $8e, $80+15, $24, $24, $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $da, $24, $24
+        .byte 19, $21, $8f, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24
+        .byte 19, $21, $90, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $91, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $d8, $24, $24
+        .byte 19, $21, $92, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
+        .byte 19, $21, $93, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $d7, $24, $24
+        .byte 19, $21, $94, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $d9, $24, $24
+        .byte 19, $21, $95, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $da, $24, $24
+        .byte 19, $21, $96, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $d9, $24, $24
+        .byte 19, $21, $97, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $da, $24, $24
+        .byte 19, $21, $98, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $d7, $24, $24
+        .byte 19, $21, $99, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24
+        .byte 19, $21, $9a, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $f7, $f9, $ec, $d7, $24, $24
+        .byte 19, $21, $9b, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f8, $fa, $e8, $db, $24, $24
+        .byte 19, $21, $9c, $80+15, $24, $24, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6, $24, $24
+        .byte 1
+        .byte 1
+        .byte 1
+        .byte 1
+
+OptionsGraphic:
+        .byte 1
+        .byte 1
+        .byte 1
+        .byte 5, $21, $84, $c0+15, $24
+        .byte 5, $21, $85, $c0+15, $24
+        .byte 5, $21, $86, $c0+15, $24
+        .byte 5, $21, $87, $c0+15, $24
+        .byte 5, $21, $88, $c0+15, $24
+        .byte 5, $21, $89, $c0+15, $24
+        .byte 5, $21, $8a, $c0+15, $24
+        .byte 5, $21, $8b, $c0+15, $24
+        .byte 5, $21, $8c, $c0+15, $24
+        .byte 5, $21, $8d, $c0+15, $24
+        .byte 5, $21, $8e, $c0+15, $24
+        .byte 5, $21, $8f, $c0+15, $24
+        .byte 5, $21, $90, $c0+15, $24
+        .byte 5, $21, $91, $c0+15, $24
+        .byte 5, $21, $92, $c0+15, $24
+        .byte 5, $21, $93, $c0+15, $24
+        .byte 5, $21, $94, $c0+15, $24
+        .byte 5, $21, $95, $c0+15, $24
+        .byte 5, $21, $96, $c0+15, $24
+        .byte 5, $21, $97, $c0+15, $24
+        .byte 5, $21, $98, $c0+15, $24
+        .byte 5, $21, $99, $c0+15, $24
+        .byte 5, $21, $9a, $c0+15, $24
+        .byte 5, $21, $9b, $c0+15, $24
+        .byte 5, $21, $9c, $c0+15, $24
+        .byte 1
+        .byte 1
+        .byte 1
+        .byte 1
 
 ;-------------------------------------------------------------------------------------
 
@@ -294,6 +529,44 @@ RenderOptionNum:
 
 DoNothing:
         rts
+
+;-------------------------------------------------------------------------------------
+
+Palette3Packet:
+        .byte $3f, $0d, 1, $27
+
+Palette3Colors:
+        .byte $27, $27, $27, $17, $07, $17
+
+ChangePalette:
+        lda FrameCounter
+        and #%00000111
+        bne :+
+        ldy #$00
+        ldx VRAM_Buffer_Offset
+        stx $00
+WritePalette3Packet:
+        lda Palette3Packet,y
+        sta VRAM_Buffer,x
+        inx
+        iny
+        cpy #$04
+        bcc WritePalette3Packet
+        lda #$00
+        sta VRAM_Buffer,x
+        stx VRAM_Buffer_Offset
+        inc ColorRotateOffset
+        lda ColorRotateOffset
+        cmp #$06
+        bcc Palette3InRange
+        lda #$00
+Palette3InRange:
+        sta ColorRotateOffset
+        tay
+        ldx $00
+        lda Palette3Colors,y
+        sta VRAM_Buffer+3,x
+:       rts
 
 ;-------------------------------------------------------------------------------------
 ; HELPER FUNCTIONS

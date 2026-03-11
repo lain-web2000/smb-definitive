@@ -44,6 +44,8 @@ PressedJoypad2Bits    = $074d
 JoypadOverride        = $0758
 
 IRQAckFlag			  = $077b
+IRQTimer_Low          = $077d
+IRQTimer_High         = $077e
 IRQUpdateFlag		  = $0722
 NMIAckFlag            = $077c
 
