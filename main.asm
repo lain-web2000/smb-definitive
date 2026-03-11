@@ -1625,7 +1625,7 @@ DefaultSprOffsets:
 
 InitializeArea:
                ldy #$4b                 ;clear all memory again, only as far as $074b
-               jsr ClearMemory     ;this is only necessary in game mode
+               jsr ClearMemory          ;this is only necessary in game mode
                ldx #$21
                lda #$00
 ClrTimersLoop: sta Timers,x             ;clear out timer memory
@@ -1681,10 +1681,10 @@ CheckHalfway:  lda HalfwayPage
                lda #$02                 ;if halfway page set, overwrite start position from header
                sta PlayerEntranceCtrl
 DoneInitArea:  lda SilenceSuppression   ;if enabled, do not silence music between areas
-               bne :+
+               bne DisableScrOut
                lda #Silence             ;silence music
                sta AreaMusicQueue
-:              lda #$00
+DisableScrOut: lda #$00
                sta SilenceSuppression
                lda #$01                 ;disable screen output
                sta DisableScreenFlag
@@ -3827,21 +3827,24 @@ ChgAreaPipe: dec ChangeAreaTimer       ;decrement timer for change of area
              bne ExitCAPipe
              sty AltEntranceControl    ;when timer expires set mode of alternate entry
 ChgAreaMode: inc DisableScreenFlag     ;set flag to disable screen output
-;             lda AreaPointer           ;if next area of same type, do not stop music
-;             rol
-;             rol
-;             rol
-;             rol
-;             and #%00000011
-;             cmp AreaType
-;             bne :+
-;             inc SilenceSuppression
-             lda WarpZoneControl
-             beq :+
-             jsr WarpZoneHandler
-:            lda #$00
+             lda #$00
              sta OperMode_Task         ;set secondary mode of operation
              sta IRQUpdateFlag         ;disable IRQ check
+             lda WarpZoneControl       ;branch ahead if warp zone not loaded
+             beq ChkNewAType
+             lda GameEngineSubroutine  ;branch ahead if player didn't go down warp zone pipe
+             cmp #$03
+             bne ChkNewAType
+             jmp WarpZoneHandler       ;otherwise set warp zone destination
+ChkNewAType: lda AreaPointer           ;if next area of same type, do not stop music
+             rol
+             rol
+             rol
+             rol
+             and #%00000011
+             cmp AreaType
+             bne ExitCAPipe
+             inc SilenceSuppression    ;set flag to continue playing music
 ExitCAPipe:  rts                       ;leave
 
 EnterSidePipe:
@@ -4012,7 +4015,8 @@ NotEndW:  sta ContinueLevel,y
           jsr RunLoadAreaPointer    ;get new level pointer
           inc FetchNewGameTimerFlag ;set flag to load new game timer
           jsr ChgAreaMode           ;do sub to set secondary mode, disable screen and IRQ
-          sta HalfwayPage           ;reset halfway page to 0 (beginning)
+          lda #$00                  ;reset halfway page to 0 (beginning)
+          sta HalfwayPage
           lda #Silence
           sta EventMusicQueue       ;silence music and leave
 ExitNA:   rts
@@ -10309,7 +10313,7 @@ ChkOnScr: lda Player_Y_HighPos
           lda #$ff
           sta Player_CollisionBits  ;initialize player's collision flag
           lda Player_Y_Position
-          cmp #$cf                  ;check player's vertical coordinate
+          cmp #$d0                  ;check player's vertical coordinate
           bcc ChkCollSize           ;if not too close to the bottom of screen, continue
 ExPBGCol: rts                       ;otherwise leave
 
@@ -10336,7 +10340,7 @@ HeadChk: lda Player_Y_Position       ;get player's vertical coordinate
          jsr BlockBufferColli_Head   ;do player-to-bg collision detection on top of
          beq DoFootCheck             ;player, and branch if nothing above player's head
          jsr CheckForCoinMTiles      ;check to see if player touched coin with their head
-         bcs AwardTouchedCoin        ;if so, branch to some other part of code
+         bcs AwardTouchedCoin_Head   ;if so, branch to some other part of code
          ldy Player_Y_Speed          ;check player's vertical speed
          bpl DoFootCheck             ;if player not moving upwards, branch elsewhere
          ldy $04                     ;check lower nybble of vertical coordinate returned
@@ -10351,6 +10355,10 @@ HeadChk: lda Player_Y_Position       ;get player's vertical coordinate
          jsr PlayerHeadCollision     ;otherwise do a sub to process collision
          jmp DoFootCheck             ;jump ahead to skip these other parts here
 
+AwardTouchedCoin_Head:
+      jsr HandleCoinMetatile     ;follow the code to erase coin and award to player 1 coin
+      jmp DoFootCheck            ;process player foot collision
+
 SolidOrClimb:
        cmp #$26               ;if climbing metatile,
        beq NYSpd              ;branch ahead and do not play sound
@@ -10363,27 +10371,31 @@ NYSpd: lda #$01               ;set player's vertical speed to nullify
 
 DoFootCheck:
       ldy $eb                    ;get block buffer adder offset
-      lda Player_Y_Position
-      cmp #$cf                   ;check to see how low player is
-      bcs DoPlayerSideCheck      ;if player is too far down on screen, skip all of this
       jsr BlockBufferColli_Feet  ;do player-to-bg collision detection on bottom left of player
-      jsr CheckForCoinMTiles     ;check to see if player touched coin with their left foot
-      bcs AwardTouchedCoin       ;if so, branch to some other part of code
-      pha                        ;save bottom left metatile to stack
+      sta $01                    ;save bottom left metatile here
       jsr BlockBufferColli_Feet  ;do player-to-bg collision detection on bottom right of player
       sta $00                    ;save bottom right metatile here
-      pla
-      sta $01                    ;pull bottom left metatile and save here
-      bne ChkFootMTile           ;if anything here, skip this part
-      lda $00                    ;otherwise check for anything in bottom right metatile
-      beq DoPlayerSideCheck      ;and skip ahead if not
-      jsr CheckForCoinMTiles     ;check to see if player touched coin with their right foot
-      bcc ChkFootMTile           ;if not, skip unconditional jump and continue code
+      ldy $eb                    ;set temp block buffer adder offset
+      sty $ec
+      lda #$02                   ;set value here to be used as counter
+      sta $ed
 
-AwardTouchedCoin:
-      jmp HandleCoinMetatile     ;follow the code to erase coin and award to player 1 coin
+FootCheckLoop:
+       ldy $ec                   ;get temp block buffer adder offset
+       jsr BlockBufferColli_Feet ;do player-to-bg collision detection on one foot
+       sty $ec                   ;update temp block buffer adder offset
+       bne ChkFootMTile          ;if something found, branch
+NFoot: dec $ed                   ;otherwise decrement counter
+       bne FootCheckLoop         ;run code until both feet of player are checked
+       beq DoPlayerSideCheck     ;branch ahead to process player side collision
+
+AwardTouchedCoin_Foot:
+      jsr HandleCoinMetatile     ;follow the code to erase coin and award to player 1 coin
+      jmp NFoot                  ;continue processing foot collision
 
 ChkFootMTile:
+          jsr CheckForCoinMTiles     ;check to see if player touched coin with their foot
+          bcs AwardTouchedCoin_Foot  ;if so, branch to some other part of code
           jsr CheckForClimbMTiles    ;check to see if player landed on climbable metatiles
           bcs DoPlayerSideCheck      ;if so, branch
           ldy Player_Y_Speed         ;check player's vertical speed
@@ -10392,7 +10404,7 @@ ChkFootMTile:
           bne ContChk                ;if player did not touch axe, skip ahead
           jmp HandleAxeMetatile      ;otherwise jump to set modes of operation
 ContChk:  jsr ChkInvisibleMTiles     ;do sub to check for hidden coin or 1-up blocks
-          beq DoPlayerSideCheck      ;if either found, branch
+          beq NFoot                  ;if either found, branch
           ldy JumpspringAnimCtrl     ;if jumpspring animating right now,
           bne InitSteP               ;branch ahead
           ldy $04                    ;check lower nybble of vertical coordinate returned
@@ -10424,10 +10436,8 @@ SideCheckLoop:
        iny                       ;move onto the next one
        sty $eb                   ;store it
        lda Player_Y_Position
-       cmp #$20                  ;check player's vertical position
+       cmp #$18                  ;check player's vertical position
        bcc BHalf                 ;if player is in status bar area, branch ahead to skip this part
-       cmp #$e4
-       bcs ExSCH                 ;branch to leave if player is too far down
        jsr BlockBufferColli_Side ;do player-to-bg collision detection on one half of player
        beq BHalf                 ;branch ahead if nothing found
        cmp #$1c                  ;otherwise check for pipe metatiles
@@ -10441,22 +10451,24 @@ BHalf: ldy $eb                   ;load block adder offset
        lda Player_Y_Position     ;get player's vertical position
        cmp #$08
        bcc ExSCH                 ;if too high, branch to leave
-       cmp #$d0
-       bcs ExSCH                 ;if too low, branch to leave
        jsr BlockBufferColli_Side ;do player-to-bg collision detection on other half of player
        bne CheckSideMTiles       ;if something found, branch
-       dec $00                   ;otherwise decrement counter
+NSide: dec $00                   ;otherwise decrement counter
        bne SideCheckLoop         ;run code until both sides of player are checked
 ExSCH: rts                       ;leave
 
+AwardTouchedCoin_Side:
+      jsr HandleCoinMetatile     ;follow the code to erase coin and award to player 1 coin
+      jmp NSide                  ;continue processing side collision
+
 CheckSideMTiles:
           jsr ChkInvisibleMTiles     ;check for hidden or coin 1-up blocks
-          beq ExCSM                  ;branch to leave if either found
+          beq NSide                  ;branch to leave if either found
           jsr CheckForClimbMTiles    ;check for climbable metatiles
           bcc ContSChk               ;if not found, skip and continue with code
           jmp HandleClimbing         ;otherwise jump to handle climbing
 ContSChk: jsr CheckForCoinMTiles     ;check to see if player touched coin
-          bcs HandleCoinMetatile     ;if so, execute code to erase coin and award to player 1 coin
+          bcs AwardTouchedCoin_Side  ;if so, execute code to erase coin and award to player 1 coin
           jsr ChkJumpspringMetatiles ;check for jumpspring metatiles
           bcc ChkPBtm                ;if not found, branch ahead to continue code
           lda JumpspringAnimCtrl     ;otherwise check jumpspring animation control
