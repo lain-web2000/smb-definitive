@@ -444,7 +444,7 @@ SubMenuOptions:
 SubMenuOptionCount:
   .byte 3, 3, 4
   .byte 2, 2, 2
-  .byte 2, 3, 3
+  .byte 3, 3, 3
   .byte 2
 
 RunSubmenu:

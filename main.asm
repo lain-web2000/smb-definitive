@@ -4605,6 +4605,8 @@ Bubble_MForceData:
 BubbleTimerData:
       .byte $40, $20
 
+GameTimerSpeedData:
+      .byte 24, 21, 18
 ;-------------------------------------------------------------------------------------
 
 RunGameTimer:
@@ -4632,11 +4634,9 @@ RunGameTimer:
            bne ResGTCtrl              ;if timer not at 100, branch to reset game timer control
            lda #TimeRunningOutMusic
            sta EventMusicQueue        ;otherwise load time running out music
-ResGTCtrl: lda #24                    ;reset game timer control
-           ldy CountdownSpeed
-           beq :+
-           lda #21
-:          sta GameTimerCtrlTimer
+ResGTCtrl: ldy CountdownSpeed
+           lda GameTimerSpeedData,y
+           sta GameTimerCtrlTimer
            ldy #$17                   ;set offset for last digit
            lda #$ff                   ;set value to decrement game timer digit
            sta DigitModifier+5
