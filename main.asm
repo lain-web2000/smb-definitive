@@ -10428,11 +10428,13 @@ InitSteP: lda #$00
 DoPlayerSideCheck:
       ldy $eb       ;get block buffer adder offset
       iny
-      iny           ;increment offset 2 bytes to use adders for side collisions
+      sty $eb                   ;store it
       lda #$02      ;set value here to be used as counter
-      sta $00
+      sta $ec
 
 SideCheckLoop:
+       ldy $eb       ;get block buffer adder offset
+       iny
        iny                       ;move onto the next one
        sty $eb                   ;store it
        lda Player_Y_Position
@@ -10453,7 +10455,7 @@ BHalf: ldy $eb                   ;load block adder offset
        bcc ExSCH                 ;if too high, branch to leave
        jsr BlockBufferColli_Side ;do player-to-bg collision detection on other half of player
        bne CheckSideMTiles       ;if something found, branch
-NSide: dec $00                   ;otherwise decrement counter
+NSide: dec $ec                   ;otherwise decrement counter
        bne SideCheckLoop         ;run code until both sides of player are checked
 ExSCH: rts                       ;leave
 
@@ -10706,6 +10708,7 @@ HandlePipeEntry:
 ExPipeE:  rts                       ;leave!!!
 
 WarpZoneHandler:
+		  lda WarpZoneControl
           ldy LevelSet              ;are we in SMB1?
           beq SMB1WarpZoneHandler   ;if so, use all stars warp-zone handler
           and #%00001111            ;mask bits
