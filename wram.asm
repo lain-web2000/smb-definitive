@@ -43,7 +43,12 @@ ContinuePlayerStatus:
 ContinuePlayerSize:
 	.byte $00
 	.byte $00
-	.byte $00	
+	.byte $00
+
+SavedTopScore:
+    .res 6, $00
+	.res 6, $00
+	.res 6, $00
 	
 ;$00 - Standard SMB1 Palette
 ;$01 - Protoype #1 Palette

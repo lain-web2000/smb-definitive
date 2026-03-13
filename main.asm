@@ -48,22 +48,16 @@ Start:      ldx #$00                    ;disable NMIs and rendering
             stx PPU_MASK
             dex
             txs                         ;reset stack pointer
-;            bit PPU_STATUS
-;            lda #%00001010
-;@CLK_IRQ:   sta PPU_ADDRESS              ;clock MMC3 IRQ correctly (thank you TakuikaNinja)
-;            sta PPU_ADDRESS
-;            asl a
-;            bcc @CLK_IRQ
-            ldy #ColdBootOffset         ;load default cold boot pointer
-            ldx #$05
-WBootCheck: lda TopScoreDisplay,x       ;first checkpoint, check each score digit
-            cmp #10                     ;in the top score for a valid digit
-            bcs ColdBoot                ;if even one digit isn't valid (greater than 10 decimal)
-            dex                         ;then branch to perform cold boot
-            bpl WBootCheck
-            lda WarmBootValidation      ;second checkpoint, check to see if
-            cmp #$a5                    ;another location has a specific value
-            bne ColdBoot
+;            ldy #ColdBootOffset         ;load default cold boot pointer
+;            ldx #$05
+;WBootCheck: lda TopScoreDisplay,x       ;first checkpoint, check each score digit
+;            cmp #10                     ;in the top score for a valid digit
+;            bcs ColdBoot                ;if even one digit isn't valid (greater than 10 decimal)
+;            dex                         ;then branch to perform cold boot
+;            bpl WBootCheck
+;            lda WarmBootValidation      ;second checkpoint, check to see if
+;            cmp #$a5                    ;another location has a specific value
+;            bne ColdBoot
             ldy #WarmBootOffset         ;if passed both, load warm boot pointer
 ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             sta SND_DELTA_REG+1         ;reset DMC output level
@@ -71,7 +65,7 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             lda #$a5                    ;set warm boot flag in case the player hits reset
             sta WarmBootValidation
             sta PseudoRandomBitReg      ;set seed for pseudorandom register
-            jsr MoveAllSpritesOffscreen
+            jsr MoveAllSpritesOffscreen ;reset OAM and nametable memory
             jsr InitializeNameTables
             inc DisableScreenFlag       ;tell NMI to keep rendering disabled
             lda #$e7                    ;set IRQ timer value for scroll split
@@ -87,12 +81,8 @@ WaitForNMI: lda NMIAckFlag              ;spin until NMI routine has executed
             jsr PauseRoutine
             jsr UpdateTopScore
             lda GamePauseStatus         ;check d0 of game pause flags
-            lsr                         ;if not set, branch ahead
-            bcc CheckTimerControl
-            lda PressedJoypadBits       ;check to see if select is pressed
-            and #Select_Button
-            beq SeedLFSR                ;if not, branch to skip
-            jmp ReturnToLoader
+            lsr                         ;if set, branch to skip
+            bcs SeedLFSR
 CheckTimerControl:
             lda TimerControl            ;if master timer control not set, branch
             beq CheckIntervalTC         ;to decrement frame and interval timers
@@ -148,6 +138,25 @@ WaitForIRQ: lda #$00
 
 ;-------------------------------------------------------------------------------------
 
+PauseMenuTemplate:
+      .byte $5f, $0f, $03, $60, $5f, $10, $03, $68, $5f, $10, $03, $70, $5f, $10, $03, $78
+      .byte $5f, $10, $03, $80, $5f, $10, $03, $88, $5f, $10, $03, $90, $5f, $0f, $43, $98
+      .byte $67, $11, $03, $60, $67, $13, $03, $68, $67, $14, $03, $70, $67, $15, $03, $78
+      .byte $67, $16, $03, $80, $67, $17, $03, $88, $67, $18, $03, $90, $67, $19, $03, $98
+      .byte $6f, $11, $03, $60, $6f, $1a, $03, $68, $6f, $1b, $03, $70, $6f, $1c, $03, $78
+      .byte $6f, $1d, $03, $80, $6f, $1e, $03, $88, $6f, $0e, $03, $90, $6f, $11, $43, $98
+      .byte $77, $11, $03, $60, $77, $13, $03, $68, $77, $14, $03, $70, $77, $15, $03, $78
+      .byte $77, $16, $03, $80, $77, $17, $03, $88, $77, $18, $03, $90, $77, $19, $03, $98
+      .byte $7f, $11, $03, $60, $7f, $1a, $03, $68, $7f, $1b, $03, $70, $7f, $1c, $03, $78
+      .byte $7f, $1d, $03, $80, $7f, $1e, $03, $88, $7f, $0e, $03, $90, $7f, $11, $43, $98
+      .byte $87, $11, $03, $60, $87, $0e, $03, $68, $87, $0e, $03, $70, $87, $0e, $03, $78
+      .byte $87, $1f, $03, $80, $87, $20, $03, $88, $87, $21, $03, $90, $87, $11, $43, $98
+      .byte $8f, $0f, $83, $60, $8f, $10, $83, $68, $8f, $10, $83, $70, $8f, $10, $83, $78
+      .byte $8f, $10, $83, $80, $8f, $10, $83, $88, $8f, $10, $83, $90, $8f, $0f, $c3, $98
+
+PauseCursorIndices:
+      .byte $21, $41, $81
+
 PauseRoutine:
                lda OperMode           ;are we in victory mode?
                cmp #VictoryMode       ;if so, go ahead
@@ -158,27 +167,60 @@ PauseRoutine:
                cmp #$04
                bne ExitPause          ;if not, leave
 ChkPauseTimer: lda GamePauseTimer     ;check if pause timer is still counting down
-               beq ChkStart
+               beq ChkPauseState
                dec GamePauseTimer     ;if so, decrement and leave
                rts
+
+ChkPauseState: lda GamePauseStatus    ;is game currently paused?
+               lsr
+               bcc ChkForPause        ;no, check for pause
+               lda #<ContinueMenuSelect
+               sta $00
+               lda #>ContinueMenuSelect
+               sta $01
+               lda #$02
+               jsr MenuSelectionLogic ;operate pause menu
+               ldy #$02               ;place cursor next to selected option
+CursorLoop:    lda #$11               ;blank tile by default
+               cpy ContinueMenuSelect
+               bne NoCursor
+               lda #$12               ;cursor tile if match found
+NoCursor:      ldx PauseCursorIndices,y
+               sta Sprite_Data+4,x
+               dey
+               bpl CursorLoop
+               jsr ChkStart           ;check for unpause
+               lda GamePauseStatus    ;if still paused, leave
+               bne ExitPause
+               lda ContinueMenuSelect ;if "save & quit" chosen, return to
+               cmp #$02               ;game selection menu
+               bne ExitPause
+               jmp ReturnToLoader
+
+ChkForPause:   jsr ChkStart           ;check for pause
+               lda GamePauseStatus    ;if not paused, leave
+               beq ExitPause
+               jsr MoveSpritesOffscreen
+               ldy #$e0               ;setup OAM for pause menu
+DrawPauseMenu: lda PauseMenuTemplate-1,y
+               sta Sprite_Data+4-1,y
+               dey
+               bne DrawPauseMenu
+               lda #$00               ;init pause menu selection
+               sta ContinueMenuSelect
+               rts
+
 ChkStart:      lda PressedJoypadBits  ;check to see if start is pressed
                and #Start_Button
-               beq ClrPauseTimer
-               lda GamePauseStatus    ;check to see if timer flag is set
-               and #%10000000         ;and if so, do not reset timer
-               bne ExitPause
-               lda #$2b               ;set pause timer
+               beq ExitPause          ;if not, leave
+TogglePause:   lda #$2b               ;set pause timer
                sta GamePauseTimer
                lda GamePauseStatus
                tay
                iny                    ;set pause sfx queue for next pause mode
                sty PauseSoundQueue
-               eor #%00000001         ;invert d0 and set d7
-               ora #%10000000
-               bne SetPause           ;unconditional branch
-ClrPauseTimer: lda GamePauseStatus    ;clear timer flag if timer is at zero and start button
-               and #%01111111         ;is not pressed
-SetPause:      sta GamePauseStatus
+               eor #%00000001         ;invert d0
+               sta GamePauseStatus
 ExitPause:     rts
 
 
@@ -807,7 +849,7 @@ TaskLoop:  jsr AreaParserTaskHandler ;render column set of current area
 OutputCol: rts
 
 GameText:
-TopStatusBarLine:
+TopStatusBarLineText:
   .byte $20, $43, 5, "MARIO"
   .byte $20, $52, 11, "WORLD  TIME"
   .byte $20, $68, 5, "0  ", $5f, "x" ;score trailing digit and coin display
@@ -815,26 +857,26 @@ TopStatusBarLine:
   .byte $23, $c2, $01, $ea ;attribute table data, used for coin icon in status bar
   .byte $ff ;end of data block
 
-WorldLivesDisplay:
+WorldLivesDisplayText:
   .byte $21, $cf, 4, "x   " ;cross with spaces used on lives display
   .byte $21, $4b, 9, "WORLD  - " ;"WORLD  - " used on lives display
   .byte $22, $0c, $47, $24 ;possibly used to clear time up
   .byte $23, $dc, $01, $ba ;attribute table data for crown
   .byte $ff
 
-TimeUp:
+TimeUpText:
   .byte $22, $0c, 7, "TIME UP"
   .byte $ff
 
-GameOver:
+GameOverText:
   .byte $21, $6b, 9, "GAME OVER"
-  .byte $21, $eb, 8, "CONTINUE"
+  .byte $21, $e8, 8, "CONTINUE"
   .byte $22, $0c, $47, $24
-  .byte $22, $4b, 4, "SAVE"
-  .byte $22, $ab, 5, "RETRY"
+  .byte $22, $48, 17, "SAVE AND CONTINUE"
+  .byte $22, $a8, 13, "SAVE AND QUIT"
   .byte $ff
 
-WarpZone:
+WarpZoneMsg:
   .byte $25, $84, 21, "WELCOME TO WARP ZONE!"
   .byte $26, $25, $01, " " ; placeholder for left pipe
   .byte $26, $2d, $01, " " ; placeholder for middle pipe
@@ -864,10 +906,10 @@ WarpZoneNumbers:
   .byte $24, $0d, $24, $00         ; B-4 warpzone
 
 GameTextOffsets:
-   .byte TopStatusBarLine-GameText
-   .byte WorldLivesDisplay-GameText
-   .byte TimeUp-GameText
-   .byte GameOver-GameText
+   .byte TopStatusBarLineText-GameText
+   .byte WorldLivesDisplayText-GameText
+   .byte TimeUpText-GameText
+   .byte GameOverText-GameText
 
 WriteGameText:
                pha                       ;save text number to stack and use as offset
@@ -947,7 +989,7 @@ WriteWarpZoneMessage:
          pha                    ;save warp zone control temporarily
          ldy #$ff
 WZMLoop: iny
-         lda WarpZone,y         ;write warp zone message to VRAM buffer
+         lda WarpZoneMsg,y      ;write warp zone message to VRAM buffer
          sta VRAM_Buffer,y
          bne WZMLoop
          pla
@@ -11728,6 +11770,7 @@ FlagpoleGfxHandler:
       sta $05                        ;store here to be used later by floatey number
       lda Enemy_Y_Position,x         ;get vertical coordinate
       jsr DumpTwoSpr                 ;and do sub to dump into first and second sprites
+      clc
       adc #$08                       ;add eight pixels
       sta Sprite_Y_Position+8,y      ;and store into third sprite
       lda FlagpoleFNum_Y_Pos         ;get vertical coordinate for floatey number
@@ -13633,13 +13676,13 @@ DiskScreen:
       lda #$00
       sta IRQUpdateFlag
       inc DisableScreenFlag
-      lda #$1b
-      sta VRAM_Buffer_AddrCtrl
+      ;lda #$1b
+      ;sta VRAM_Buffer_AddrCtrl
       inc DiskIOTask        ;move on to next subtask involving the disk drive
       rts
 
 GameOverCursorData:
-  .byte $04, $02, $48
+  .byte $04, $02, $30
 
 GameOverCursorY:
   .byte $77, $8f, $a7
@@ -13647,29 +13690,19 @@ GameOverCursorY:
 GameOverMenu:
             lda #$00
             sta DisableScreenFlag
+            lda #<ContinueMenuSelect     ;load pointer to selection index
+            sta $00
+            lda #>ContinueMenuSelect
+            sta $01
+            lda #$02                     ;pass highest index to routine
+            jsr MenuSelectionLogic       ;operate continue menu
             lda PressedJoypadBits        ;if player pressed the start button
             and #Start_Button            ;then either continue or start over
             bne ContinueOrRetry
-            ldy ContinueMenuSelect       ;load menu option index into Y
-            lda PressedJoypadBits
-            and #Down_Dir+Select_Button  ;if player pressed down or select
-            beq ChkUpDir                 ;then move to next menu option
-            iny
-            bne MoveSel
-ChkUpDir:   lda PressedJoypadBits        ;if player pressed up move to
-            and #Up_Dir                  ;previous menu option
-            beq ChgSel
-            dey
-MoveSel:    lda #Sfx_Fireball            ;play sound effect when moving cursor
+            cpx #$00                     ;if player didn't change selection
+            beq ChgSel                   ;branch to draw cursor sprite
+            lda #Sfx_Fireball            ;play sound effect when moving cursor
             sta Square1SoundQueue
-            lda #$02                     ;keep menu option in range
-            cpy #$00
-            bmi SetSel
-            lda #$00
-            cpy #$03
-            bcs SetSel
-            tya
-SetSel:     sta ContinueMenuSelect
 ChgSel:     ldy #$02
 ChgSelLoop: lda GameOverCursorData,y     ;set up cursor sprite tile, attribute
             sta Sprite_Data+1,y          ;and X position in sprite OAM data
@@ -13682,31 +13715,34 @@ ChgSelLoop: lda GameOverCursorData,y     ;set up cursor sprite tile, attribute
 
 ContinueOrRetry:
   lda ContinueMenuSelect       ;if player selected "continue"
-  beq Continue                 ;then branch to continue
-  cmp #$01
-  bne RetryGame                ;if not selected "save", don't save progress
-  ldx CurrentGame
-  lda WorldNumber              ;otherwise save world number and worlds completed
+  beq Continue                 ;then branch to continue, do not save
+  ldx CurrentGame              ;otherwise save world number and worlds completed
+  lda WorldNumber
   sta ContinueWorld,x
   lda CurrentGame
   bne :+
   lda LevelSet
   sta SavedLevelSet
-: lda DifficultyFlag
-  cmp #$02
-  beq RetryGame
+: ;lda DifficultyFlag
+  ;cmp #$02
+  ;beq RetryGame
   lda LevelNumber
   sta ContinueLevel,x
   lda AreaNumber
   sta ContinueArea,x
   lda CompletedWorlds
   sta SavedCompletedWorlds
+  lda ContinueMenuSelect       ;if player selected "save and continue"
+  cmp #$01                     ;then branch to continue
+  beq Continue
+  jmp ReturnToLoader           ;otherwise exit game
 RetryGame:
-  lda #$00
-  sta CompletedWorlds          ;init completed worlds flags
-  jmp TerminateGame            ;and end the game
+  ;lda #$00
+  ;sta CompletedWorlds          ;init completed worlds flags
+  ;jmp TerminateGame            ;and end the game
 
 Continue:
+        lda #$00                    ;load A to clear values
         ldy #$02                    ;give three lives if on hard mode
         ldx DifficultyFlag
         cpx #$02
@@ -13730,7 +13766,12 @@ ISCont: sta ScoreAndCoinDisplay,y   ;reset score
 GameMenuRoutine:
               lda PressedJoypadBits       ;check to see if the player pressed B
               and #B_Button
-              bne ExitGame                ;if so, return to game selection menu
+              beq ProcGameMenu            ;if not, process title screen menu
+              lda SavedJoypadBits         ;was A being held when B was pressed?
+              and #A_Button
+              beq ExitGame                ;no, return to game selection menu
+              jmp ClearTopScore           ;yes, clear top score and reload menu        
+ProcGameMenu: 
               lda PressedJoypadBits       ;check to see if the player pressed start
               and #Start_Button
               beq ChkSelect               ;if not, branch to check other buttons
@@ -13982,6 +14023,14 @@ TScrClear:   sta VRAM_Buffer-1,x
              ;jsr DrawTitleScreenStars
              inc ScreenRoutineTask      ;move onto next task
              rts
+
+ClearTopScore:
+      lda #0                   ;reset each digit back to 0
+      ldy #5
+:     sta TopScoreDisplay,y    ;clear each digit of top score
+      dey                      ;loop until done
+      bpl :-
+      jmp ResetTitle           ;reset the title screen
 
 ;-------------------------------------------------------------------------------------
 ;$00 - used to store low byte of VRAM address
@@ -14302,9 +14351,11 @@ PrintVictoryMsgsForWorld8:
          lda WorldNumber            ;branch to alt sub if doing world D messages
          cmp #WorldD
          beq PrintVictoryMsgsForWorldD
-         cpy #$03                   ;if message counter gone past a certain
+         cpy #$01                   ;stall between messages to delay music appropriately
+         beq IncVMC                 ;(TO-DO: better fix that doesn't delay "THANK YOU" message)
+         cpy #$04                   ;if message counter gone past a certain
          bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
-         cpy #$01                   ;wait for specific message to start music
+         cpy #$02                   ;wait for specific message to start music
          bne :+
          lda #VictoryMusic          ;residual code from original smb source, this will not
          sta EventMusicQueue        ;be checked due to alternate vector for sound engine
@@ -14312,10 +14363,10 @@ PrintVictoryMsgsForWorld8:
          bne GetVMID
          lda SelectedPlayer         ;check selected player
          beq GetVMID                ;if mario, use standard message offset
-         ldy #$03                   ;otherwise use alt offset for luigi
+         ldy #$04                   ;otherwise use alt offset for luigi
 GetVMID: tya
          clc
-         adc #VRAM_NT_PEACH_1ST     ;get appropriate range for victory messages
+         adc #VRAM_NT_PEACH_1ST-1   ;get appropriate range for victory messages
          jmp StoreVM                ;jump to set message ID and increment fractional
 
 PrintVictoryMsgsForWorldD:
@@ -15425,12 +15476,12 @@ CHRBankLoop:
       sta FME7Command
       lda #$00
       sta FME7Parameter
+ReturnToLoader:
       lda #FME7_IRQTimer_Ctrl     ;disable FME7 IRQ counter
       sta FME7Command
       lda #$00
       sta FME7Parameter
       cli                         ;enable IRQs
-ReturnToLoader:
       lda #LoaderBank             ;switch to loader bank
       jsr Switch16KBank
       jmp StartLoader             ;now start the game!

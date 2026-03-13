@@ -11,7 +11,7 @@ StartLoader:
         stx PPU_MASK
         dex
         txs                         ;reset stack pointer
-        ldy #WarmBootOffset         ;clear memory up to $07D6
+        ldy #ColdBootOffset         ;clear memory up to $07fe
         jsr InitializeMemory
         sta ContinueMenuSelect      ;reset menu selection
         jsr CheckSaveData
@@ -50,6 +50,7 @@ MainMenuStateMachine:
         jsr JumpEngine
 
         .word RenderMainTilemap
+        .word RenderTitleScreen
         .word PrepMenu
         .word RunMenu
         .word ScrollNewTitle
@@ -96,6 +97,30 @@ RenderMainTilemap:
         inc OperMode_Task
         rts
 
+RenderTitleScreen:
+        lda TitleScrollOffset
+        bne DrawNextFiveColumns
+        sta NameTableDestination
+        jsr WriteAttributeData
+        lda #4
+        sta TitleScrollOffset
+DrawNextFiveColumns:
+        clc
+        adc #5
+        sta $04
+        cmp #30
+        bcs DoneWithTitleScreen
+DrawTitleColumnsLoop:
+        jsr WriteTitleColumn
+        inc TitleScrollOffset
+        lda TitleScrollOffset
+        cmp $04
+        bcc DrawTitleColumnsLoop
+        rts
+DoneWithTitleScreen:
+        inc OperMode_Task
+        rts
+
 PrepMenu:
         lda #$00
         sta DisableScreenFlag
@@ -118,8 +143,6 @@ RunMenu:
         sta $00
         lda #>ContinueMenuSelect
         sta $01
-        lda ContinueMenuSelect
-        sta $03
         lda #$03
         jsr MenuSelectionLogic
         bcs CheckForSelection
@@ -138,6 +161,7 @@ UpdateMenuSelection:
         lda NameTableDestination
         eor #%00000001
         sta NameTableDestination
+        jsr WriteAttributeData
         inc OperMode_Task
 DrawMainMenuCursor:
         ldy #$01
@@ -191,17 +215,58 @@ WriteAttributeData:
         clc
         adc #4
         sta VRAM_Buffer_Offset
-        jmp SkipTitleColumn
+        rts
 
 ScrollNewTitle:
-        lda ScreenEdge_X_Pos  ; lil' hacky
-        beq WriteAttributeData
+        jsr WriteTitleColumn
+        lda TitleScrollAmount
+        bpl ScrollRight
+        eor #$ff
+        clc
+        adc #$01
+        sta $00
+        lda ScreenEdge_X_Pos
+        sec
+        sbc $00
+        sta ScreenEdge_X_Pos
+        bcs :+
+        lda ScreenEdge_PageLoc
+        eor #%00000001
+        sta ScreenEdge_PageLoc
+:       dec TitleScrollOffset
+        bpl ExitTitleScroll
+        bmi StopTitleScroll
+ScrollRight:
+        clc
+        adc ScreenEdge_X_Pos
+        sta ScreenEdge_X_Pos
+        bcc :+
+        lda ScreenEdge_PageLoc
+        eor #%00000001
+        sta ScreenEdge_PageLoc
+:       inc TitleScrollOffset
+        lda TitleScrollOffset
+        cmp #32
+        bcc ExitTitleScroll
+StopTitleScroll:
+        dec OperMode_Task
+        lda #$00
+        sta TitleScrollOffset
+ExitTitleScroll:
+        rts
+
+WriteTitleColumn:
         lda TitleScrollOffset
         cmp #4
         bcc SkipTitleColumn
         cmp #29
         bcs SkipTitleColumn
         sta $00 ; col index
+        ldy ContinueMenuSelect
+        cpy #$03
+        bne UseScrollOffset
+        lda #4
+UseScrollOffset:
         sec
         sbc #4
         ldx #$02
@@ -246,40 +311,6 @@ CopyTitleColumn:
         adc #3
         sta VRAM_Buffer_Offset
 SkipTitleColumn:
-        lda TitleScrollAmount
-        bpl ScrollRight
-        eor #$ff
-        clc
-        adc #$01
-        sta $00
-        lda ScreenEdge_X_Pos
-        sec
-        sbc $00
-        sta ScreenEdge_X_Pos
-        bcs :+
-        lda ScreenEdge_PageLoc
-        eor #%00000001
-        sta ScreenEdge_PageLoc
-:       dec TitleScrollOffset
-        bpl ExitTitleScroll
-        bmi StopTitleScroll
-ScrollRight:
-        clc
-        adc ScreenEdge_X_Pos
-        sta ScreenEdge_X_Pos
-        bcc :+
-        lda ScreenEdge_PageLoc
-        eor #%00000001
-        sta ScreenEdge_PageLoc
-:       inc TitleScrollOffset
-        lda TitleScrollOffset
-        cmp #32
-        bcc ExitTitleScroll
-StopTitleScroll:
-        dec OperMode_Task
-        lda #$00
-        sta TitleScrollOffset
-ExitTitleScroll:
         rts
 
 GameTitlePointers:
@@ -373,6 +404,7 @@ SMB2Title:
         .byte $24, $24, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6, $24, $24, $24
 
 OptionsGraphic:
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
 
 ;-------------------------------------------------------------------------------------
 
@@ -724,7 +756,25 @@ LoadIntoGame:
         jsr CopyFrictionData
         jsr CopyPaletteData
         jsr CopyDemoData
+        jsr CopyTopScoreDisplay
         jmp BootIntoGame
+
+CopyTopScoreDisplay:
+            lda CurrentGame          ;multiply game index by six for correct
+            asl                      ;index into top score table
+            sta $00
+            asl
+            clc
+            adc $00
+            tax
+            ldy #0
+LdTopScore: lda SavedTopScore,x      ;restore previously saved top score
+            sta TopScoreDisplay,y
+            inx
+            iny
+            cpy #6
+            bcc LdTopScore
+            rts
 
 CopyDemoData:
 		lda CurrentGame
