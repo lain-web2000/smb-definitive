@@ -169,7 +169,18 @@ PauseRoutine:
 ChkPauseTimer: lda GamePauseTimer     ;check if pause timer is still counting down
                beq ChkPauseState
                dec GamePauseTimer     ;if so, decrement and leave
-               rts
+               lda GamePauseTimer
+               ldy GamePauseStatus    ;if unpausing, branch
+               beq UnpausingCHR
+               cmp #33                ;load pause graphics
+               bcc ExitPause
+               sbc #33
+               jmp QueueCHRTransfer
+UnpausingCHR:  cmp #33                ;reload normal tiles
+               bcc ExitPause
+               sbc #23
+               jmp QueueCHRTransfer
+ExitPause:     rts
 
 ChkPauseState: lda GamePauseStatus    ;is game currently paused?
                lsr
@@ -191,15 +202,15 @@ NoCursor:      ldx PauseCursorIndices,y
                bpl CursorLoop
                jsr ChkStart           ;check for unpause
                lda GamePauseStatus    ;if still paused, leave
-               bne ExitPause
+               bne ExitPause2
                lda ContinueMenuSelect ;if "save & quit" chosen, return to
                cmp #$02               ;game selection menu
-               bne ExitPause
+               bne ExitPause2
                jmp ReturnToLoader
 
 ChkForPause:   jsr ChkStart           ;check for pause
                lda GamePauseStatus    ;if not paused, leave
-               beq ExitPause
+               beq ExitPause2
                jsr MoveSpritesOffscreen
                ldy #$e0               ;setup OAM for pause menu
 DrawPauseMenu: lda PauseMenuTemplate-1,y
@@ -212,8 +223,8 @@ DrawPauseMenu: lda PauseMenuTemplate-1,y
 
 ChkStart:      lda PressedJoypadBits  ;check to see if start is pressed
                and #Start_Button
-               beq ExitPause          ;if not, leave
-TogglePause:   lda #$2b               ;set pause timer
+               beq ExitPause2         ;if not, leave
+TogglePause:   lda #43                ;set pause timer
                sta GamePauseTimer
                lda GamePauseStatus
                tay
@@ -221,7 +232,7 @@ TogglePause:   lda #$2b               ;set pause timer
                sty PauseSoundQueue
                eor #%00000001         ;invert d0
                sta GamePauseStatus
-ExitPause:     rts
+ExitPause2:    rts
 
 
 ;-------------------------------------------------------------------------------------
@@ -1790,6 +1801,7 @@ StoreMusic:  lda MusicSelectData,y  ;otherwise select appropriate music for leve
              cmp AreaMusicBuffer_Alt
              beq ExitGetM           ;this check is for when low time warning is playing
              sta AreaMusicQueue     ;store in queue and leave
+             sta AreaMusicBuffer_Alt
 ExitGetM:    rts
 
 ;-------------------------------------------------------------------------------------
@@ -14798,7 +14810,7 @@ ThanksForPlayingMsg:
 
 ;-------------------------------------------------------------------------------------
 ; FIXED BANK
-.res $F000 - *, $FF
+.res $F800 - *, $FF
 
 MoveAllSpritesOffscreen:
               ldy #$00                ;this routine moves all sprites off the screen
@@ -15211,6 +15223,64 @@ WriteCHRPacket:
             bne @chklen
 @done:      lda Mirror_PPU_CTRL    ;re-enable NMI
             sta PPU_CTRL
+            lda ShadowPRGBank      ;restore original bank
+            jmp TempSwitch16KBank
+
+CHRTransfer_Src:
+      .word spr_pause, spr_pause+32, spr_pause+32*2
+      .word spr_pause+32*3, spr_pause+32*4, spr_pause+32*5
+      .word spr_pause+32*6, spr_pause+32*7, spr_pause+32*8
+      .word spr_pause+32*9
+      .word spr_main, spr_main+32, spr_main+32*2
+      .word spr_main+32*3, spr_main+32*4, spr_main+32*5
+      .word spr_main+32*6, spr_main+32*7, spr_main+32*8
+      .word spr_main+32*9
+CHRTransfer_Len:
+      .byte 32, 32, 32, 32, 32
+      .byte 32, 32, 32, 32, 32
+      .byte 32, 32, 32, 32, 32
+      .byte 32, 32, 32, 32, 32
+CHRTransfer_Dest:
+      .word $10e0, $10e0+32, $10e0+32*2, $10e0+32*3
+      .word $10e0+32*4, $10e0+32*5, $10e0+32*6, $10e0+32*7
+      .word $10e0+32*8, $10e0+32*9
+      .word $10e0, $10e0+32, $10e0+32*2, $10e0+32*3
+      .word $10e0+32*4, $10e0+32*5, $10e0+32*6, $10e0+32*7
+      .word $10e0+32*8, $10e0+32*9
+
+QueueCHRTransfer:
+            ldx VRAM_Buffer_Offset
+            tay
+            lda CHRTransfer_Len,y
+            sta VRAM_Buffer+2,x
+            sta $02
+            tya
+            asl
+            tay
+            lda CHRTransfer_Dest,y
+            sta VRAM_Buffer+1,x
+            lda CHRTransfer_Dest+1,y
+            sta VRAM_Buffer,x
+            lda CHRTransfer_Src,y
+            sta $00
+            lda CHRTransfer_Src+1,y
+            sta $01
+            lda #CHRBank          ; load CHR data bank
+            jsr TempSwitch16KBank
+            ldy #$00
+QueueCHRLoop:
+            lda ($00),y
+            sta VRAM_Buffer+3,x
+            inx
+            iny
+            cpy $02
+            bcc QueueCHRLoop
+            lda #$00
+            sta VRAM_Buffer+3,x
+            txa
+            clc
+            adc #3
+            sta VRAM_Buffer_Offset
             lda ShadowPRGBank      ;restore original bank
             jmp TempSwitch16KBank
 

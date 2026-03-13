@@ -21,6 +21,8 @@ bg_title:
 .incbin "chr/bg_title.chr"
 spr_main:
 .incbin "chr/spr_main.chr"
+spr_pause:
+.incbin "chr/spr_pause.chr"
 
 ; loader tile data
 bg_border:
