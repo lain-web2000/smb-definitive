@@ -2,7 +2,8 @@
 .org $8000
 
 NameTableDestination = $08
-TitleOffset = $0a
+TitleScrollOffset = $0a
+TitleScrollAmount = $0b
 
 StartLoader:
         ldx #$00                    ;disable NMIs and rendering
@@ -51,6 +52,7 @@ MainMenuStateMachine:
         .word RenderMainTilemap
         .word PrepMenu
         .word RunMenu
+        .word ScrollNewTitle
         .word LoadIntoGame
 
 SubMenuStateMachine:
@@ -112,22 +114,31 @@ MenuCursorX:
   .byte $27, $27, $27, $27
 
 RunMenu:
-        lda SelectTimer
-        bne ScrollNewTitle
         lda #<ContinueMenuSelect
         sta $00
         lda #>ContinueMenuSelect
         sta $01
+        lda ContinueMenuSelect
+        sta $03
         lda #$03
         jsr MenuSelectionLogic
         bcs CheckForSelection
+        cpx #$00
         bne UpdateMenuSelection
         rts
 UpdateMenuSelection:
-        inc SelectTimer
+        ldy #$08
+        lda #0
+        cpx #$02
+        beq :+
+        ldy #$f8
+        lda #31
+:       sty TitleScrollAmount
+        sta TitleScrollOffset
         lda NameTableDestination
         eor #%00000001
         sta NameTableDestination
+        inc OperMode_Task
 DrawMainMenuCursor:
         ldy #$01
 :       lda MenuCursorData,y     ;set up cursor sprite tile, attribute
@@ -153,73 +164,122 @@ DoSelection:
         cmp #$03
         bne :+
         inc OperMode
-        lda #$ff
+        lda #$fe
         sta OperMode_Task
 :       inc OperMode_Task
+        inc OperMode_Task
         rts
 
-ScrollNewTitle:
-        lda HorizontalScroll
+WriteAttributeData:
+        ldx VRAM_Buffer_Offset
+        lda NameTableDestination
+        asl
+        asl
         clc
-        adc #$08
-        sta HorizontalScroll
-        bne :+
-        lda NameTableSelect
-        eor #%00000001
-        sta NameTableSelect
-:       lda ContinueMenuSelect
+        adc #$23
+        sta VRAM_Buffer,x
+        lda #$d8
+        sta VRAM_Buffer+1,x
+        lda #$40+32
+        sta VRAM_Buffer+2,x
+        ldy #32
+        lda #$55
+        sta VRAM_Buffer+3,x
+        lda #$00
+        sta VRAM_Buffer+4,x
+        txa
+        clc
+        adc #4
+        sta VRAM_Buffer_Offset
+        jmp SkipTitleColumn
+
+ScrollNewTitle:
+        lda ScreenEdge_X_Pos  ; lil' hacky
+        beq WriteAttributeData
+        lda TitleScrollOffset
+        cmp #4
+        bcc SkipTitleColumn
+        cmp #29
+        bcs SkipTitleColumn
+        sta $00 ; col index
+        sec
+        sbc #4
+        ldx #$02
+        ldy #4
+        jsr MultByPow2
+        lda ContinueMenuSelect
         asl
         tax
         lda GameTitlePointers,x
         clc
-        adc TitleOffset
-        sta $00
-        lda GameTitlePointers+1,x
-        adc TitleOffset+1
-        sta $01
-
-        ldy #$00
-        lda ($00),y
+        adc $02
         sta $02
-        clc
-        adc TitleOffset
-        sta TitleOffset
-        lda TitleOffset+1
-        adc #0
-        sta TitleOffset+1
-        lda $02
-        cmp #1
-        beq NoColumn
-        iny
-        ldx VRAM_Buffer_Offset
-        stx $03
-:       lda ($00),y
-        sta VRAM_Buffer,x
-        inx
-        iny
-        cpy $02
-        bcc :-
-        lda #$00
-        sta VRAM_Buffer,x
-        stx VRAM_Buffer_Offset
-        ldx $03
+        lda GameTitlePointers+1,x
+        adc $03
+        sta $03
         lda NameTableDestination
         asl
         asl
-        sta $03
-        lda VRAM_Buffer,x
-        ora $03
+        sta $01 ; nt << 2
+        ldx VRAM_Buffer_Offset
+        lda #$80
+        clc
+        adc $00
+        sta VRAM_Buffer+1,x
+        lda #$21
+        adc $01
         sta VRAM_Buffer,x
-
-NoColumn:
-        inc SelectTimer
-        lda SelectTimer
-        cmp #33
-        bne :+
+        lda #$80+16
+        sta VRAM_Buffer+2,x
+        ldy #$00
+CopyTitleColumn:
+        lda ($02),y
+        sta VRAM_Buffer+3,x
+        inx
+        iny
+        cpy #16
+        bcc CopyTitleColumn
         lda #$00
-        sta TitleOffset
-        sta TitleOffset+1
-:       sta SelectTimer
+        sta VRAM_Buffer+3,x
+        txa
+        clc
+        adc #3
+        sta VRAM_Buffer_Offset
+SkipTitleColumn:
+        lda TitleScrollAmount
+        bpl ScrollRight
+        eor #$ff
+        clc
+        adc #$01
+        sta $00
+        lda ScreenEdge_X_Pos
+        sec
+        sbc $00
+        sta ScreenEdge_X_Pos
+        bcs :+
+        lda ScreenEdge_PageLoc
+        eor #%00000001
+        sta ScreenEdge_PageLoc
+:       dec TitleScrollOffset
+        bpl ExitTitleScroll
+        bmi StopTitleScroll
+ScrollRight:
+        clc
+        adc ScreenEdge_X_Pos
+        sta ScreenEdge_X_Pos
+        bcc :+
+        lda ScreenEdge_PageLoc
+        eor #%00000001
+        sta ScreenEdge_PageLoc
+:       inc TitleScrollOffset
+        lda TitleScrollOffset
+        cmp #32
+        bcc ExitTitleScroll
+StopTitleScroll:
+        dec OperMode_Task
+        lda #$00
+        sta TitleScrollOffset
+ExitTitleScroll:
         rts
 
 GameTitlePointers:
@@ -229,140 +289,90 @@ GameTitlePointers:
         .word OptionsGraphic
 
 SMBCompleteTitle:
-        .byte 5, $23, $d8, $40+32, $55
-        .byte 1
-        .byte 1
-        .byte 5, $21, $84, $c0+15, $24
-        .byte 19, $21, $85, $80+15, $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4
-        .byte 19, $21, $86, $80+15, $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9
-        .byte 19, $21, $87, $80+15, $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $ef, $e8, $eb, $e8, $db
-        .byte 19, $21, $88, $80+15, $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9
-        .byte 19, $21, $89, $80+15, $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $ef, $df, $f2, $e7, $da
-        .byte 19, $21, $8a, $80+15, $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $ef, $de, $e9, $e9, $d7
-        .byte 19, $21, $8b, $80+15, $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $f6, $f2, $e9, $d7
-        .byte 19, $21, $8c, $80+15, $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $ef, $df, $f2, $e9, $d7
-        .byte 19, $21, $8d, $80+15, $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $ef, $ec, $e9, $e9, $d7
-        .byte 19, $21, $8e, $80+15, $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $e4, $df, $e7, $f0, $d5
-        .byte 19, $21, $8f, $80+15, $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $e5, $e6, $e9, $e2, $d9
-        .byte 19, $21, $90, $80+15, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e8, $db
-        .byte 19, $21, $91, $80+15, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9
-        .byte 19, $21, $92, $80+15, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $f0, $e8, $ea, $e8, $db
-        .byte 19, $21, $93, $80+15, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $ec, $fb, $fd, $dc
-        .byte 19, $21, $94, $80+15, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $ef, $e8, $fc, $fe, $dd
-        .byte 19, $21, $95, $80+15, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $e4, $de, $e9, $e2, $d9
-        .byte 19, $21, $96, $80+15, $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $e5, $e8, $ea, $e8, $db
-        .byte 19, $21, $97, $80+15, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $e4, $5d, $5d, $5d, $d5
-        .byte 19, $21, $98, $80+15, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $e5, $5d, $5d, $5d, $d5
-        .byte 19, $21, $99, $80+15, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $ef, $5d, $5d, $5d, $d5
-        .byte 19, $21, $9a, $80+15, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6
-        .byte 5, $21, $9b, $c0+15, $24
-        .byte 5, $21, $9c, $c0+15, $24
-        .byte 1
-        .byte 1
-        .byte 1
-        .byte 1
+        ;.byte 5, $23, $d8, $40+32, $55
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4, $24
+        .byte $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9, $24
+        .byte $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $ef, $e8, $eb, $e8, $db, $24
+        .byte $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9, $24
+        .byte $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $ef, $df, $f2, $e7, $da, $24
+        .byte $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $ef, $de, $e9, $e9, $d7, $24
+        .byte $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $f6, $f2, $e9, $d7, $24
+        .byte $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $ef, $df, $f2, $e9, $d7, $24
+        .byte $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $ef, $ec, $e9, $e9, $d7, $24
+        .byte $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $e4, $df, $e7, $f0, $d5, $24
+        .byte $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $e5, $e6, $e9, $e2, $d9, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e8, $db, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $de, $e9, $e2, $d9, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $f0, $e8, $ea, $e8, $db, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $ef, $ec, $fb, $fd, $dc, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $ef, $e8, $fc, $fe, $dd, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $e4, $de, $e9, $e2, $d9, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $e5, $e8, $ea, $e8, $db, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $e4, $5d, $5d, $5d, $d5, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $e5, $5d, $5d, $5d, $d5, $24
+        .byte $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $ef, $5d, $5d, $5d, $d5, $24
+        .byte $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
 
 SMB1Title:
-        .byte 5, $23, $d8, $40+32, $55
-        .byte 1
-        .byte 1
-        .byte 5, $21, $84, $c0+15, $24
-        .byte 19, $21, $85, $80+15, $24, $24, $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4, $24, $24
-        .byte 19, $21, $86, $80+15, $24, $24, $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $87, $80+15, $24, $24, $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $88, $80+15, $24, $24, $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $89, $80+15, $24, $24, $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $d7, $24, $24
-        .byte 19, $21, $8a, $80+15, $24, $24, $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $d7, $24, $24
-        .byte 19, $21, $8b, $80+15, $24, $24, $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $8c, $80+15, $24, $24, $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $d7, $24, $24
-        .byte 19, $21, $8d, $80+15, $24, $24, $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $8e, $80+15, $24, $24, $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $d9, $24, $24
-        .byte 19, $21, $8f, $80+15, $24, $24, $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $da, $24, $24
-        .byte 19, $21, $90, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24
-        .byte 19, $21, $91, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $92, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $d8, $24, $24
-        .byte 19, $21, $93, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $94, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $d7, $24, $24
-        .byte 19, $21, $95, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $d9, $24, $24
-        .byte 19, $21, $96, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $da, $24, $24
-        .byte 19, $21, $97, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $d9, $24, $24
-        .byte 19, $21, $98, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $da, $24, $24
-        .byte 19, $21, $99, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $d7, $24, $24
-        .byte 19, $21, $9a, $80+15, $24, $24, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6, $24, $24
-        .byte 5, $21, $9b, $c0+15, $24
-        .byte 5, $21, $9c, $c0+15, $24
-        .byte 1
-        .byte 1
-        .byte 1
-        .byte 1
+        ;.byte 5, $23, $d8, $40+32, $55
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4, $24, $24, $24
+        .byte $24, $24, $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $d9, $24, $24, $24
+        .byte $24, $24, $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $da, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $d8, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $d9, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $da, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $d9, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $da, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $d7, $24, $24, $24
+        .byte $24, $24, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
 
 SMB2Title:
-        .byte 36, $23, $d8, 32, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $d5, $55, $55, $55, $55, $55, $55, $55, $dd, $55, $55, $55, $55, $55, $55, $55, $55, $55
-        .byte 1
-        .byte 1
-        .byte 19, $21, $84, $80+15, $24, $24, $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4, $24, $24
-        .byte 19, $21, $85, $80+15, $24, $24, $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $86, $80+15, $24, $24, $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $87, $80+15, $24, $24, $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $88, $80+15, $24, $24, $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $d7, $24, $24
-        .byte 19, $21, $89, $80+15, $24, $24, $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $d7, $24, $24
-        .byte 19, $21, $8a, $80+15, $24, $24, $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $8b, $80+15, $24, $24, $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $d7, $24, $24
-        .byte 19, $21, $8c, $80+15, $24, $24, $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $8d, $80+15, $24, $24, $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $d9, $24, $24
-        .byte 19, $21, $8e, $80+15, $24, $24, $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $da, $24, $24
-        .byte 19, $21, $8f, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24
-        .byte 19, $21, $90, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $91, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $d8, $24, $24
-        .byte 19, $21, $92, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24
-        .byte 19, $21, $93, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $d7, $24, $24
-        .byte 19, $21, $94, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $d9, $24, $24
-        .byte 19, $21, $95, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $da, $24, $24
-        .byte 19, $21, $96, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $d9, $24, $24
-        .byte 19, $21, $97, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $da, $24, $24
-        .byte 19, $21, $98, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $d7, $24, $24
-        .byte 19, $21, $99, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24
-        .byte 19, $21, $9a, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $f7, $f9, $ec, $d7, $24, $24
-        .byte 19, $21, $9b, $80+15, $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f8, $fa, $e8, $db, $24, $24
-        .byte 19, $21, $9c, $80+15, $24, $24, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6, $24, $24
-        .byte 1
-        .byte 1
-        .byte 1
-        .byte 1
+        ;.byte 36, $23, $d8, 32, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $d5, $55, $55, $55, $55, $55, $55, $55, $dd, $55, $55, $55, $55, $55, $55, $55, $55, $55
+        .byte $24, $24, $cf, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d2, $d4, $24, $24, $24
+        .byte $24, $24, $d0, $de, $e0, $e2, $e4, $de, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $df, $e1, $e3, $e5, $f6, $f2, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $e6, $e9, $e2, $e4, $df, $f2, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $e6, $e9, $e7, $e5, $de, $e9, $e9, $ec, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $ec, $e9, $e9, $ef, $df, $f2, $e9, $f5, $f2, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $df, $e7, $f0, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $de, $e9, $e2, $e4, $df, $f2, $ed, $ee, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $e8, $ea, $e8, $eb, $e6, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $ec, $e9, $e9, $ef, $de, $e9, $e9, $e9, $e2, $d9, $24, $24, $24
+        .byte $24, $24, $d0, $df, $ed, $ee, $ef, $df, $f2, $e9, $e9, $e7, $da, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e7, $d8, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $ec, $e9, $e9, $e9, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $ed, $ee, $e9, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e9, $e9, $e2, $d9, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $e9, $e9, $e7, $da, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $e0, $f4, $e2, $d9, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f3, $f1, $e7, $da, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $e6, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $5d, $d5, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $de, $e9, $f7, $f9, $ec, $d7, $24, $24, $24
+        .byte $24, $24, $d0, $5d, $5d, $5d, $5d, $df, $f2, $f8, $fa, $e8, $db, $24, $24, $24
+        .byte $24, $24, $d1, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d3, $d6, $24, $24, $24
 
 OptionsGraphic:
-        .byte 1
-        .byte 1
-        .byte 1
-        .byte 5, $21, $84, $c0+15, $24
-        .byte 5, $21, $85, $c0+15, $24
-        .byte 5, $21, $86, $c0+15, $24
-        .byte 5, $21, $87, $c0+15, $24
-        .byte 5, $21, $88, $c0+15, $24
-        .byte 5, $21, $89, $c0+15, $24
-        .byte 5, $21, $8a, $c0+15, $24
-        .byte 5, $21, $8b, $c0+15, $24
-        .byte 5, $21, $8c, $c0+15, $24
-        .byte 5, $21, $8d, $c0+15, $24
-        .byte 5, $21, $8e, $c0+15, $24
-        .byte 5, $21, $8f, $c0+15, $24
-        .byte 5, $21, $90, $c0+15, $24
-        .byte 5, $21, $91, $c0+15, $24
-        .byte 5, $21, $92, $c0+15, $24
-        .byte 5, $21, $93, $c0+15, $24
-        .byte 5, $21, $94, $c0+15, $24
-        .byte 5, $21, $95, $c0+15, $24
-        .byte 5, $21, $96, $c0+15, $24
-        .byte 5, $21, $97, $c0+15, $24
-        .byte 5, $21, $98, $c0+15, $24
-        .byte 5, $21, $99, $c0+15, $24
-        .byte 5, $21, $9a, $c0+15, $24
-        .byte 5, $21, $9b, $c0+15, $24
-        .byte 5, $21, $9c, $c0+15, $24
-        .byte 1
-        .byte 1
-        .byte 1
-        .byte 1
 
 ;-------------------------------------------------------------------------------------
 
@@ -506,7 +516,8 @@ AdvanceOption:
         lda ContinueMenuSelect
 RenderOptionNum:
         ldx #$02
-        jsr MultBy32
+        ldy #5
+        jsr MultByPow2
         lda #$b9
         clc
         adc $02
@@ -571,22 +582,17 @@ Palette3InRange:
 ;-------------------------------------------------------------------------------------
 ; HELPER FUNCTIONS
 
-; A: multiplicand to be multiplied by 32
+; A: multiplicand to be multiplied by 2^Y
 ; X: location of 16-bit product in zero page
-MultBy32:
+; Y; exponent of multiplier 2^Y
+MultByPow2:
     sta $00,x
     lda #$00
     sta $01,x
-    asl $00,x
+:   asl $00,x
     rol $01,x
-    asl $00,x
-    rol $01,x
-    asl $00,x
-    rol $01,x
-    asl $00,x
-    rol $01,x
-    asl $00,x
-    rol $01,x
+    dey
+    bne :-
     rts
 
 BaseTextbox:
@@ -609,7 +615,8 @@ DrawArbitraryTextbox:
         pha
         ldx #$02
         tya
-        jsr MultBy32
+        ldy #5
+        jsr MultByPow2
         pla
         clc
         adc $02
@@ -646,7 +653,8 @@ DrawArbitraryTextbox:
         inc $01
         ldx #$04
         lda $01
-        jsr MultBy32
+        ldy #5
+        jsr MultByPow2
         ; set top left corner and top border
         lda $02
         sta VRAM_Buffer+1

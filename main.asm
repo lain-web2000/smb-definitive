@@ -142,8 +142,7 @@ CheckInvalidWorldNum:
             jsr TerminateGame
 ExecutionTree:
             jsr OperModeExecutionTree ;run one of the program's four modes
-WaitForIRQ: lda IRQAckFlag            ;wait for IRQ (TO-DO: is this necessary?)
-            bne WaitForIRQ
+WaitForIRQ: lda #$00
             sta NMIAckFlag            ;clear NMI flag and wait for next NMI
             jmp WaitForNMI
 
@@ -768,8 +767,6 @@ IncSubtask:
       rts
 
 DisplayIntermediate:
-               lda #$00
-               sta NameTableSelect          ;we need to reset nametable unlike super mario bros 1
                lda OperMode                 ;check primary mode of operation
                beq NoInter                  ;if in attract mode, do not display intermediate screens
                cmp #GameOverMode            ;are we in game over mode?
@@ -1707,9 +1704,6 @@ ClearVRLoop: sta VRAM_Buffer-1,y       ;clear buffer at $0300-$03ff
              sta BackloadingFlag       ;clear value here
              lda #$ff
              sta BalPlatformAlignment  ;initialize balance platform assignment flag
-             lda ScreenLeft_PageLoc    ;get left side page location
-             and #$01
-             sta NameTableSelect
              jsr GetAreaMusic
              lda #$38                  ;load sprite shuffle amounts to be used later
              sta SprShuffleAmt+2
@@ -1751,6 +1745,8 @@ ChkAreaType: ldy AreaType           ;load area type as offset for music bit
 StoreMusic:  lda MusicSelectData,y  ;otherwise select appropriate music for level type
              cmp AreaMusicBuffer    ;leave if music to be queued is already playing
              beq ExitGetM
+             cmp AreaMusicBuffer_Alt
+             beq ExitGetM           ;this check is for when low time warning is playing
              sta AreaMusicQueue     ;store in queue and leave
 ExitGetM:    rts
 
@@ -3517,8 +3513,6 @@ ChkNearMid: lda Player_Pos_ForScroll
             ldy Player_X_Scroll       ;otherwise get original value undecremented
 
 ScrollScreen:
-              lda IRQAckFlag
-              bne ScrollScreen           ;loop if IRQ has not yet happened
               tya
               sta ScrollAmount           ;save value here
               clc
@@ -3528,12 +3522,9 @@ ScrollScreen:
               clc
               adc ScreenLeft_X_Pos       ;add to left side coordinate
               sta ScreenLeft_X_Pos       ;save as new left side coordinate
-              sta HorizontalScroll       ;save here also
               lda ScreenLeft_PageLoc
               adc #$00                   ;add carry to page location for left
               sta ScreenLeft_PageLoc     ;side of the screen
-              and #$01                   ;get LSB of page location
-              sta NameTableSelect        ;save as name table select for later use
               jsr GetScreenPosition
               lda #$08
               jmp ChkPOffscr             ;skip this part
@@ -4605,9 +4596,10 @@ Bubble_MForceData:
 BubbleTimerData:
       .byte $40, $20
 
+;-------------------------------------------------------------------------------------
+
 GameTimerSpeedData:
       .byte 24, 21, 18
-;-------------------------------------------------------------------------------------
 
 RunGameTimer:
            lda OperMode               ;get primary mode of operation
@@ -6820,9 +6812,10 @@ NoBowser: dey                   ;loop until all slots are checked
 
 CreateBowser:
       jsr DuplicateEnemyObj     ;jump to create another bowser object
-      bcc :+                    ;if free slot was found, initialize bowser
+      bcc SetupBowser           ;if free slot was found, initialize bowser
       jmp EraseEnemyObject      ;otherwise erase object
-:     stx BowserFront_Offset    ;save offset of first here
+SetupBowser:
+      stx BowserFront_Offset    ;save offset of first here
       lda #$00
       sta BowserBodyControls    ;initialize bowser's body controls
       sta BridgeCollapseOffset  ;and bridge collapse offset
@@ -8018,7 +8011,7 @@ FirebarTblOffsets:
       .byte $36, $3f, $48, $51, $5a, $63
 
 FirebarYPos:
-      .byte $0c, $18
+      .byte $06, $0f, $18
 
 ProcFirebar:
           jsr GetEnemyOffscreenBits   ;get offscreen information
@@ -8131,15 +8124,14 @@ FirebarCollision:
          lda PlayerSize           ;get player's size
          bne AdjSm                ;if player small, branch to alter variables
          lda CrouchingFlag
-         beq BigJp                ;if player big and not crouching, jump ahead
+         beq FBCLoop              ;if player big and not crouching, jump ahead
 AdjSm:   inc $05                  ;if small or big but crouching, execute this part
-         inc $05                  ;first increment our counter twice (setting $02 as flag)
-         tya
-         clc                      ;then add 24 pixels to the player's
-         adc #$18                 ;vertical coordinate
-         tay
-BigJp:   tya                      ;get vertical coordinate, altered or otherwise, from Y
-FBCLoop: sec                      ;subtract vertical position of firebar
+         inc $05                  ;increment our counter twice (setting $02 as flag)
+FBCLoop: ldy $05                  ;get temp here and use as offset
+         lda Player_Y_Position
+         clc
+         adc FirebarYPos,y        ;add value loaded with offset to player's vertical coordinate
+         sec                      ;subtract vertical position of firebar
          sbc $07                  ;from the vertical coordinate of the player
          bpl ChkVFBD              ;if player lower on the screen than firebar,
          eor #$ff                 ;skip two's compliment part
@@ -8162,15 +8154,11 @@ ChkVFBD: cmp #$08                 ;if difference => 8 pixels, skip ahead of this
          adc #$01
 ChkFBCl: cmp #$08                 ;if difference < 8 pixels, collision, thus branch
          bcc DmgPlyr              ;to process
-Chk2Ofs: lda $05                  ;if value of $02 was set earlier for whatever reason,
-         cmp #$02                 ;branch to increment OAM offset and leave, no collision
-         beq NoColFB
-         ldy $05                  ;otherwise get temp here and use as offset
-         lda Player_Y_Position
-         clc
-         adc FirebarYPos,y        ;add value loaded with offset to player's vertical coordinate
-         inc $05                  ;then increment temp and jump back
-         jmp FBCLoop
+Chk2Ofs: lda $05                  ;if value of $02 was set earlier, no collision,
+         cmp #$02                 ;branch to increment OAM offset and leave
+         bcs NoColFB
+         inc $05                  ;otherwise increment temp and branch back
+         bne FBCLoop
 DmgPlyr: lda $00                  ;save value written to $00 to stack
          pha
          jsr InjurePlayer         ;perform sub to hurt or kill player
@@ -9552,6 +9540,9 @@ PlayerHammerCollision:
         lda FrameCounter          ;get frame counter
         lsr                       ;shift d0 into carry
         bcc ExPHC                 ;branch to leave if d0 not set to execute every other frame
+        lda GameEngineSubroutine
+        cmp #$08                  ;if not set to run player control routine
+        bne ExPHC                 ;on next frame, branch to leave
         lda Player_OffscreenBits  ;if player offscreen bits, master timer control
         ora TimerControl          ;or any offscreen bits for hammer are set
         ora Misc_OffscreenBits    ;then branch to leave
@@ -10209,13 +10200,13 @@ ValidPlatformCollision:
 
 PlatformSideCollisions:
          lda #$01                   ;set value here to indicate possible horizontal
-         sta $00                    ;collision on left side of platform
+         sta $ed                    ;collision on left side of platform
          lda BoundingBox_DR_XPos    ;get difference by subtracting platform's left edge
          sec                        ;from player's right edge
          sbc BoundingBox_UL_XPos,y
          cmp #$08                   ;if difference close enough, skip all of this
          bcc SideC
-         inc $00                    ;otherwise increment value set here for right side collision
+         inc $ed                    ;otherwise increment value set here for right side collision
          lda BoundingBox_DR_XPos,y  ;get difference by subtracting player's left edge
          clc                        ;from platform's right edge
          sbc BoundingBox_UL_XPos
@@ -10286,6 +10277,8 @@ GetEnemyBoundBoxOfsArg:
 ;$00-$01 - used to hold many values, essentially temp variables
 ;$04 - holds lower nybble of vertical coordinate from block buffer routine
 ;$eb - used to hold block buffer adder
+;$ec - holds block buffer index for loop iteration
+;$ed - holds loop count for foot and side collision
 
 PlayerBGUpperExtent:
       .byte $20, $10
@@ -10375,15 +10368,15 @@ DoFootCheck:
       sta $01                    ;save bottom left metatile here
       jsr BlockBufferColli_Feet  ;do player-to-bg collision detection on bottom right of player
       sta $00                    ;save bottom right metatile here
-      ldy $eb                    ;set temp block buffer adder offset
+      ldy $eb                    ;set block buffer index
       sty $ec
       lda #$02                   ;set value here to be used as counter
       sta $ed
 
 FootCheckLoop:
-       ldy $ec                   ;get temp block buffer adder offset
+       ldy $ec                   ;get block buffer index
        jsr BlockBufferColli_Feet ;do player-to-bg collision detection on one foot
-       sty $ec                   ;update temp block buffer adder offset
+       sty $ec                   ;update block buffer index
        bne ChkFootMTile          ;if something found, branch
 NFoot: dec $ed                   ;otherwise decrement counter
        bne FootCheckLoop         ;run code until both feet of player are checked
@@ -10411,7 +10404,7 @@ ContChk:  jsr ChkInvisibleMTiles     ;do sub to check for hidden coin or 1-up bl
           cpy #$05                   ;from collision detection routine
           bcc LandPlyr               ;if lower nybble < 5, branch
           lda Player_MovingDir
-          sta $00                    ;use player's moving direction as temp variable
+          sta $ed                    ;use player's moving direction as temp variable
           jmp ImpedePlayerMove       ;jump to impede player's movement in that direction
 LandPlyr: jsr ChkForLandJumpSpring   ;do sub to check for jumpspring metatiles and deal with it
           lda #$f0
@@ -10428,15 +10421,15 @@ InitSteP: lda #$00
 DoPlayerSideCheck:
       ldy $eb       ;get block buffer adder offset
       iny
-      sty $eb                   ;store it
+      sty $ec       ;set block buffer offset
       lda #$02      ;set value here to be used as counter
-      sta $ec
+      sta $ed
 
 SideCheckLoop:
-       ldy $eb       ;get block buffer adder offset
+       ldy $ec                   ;get block buffer index
        iny
        iny                       ;move onto the next one
-       sty $eb                   ;store it
+       sty $ec                   ;store it
        lda Player_Y_Position
        cmp #$18                  ;check player's vertical position
        bcc BHalf                 ;if player is in status bar area, branch ahead to skip this part
@@ -10448,14 +10441,14 @@ SideCheckLoop:
        beq BHalf                 ;if collided with water pipe (top), branch ahead
        jsr CheckForClimbMTiles   ;do sub to see if player bumped into anything climbable
        bcc CheckSideMTiles       ;if not, branch to alternate section of code
-BHalf: ldy $eb                   ;load block adder offset
+BHalf: ldy $ec                   ;load block adder offset
        iny                       ;increment it
        lda Player_Y_Position     ;get player's vertical position
        cmp #$08
        bcc ExSCH                 ;if too high, branch to leave
        jsr BlockBufferColli_Side ;do player-to-bg collision detection on other half of player
        bne CheckSideMTiles       ;if something found, branch
-NSide: dec $ec                   ;otherwise decrement counter
+NSide: dec $ed                   ;otherwise decrement counter
        bne SideCheckLoop         ;run code until both sides of player are checked
 ExSCH: rts                       ;leave
 
@@ -10508,7 +10501,7 @@ ChkGERtn: lda GameEngineSubroutine   ;get number of game engine routine running
           bne ExCSM
           lda #$02
           sta GameEngineSubroutine   ;otherwise set sideways pipe entry routine to run
-          rts                        ;and leave
+ExCSM:    rts                        ;and leave
 
 ;--------------------------------
 ;$02 - high nybble of vertical coordinate from block buffer
@@ -10516,8 +10509,7 @@ ChkGERtn: lda GameEngineSubroutine   ;get number of game engine routine running
 ;$06-$07 - block buffer address
 
 StopPlayerMove:
-       jsr ImpedePlayerMove      ;stop player's movement
-ExCSM: rts                       ;leave
+       jmp ImpedePlayerMove      ;stop player's movement
 
 AreaChangeTimerData:
       .byte $a0, $34
@@ -10658,7 +10650,7 @@ ExCInvT: rts            ;leave with zero flag set if any of these found
 
 ;--------------------------------
 ;$00-$01 - used to hold bottom right and bottom left metatiles (in that order)
-;$00 - used as flag by ImpedePlayerMove to restrict specific movement
+;$ed - used as flag by ImpedePlayerMove to restrict specific movement
 
 ChkForLandJumpSpring:
         jsr ChkJumpspringMetatiles  ;do sub to check if player landed on jumpspring
@@ -10708,7 +10700,7 @@ HandlePipeEntry:
 ExPipeE:  rts                       ;leave!!!
 
 WarpZoneHandler:
-		  lda WarpZoneControl
+          lda WarpZoneControl       ;load warp zone index
           ldy LevelSet              ;are we in SMB1?
           beq SMB1WarpZoneHandler   ;if so, use all stars warp-zone handler
           and #%00001111            ;mask bits
@@ -10777,7 +10769,7 @@ CalculateWarpPipeOffset:
 ImpedePlayerMove:
        lda #$00                  ;initialize value here
        ldy Player_X_Speed        ;get player's horizontal speed
-       ldx $00                   ;check value set earlier for
+       ldx $ed                   ;check value set earlier for
        dex                       ;left side collision
        bne RImpd                 ;if right side collision, skip this part
        inx                       ;return value to X
@@ -10796,12 +10788,12 @@ NXSpd: ldy #$10
        cmp #$00                  ;if value set in A not set to $ff,
        bpl PlatF                 ;branch ahead, do not decrement Y
        dey                       ;otherwise decrement Y now
-PlatF: sty $00                   ;store Y as high bits of horizontal adder
+PlatF: sty $ed                   ;store Y as high bits of horizontal adder
        clc
        adc Player_X_Position     ;add contents of A to player's horizontal
        sta Player_X_Position     ;position to move player left or right
        lda Player_PageLoc
-       adc $00                   ;add high bits and carry to
+       adc $ed                   ;add high bits and carry to
        sta Player_PageLoc        ;page location if necessary
 ExIPM: txa                       ;invert contents of X
        eor #$ff
@@ -13910,6 +13902,8 @@ DrawWorldLevel:
              clc
              adc #$06
              sta VRAM_Buffer_Offset
+             lda #$18             ;set demo timer
+             sta DemoTimer
 NoWorldLevelSel:
              rts
 
@@ -14308,7 +14302,7 @@ PrintVictoryMsgsForWorld8:
          lda WorldNumber            ;branch to alt sub if doing world D messages
          cmp #WorldD
          beq PrintVictoryMsgsForWorldD
-         cpy #$04                   ;if message counter gone past a certain
+         cpy #$03                   ;if message counter gone past a certain
          bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
          cpy #$01                   ;wait for specific message to start music
          bne :+
@@ -14318,7 +14312,7 @@ PrintVictoryMsgsForWorld8:
          bne GetVMID
          lda SelectedPlayer         ;check selected player
          beq GetVMID                ;if mario, use standard message offset
-         ldy #$04                   ;otherwise use alt offset for luigi
+         ldy #$03                   ;otherwise use alt offset for luigi
 GetVMID: tya
          clc
          adc #VRAM_NT_PEACH_1ST     ;get appropriate range for victory messages
@@ -14608,17 +14602,14 @@ NextMRet:
 ;-------------------------------------------------------------------------------------
 
 TheKingdomIsSavedMsg:
-    .byte $25, $c5, 21
+    .byte $25, $c6, 21
     .byte "THE KINGDOM IS SAVED!"
     .byte $00
 
-NowTryAMoreMsg:
-    .byte $26, $05, 14
+NowTryAMoreDifficultQuestMsg:
+    .byte $26, $06, 14
     .byte "NOW TRY A MORE"
-    .byte $00
-
-DifficultQuestMsg:
-    .byte $26, $45, 18
+    .byte $26, $46, 18
     .byte "DIFFICULT QUEST..."
     .byte $00
 
@@ -14627,7 +14618,8 @@ FinalRoomPalette:
     .byte $0f, $0f, $0f, $0f, $0f, $30, $10, $00
     .byte $0f, $21, $12, $02, $0f, $27, $17, $00
 
-    .byte $23, $c0, $50, $55
+    .byte $23, $c0, $48, $55
+    .byte $23, $c2, $01, $d5
     .byte $27, $d0, $58, $aa
     .byte $00
 
@@ -14646,7 +14638,7 @@ LuigiThankYouMsgFinal:
     .byte $00
 
 HurrahToOurHeroMsg:
-    .byte $26, $06, 19
+    .byte $26, $07, 19
     .byte "HURRAH TO OUR HERO,"
     .byte $00
 
@@ -14965,9 +14957,12 @@ PrepZeroPage:
 ; $00-$01: pointer to selection index
 ; Returns with carry set if user backed out of menu or made selection,
 ; returns with carry clear if not.
-; Returns with A = 0x00 if user changed selection, A != 0x00 if not.
+; Returns with X == 0x00 if user did not change selection,
+; X == 0x01 if user selected the previous option, and X == 0x02
+; if user selected the next option.
 MenuSelectionLogic:
         sta $02
+        ldx #$00
         lda PressedJoypadBits
         and #Start_Button+B_Button+A_Button
         bne CloseMenu
@@ -14977,11 +14972,13 @@ MenuSelectionLogic:
         lda PressedJoypadBits
         and #Down_Dir+Select_Button
         beq :+
+        ldx #$02
         iny
         bne CheckValidSelection
 :       lda PressedJoypadBits
         and #Up_Dir
         beq NoMenuAction
+        ldx #$01
         dey
 CheckValidSelection:
         lda $02
@@ -15000,7 +14997,6 @@ NoMenuAction:
         clc
         rts
 CloseMenu:
-        lda #$00
         sec
         rts
 
@@ -15255,8 +15251,7 @@ VRAM_AddrTable:
    ;end-of-castle messages for 1st princess
    .word MarioThankYouMsg
    .word TheKingdomIsSavedMsg
-   .word NowTryAMoreMsg
-   .word DifficultQuestMsg
+   .word NowTryAMoreDifficultQuestMsg
    .word LuigiThankYouMsg
 
    ;end-of-castle messages for 2nd princess
@@ -15363,7 +15358,12 @@ ScrnSwch:
 :     sta VRAM_Buffer_AddrCtrl
       lda Mirror_PPU_MASK
       sta PPU_MASK              ;dump PPU control register 2
-      jsr ReadJoypads
+      lda ScreenEdge_PageLoc    ;update IRQ scroll position
+      and #$01
+      sta NameTableSelect
+      lda ScreenEdge_X_Pos
+      sta HorizontalScroll
+      jsr ReadJoypads           ;read controllers
       pla                       ;restore zero page RAM
       sta $01
       pla
