@@ -203,9 +203,11 @@ NoCursor:      ldx PauseCursorIndices,y
                jsr ChkStart           ;check for unpause
                lda GamePauseStatus    ;if still paused, leave
                bne ExitPause2
-               lda ContinueMenuSelect ;if "save & quit" chosen, return to
-               cmp #$02               ;game selection menu
-               bne ExitPause2
+               ldy ContinueMenuSelect ;if "save & quit" chosen, return to
+               beq ExitPause2
+               jsr SaveProgress
+               cpy #$02
+               bcc ExitPause2
                jmp ReturnToLoader
 
 ChkForPause:   jsr ChkStart           ;check for pause
@@ -13725,25 +13727,30 @@ ChgSelLoop: lda GameOverCursorData,y     ;set up cursor sprite tile, attribute
             sta Sprite_Data
             rts
 
+SaveProgress:
+            ldx CurrentGame              ;otherwise save world number and worlds completed
+            lda WorldNumber
+            sta ContinueWorld,x
+            lda CurrentGame
+            bne :+
+            lda LevelSet
+            sta SavedLevelSet
+             ;lda DifficultyFlag
+            ;cmp #$02
+            ;beq RetryGame
+:           lda LevelNumber
+            sta ContinueLevel,x
+            lda AreaNumber
+            sta ContinueArea,x
+            lda CompletedWorlds
+            sta SavedCompletedWorlds
+            rts
+			
 ContinueOrRetry:
   lda ContinueMenuSelect       ;if player selected "continue"
   beq Continue                 ;then branch to continue, do not save
   ldx CurrentGame              ;otherwise save world number and worlds completed
-  lda WorldNumber
-  sta ContinueWorld,x
-  lda CurrentGame
-  bne :+
-  lda LevelSet
-  sta SavedLevelSet
-: ;lda DifficultyFlag
-  ;cmp #$02
-  ;beq RetryGame
-  lda LevelNumber
-  sta ContinueLevel,x
-  lda AreaNumber
-  sta ContinueArea,x
-  lda CompletedWorlds
-  sta SavedCompletedWorlds
+  jsr SaveProgress
   lda ContinueMenuSelect       ;if player selected "save and continue"
   cmp #$01                     ;then branch to continue
   beq Continue
