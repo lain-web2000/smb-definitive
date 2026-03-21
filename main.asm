@@ -14362,8 +14362,7 @@ PrintVictoryMsgsForWorld8:
          beq @ChkL
          cpy #$03                   ;if not at 3 yet, branch to increment
          bcc IncVMC
-         dey                        ;otherwise subtract 3 and use as message counter
-         dey
+         dey                        ;otherwise subtract 2 and use as message counter
          dey
          cpy #$03                   ;if message counter gone past a certain
          bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
