@@ -334,8 +334,6 @@ VictoryModeSubsForW8andD:
     .word BridgeCollapse
     .word SetupVictoryMode
     .word PlayerVictoryWalk
-    .word StartVMDelay
-    .word ContinueVMDelay
     .word PrintVictoryMsgsForWorld8
     .word EndCastleAward            ;except this one
     .word AwardExtraLives
@@ -374,18 +372,15 @@ IncModeTask:
 VMExit:  rts
 
 ;-------------------------------------------------------------------------------------
+TitleScreen_VRAMAddrs:
+      .byte VRAM_NT_COMPLETE, VRAM_NT_SMB1, VRAM_NT_SMB2
 
 DrawTitleScreen:
     lda OperMode       ;if not in attract mode, do not draw title screen
     bne IncModeTask    ;yes, this routine is run in other modes
-    lda #VRAM_NT_COMPLETE
     ldy CurrentGame
-    beq :+
-    lda #VRAM_NT_SMB1
-    dey
-    beq :+
-    lda #VRAM_NT_SMB2
-:   jmp SetVRAMAddr_B  ;otherwise set up VRAM address controller accordingly
+    lda TitleScreen_VRAMAddrs,y
+    jmp SetVRAMAddr_B  ;otherwise set up VRAM address controller accordingly
 
 ;-------------------------------------------------------------------------------------
 
@@ -1202,7 +1197,7 @@ ColorRotation:
               and #$07                 ;mask out all but three LSB
               bne ExitColorRot         ;branch if not set to zero to do this every eighth frame
               ldx VRAM_Buffer_Offset   ;check vram buffer offset
-              cpx #$31
+              cpx #49
               bcs ExitColorRot         ;if offset over 48 bytes, branch to leave
               tay                      ;otherwise use frame counter's 3 LSB as offset here
 GetBlankPal:  lda BlankPalette,y       ;get blank palette for palette 3
@@ -1732,12 +1727,14 @@ CheckHalfway:  lda HalfwayPage
                beq DoneInitArea
                lda #$02                 ;if halfway page set, overwrite start position from header
                sta PlayerEntranceCtrl
-DoneInitArea:  lda SilenceSuppression   ;if enabled, do not silence music between areas
-               bne DisableScrOut
-               lda #Silence             ;silence music
+DoneInitArea:  jsr GetAreaMusic         ;if music to be queued later isn't already playing,
+               cmp AreaMusicBuffer      ;branch ahead to silence music
+               bne SilenceMusic
+               inc ContinueMusicFlag    ;otherwise flag that we will keep the current music
+               lda #$00                 ;and clear area music queue to continue music
+               .byte $2c                ;BIT instruction opcode
+SilenceMusic:  lda #Silence             ;silence music
                sta AreaMusicQueue
-DisableScrOut: lda #$00
-               sta SilenceSuppression
                lda #$01                 ;disable screen output
                sta DisableScreenFlag
                inc OperMode_Task        ;increment task for this mode
@@ -1759,7 +1756,11 @@ ClearVRLoop: sta VRAM_Buffer-1,y       ;clear buffer at $0300-$03ff
              sta BackloadingFlag       ;clear value here
              lda #$ff
              sta BalPlatformAlignment  ;initialize balance platform assignment flag
+             lda ContinueMusicFlag     ;do not queue area music if same track is already playing
+             bne KeepAreaMus
              jsr GetAreaMusic
+KeepAreaMus: lda #$00                  ;clear flag for queuing music next area transition
+             sta ContinueMusicFlag
              lda #$38                  ;load sprite shuffle amounts to be used later
              sta SprShuffleAmt+2
              lda #$48
@@ -1798,12 +1799,7 @@ ChkAreaType: ldy AreaType           ;load area type as offset for music bit
              beq StoreMusic         ;check for cloud type override
              ldy #$04               ;select music for cloud type level if found
 StoreMusic:  lda MusicSelectData,y  ;otherwise select appropriate music for level type
-             cmp AreaMusicBuffer    ;leave if music to be queued is already playing
-             beq ExitGetM
-             cmp AreaMusicBuffer_Alt
-             beq ExitGetM           ;this check is for when low time warning is playing
              sta AreaMusicQueue     ;store in queue and leave
-             sta AreaMusicBuffer_Alt
 ExitGetM:    rts
 
 ;-------------------------------------------------------------------------------------
@@ -3877,21 +3873,12 @@ ChgAreaMode: inc DisableScreenFlag     ;set flag to disable screen output
              lda #$00
              sta OperMode_Task         ;set secondary mode of operation
              sta IRQUpdateFlag         ;disable IRQ check
-             lda WarpZoneControl       ;branch ahead if warp zone not loaded
-             beq ChkNewAType
-             lda GameEngineSubroutine  ;branch ahead if player didn't go down warp zone pipe
+             lda WarpZoneControl       ;branch to leave if warp zone not loaded
+             beq ExitCAPipe
+             lda GameEngineSubroutine  ;branch to leave if player didn't go down warp zone pipe
              cmp #$03
-             bne ChkNewAType
-             jmp WarpZoneHandler       ;otherwise set warp zone destination
-ChkNewAType: lda AreaPointer           ;if next area of same type, do not stop music
-             rol
-             rol
-             rol
-             rol
-             and #%00000011
-             cmp AreaType
              bne ExitCAPipe
-             inc SilenceSuppression    ;set flag to continue playing music
+             jmp WarpZoneHandler       ;otherwise set warp zone destination
 ExitCAPipe:  rts                       ;leave
 
 EnterSidePipe:
@@ -4990,17 +4977,7 @@ VDrawLoop:  jsr DrawVine              ;draw vine
             iny                       ;increment offset
             cpy VineFlagOffset        ;if offset in Y and offset here
             bne VDrawLoop             ;do not yet match, loop back to draw more vine
-            lda Enemy_OffscreenBits
-            and #%00001100            ;mask offscreen bits
-            beq WrCMTile              ;if none of the saved offscreen bits set, skip ahead
-            dey                       ;otherwise decrement Y to get proper offset again
-KillVine:   ldx VineObjOffset,y       ;get enemy object offset for this vine object
-            jsr EraseEnemyObject      ;kill this vine object
-            dey                       ;decrement Y
-            bpl KillVine              ;if any vine objects left, loop back to kill it
-            sta VineFlagOffset        ;initialize vine flag/offset
-            sta VineHeight            ;initialize vine height
-WrCMTile:   lda VineHeight            ;check vine height
+            lda VineHeight            ;check vine height
             cmp #$20                  ;if vine small (less than 32 pixels tall)
             bcc ChkVOffscr            ;then branch ahead to last part to skip this
             ldx #$06                  ;set offset in X to last enemy slot
@@ -5020,11 +4997,17 @@ ChkVOffscr: lda Enemy_X_Position+5
             tay
             lda Enemy_PageLoc+5       ;compare horizontal position of vine
             sbc ScreenLeft_PageLoc    ;to that of the left side of the screen
-            bmi VineOffscr            ;if vine isn't within 8 pixels of the edge
-            cpy #$09                  ;or past the left edge, branch to leave
+            bmi VineOffscr            ;if vine isn't within 6 pixels of the edge
+            cpy #$07                  ;or past the left edge, branch to leave
             bcs ExitVH
-VineOffscr: lda #$00                  ;erase vine's flag to kill it
-            sta Enemy_Flag+5
+VineOffscr: ldy VineFlagOffset
+            dey                       ;otherwise decrement Y to get proper offset again
+KillVine:   ldx VineObjOffset,y       ;get enemy object offset for this vine object
+            jsr EraseEnemyObject      ;kill this vine object
+            dey                       ;decrement Y
+            bpl KillVine              ;if any vine objects left, loop back to kill it
+            sta VineFlagOffset        ;initialize vine flag/offset
+            sta VineHeight            ;initialize vine height
             lda Enemy_PageLoc+5
             and #$01                  ;fetch the right block buffer address
             tay
@@ -5378,17 +5361,21 @@ GiveOneCoin:
       lda #$00
       sta CoinTally          ;otherwise, reinitialize coin amount
       jsr GiveExtraLife      ;award an extra life
-
 CoinPoints:
       lda #$02               ;set digit modifier to award
       sta DigitModifier+4    ;200 points to the player
+      ldy #$0b               ;get offset for player's score
+      jsr DigitsMathRoutine  ;update the score internally with value in digit modifier
+      jmp WriteScoreAndCoinTally
 
 AddToScore:
       ldy #$0b               ;get offset for player's score
       jsr DigitsMathRoutine  ;update the score internally with value in digit modifier
+      lda #$a1               ;print only player's score
+      .byte $2c              ;BIT instruction opcode
 
 WriteScoreAndCoinTally:
-        lda #$12
+        lda #$12             ;print player's score and coin tally
 WriteDigits:
         jsr PrintStatusBarNumbers ;print status bar numbers
         ldy VRAM_Buffer_Offset
@@ -5670,7 +5657,7 @@ BrickShatter:
       sta Block_RepFlag,x    ;set flag for block object to immediately replace metatile
       sta NoiseSoundQueue    ;load brick shatter sound
       jsr SpawnBrickChunks   ;create brick chunk objects
-      lda #$fe
+      lda #$00
       sta Player_Y_Speed     ;set vertical speed for player
       lda #$05
       sta DigitModifier+5    ;set digit modifier to give player 50 points
@@ -5722,8 +5709,6 @@ SpawnBrickChunks:
       clc                        ;add 8 pixels to vertical coordinate
       adc #$08                   ;and save as vertical coordinate for one of them
       sta Block_Y_Position+2,x
-      lda #$fa
-      sta Block_Y_Speed,x        ;set vertical speed...again??? (redundant)
       rts
 
 ;-------------------------------------------------------------------------------------
@@ -5790,8 +5775,6 @@ UpdSte:    sta Block_State,x          ;store contents of A in block object state
 BlockObjMT_Updater:
             ldx #$01                  ;set offset to start with second block object
 UpdateLoop: stx ObjectOffset          ;set offset here
-            lda VRAM_Buffer           ;if vram buffer already being used here,
-            bne NextBUpd              ;branch to move onto next block object
             lda Block_RepFlag,x       ;if flag for block object already clear,
             beq NextBUpd              ;branch to move onto next block object
             lda Block_BBuf_Low,x      ;get low byte of block buffer
@@ -6321,7 +6304,7 @@ CheckRightExtBounds:
         asl
         sta Enemy_Y_Position,x
         cmp #$e0                 ;do one last check for special row $0e
-        beq ParseRow0e           ;(necessary if branched to $c1cb)
+        beq ParseRow0e           ;(necessary if branched to CheckRightExtBounds)
         iny
         lda (EnemyData),y        ;get second byte of object
         and #%01000000           ;check to see if hard mode bit is set
@@ -7065,6 +7048,8 @@ BulletBillCheepCheep:
 ChkW2:   lda WorldNumber           ;check world number
          cmp #World2
          beq Get17ID               ;if we're on world 2, do not increment offset
+         cmp #WorldB
+         beq Get17ID               ;if we're on world B, do not increment offset
          iny                       ;otherwise increment
 Get17ID: tya
          and #%00000001            ;mask out all but last bit of offset
@@ -8406,18 +8391,13 @@ ChkPSpeed: lda $00
            iny                        ;otherwise increment once more
 ChkSpinyO: lda Enemy_ID,x             ;check for spiny object
            cmp #Spiny
-           bne ChkEmySpd              ;branch if not found
-           lda Player_X_Speed         ;if player not moving, skip this part
-           bne SubDifAdj
-ChkEmySpd: lda Enemy_Y_Speed,x        ;check vertical speed
-           bne SubDifAdj              ;branch if nonzero
+           beq SubDifAdj              ;branch if found
+           lda LakituMoveDirection,x  ;check lakitu moving direction
+           bne SubDifAdj              ;branch if moving right
            ldy #$00                   ;otherwise reinit offset
 SubDifAdj: lda $01,y                  ;get one of three saved values from earlier
-           ldy $00                    ;get saved horizontal difference
-SPixelLak: sec                        ;subtract one for each pixel of horizontal difference
-           sbc #$01                   ;from one of three saved values
-           dey
-           bpl SPixelLak              ;branch until all pixels are subtracted, to adjust difference
+           clc                        ;subtract one extra like original code
+           sbc $00                    ;subtract horizontal difference
 ExMoveLak: rts                        ;leave!!!
 
 ;-------------------------------------------------------------------------------------
@@ -9536,10 +9516,10 @@ HurtBowser:
           lda BowserIdentities,y     ;get enemy identifier to replace bowser with
           sta Enemy_ID,x             ;set as new enemy identifier
           tay                        ;move enemy identifier to Y
-          lda #$20                   ;set A to use starting value for state
-          cpy #$04                   ;check to see if enemy ID >= $04
+          lda #%00100000             ;set A to use starting value for state
+          cpy #UpsideDownPiranhaP    ;check to see if enemy ID >= $04
           bcs SetDBSte               ;branch if so
-          ora #$03                   ;otherwise add 3 to enemy state
+          ora #%00000011             ;otherwise add 3 to enemy state
 SetDBSte: sta Enemy_State,x          ;set defeated enemy state
           lda #Sfx_BowserFall
           sta Square2SoundQueue      ;load bowser defeat sound
@@ -10053,30 +10033,34 @@ ProcEnemyCollisions:
       ora Enemy_State,x
       and #%00100000           ;if d5 is set in either state, or both, branch
       bne ExitProcessEColl     ;to leave and do nothing else at this point
+      lda Enemy_ID,x           ;check first enemy identifier for hammer bro
+      cmp #HammerBro           ;if hammer bro found, branch elsewhere
+      beq ProcSecondEnemyColl
       lda Enemy_State,x
-      cmp #$06                 ;if second enemy state < $06, branch elsewhere
+      cmp #$06                 ;if first enemy state < $06, branch elsewhere
       bcc ProcSecondEnemyColl
-      lda Enemy_ID,x           ;check second enemy identifier for hammer bro
-      cmp #HammerBro           ;if hammer bro found in alt state, branch to leave
-      beq ExitProcessEColl
-      lda Enemy_State,y        ;check first enemy state for d7 set
+      lda Enemy_State,y        ;check second enemy state for d7 set
       asl
       bcc ShellCollisions      ;branch if d7 is clear
       lda #$06
-      jsr SetupFloateyNumber   ;award 1000 points for killing enemy
-      jsr ShellOrBlockDefeat   ;then kill enemy, then load
+      jsr SetupFloateyNumber   ;award 1000 points for killing first enemy
+      jsr ShellOrBlockDefeat   ;then kill first enemy, then load
       ldy $01                  ;original offset of second enemy
 
 ShellCollisions:
       tya                      ;move Y to X
       tax
       jsr ShellOrBlockDefeat   ;kill second enemy
+      lda Enemy_ID,x           ;check second enemy identifier for hammer bro
+      cmp #HammerBro           ;if hammer bro found, award 1000 points
+      beq IncFirstEnemyChain
       ldx ObjectOffset
       lda ShellChainCounter,x  ;get chain counter for shell
       clc
       adc #$04                 ;add four to get appropriate point offset
       ldx $01
       jsr SetupFloateyNumber   ;award appropriate number of points for second enemy
+IncFirstEnemyChain:
       ldx ObjectOffset         ;load original offset of first enemy
       inc ShellChainCounter,x  ;increment chain counter for additional enemies
 
@@ -10084,19 +10068,23 @@ ExitProcessEColl:
       rts                      ;leave!!!
 
 ProcSecondEnemyColl:
-      lda Enemy_State,y        ;if first enemy state < $06, branch elsewhere
+      lda Enemy_ID,y           ;check second enemy identifier for hammer bro
+      cmp #HammerBro           ;if hammer bro found, branch elsewhere
+      beq MoveEOfs
+      lda Enemy_State,y        ;if second enemy state < $06, branch elsewhere
       cmp #$06
       bcc MoveEOfs
-      lda Enemy_ID,y           ;check first enemy identifier for hammer bro
-      cmp #HammerBro           ;if hammer bro found in alt state, branch to leave
-      beq ExitProcessEColl
       jsr ShellOrBlockDefeat   ;otherwise, kill first enemy
+      lda Enemy_ID,x           ;check first enemy identifier for hammer bro
+      cmp #HammerBro           ;if hammer bro found, award 1000 points
+      beq IncSecondEnemyChain
       ldy $01
       lda ShellChainCounter,y  ;get chain counter for shell
       clc
       adc #$04                 ;add four to get appropriate point offset
       ldx ObjectOffset
       jsr SetupFloateyNumber   ;award appropriate number of points for first enemy
+IncSecondEnemyChain:
       ldx $01                  ;load original offset of second enemy
       inc ShellChainCounter,x  ;increment chain counter for additional enemies
       rts                      ;leave!!!
@@ -13667,18 +13655,7 @@ LoadWindWorlds5ThruD:
 ResetDiskIOTask:
       lda #$00              ;reset disk-related task number for next time
       sta DiskIOTask
-VMDelay:
       inc OperMode_Task     ;move on to next task in the current mode
-      rts
-
-StartVMDelay:
-      lda #$04           ;start world end delay
-      sta WorldEndTimer
-      bne VMDelay
-
-ContinueVMDelay:
-      lda WorldEndTimer  ;wait for delay to end, then move on
-      beq VMDelay
       rts
 
 DiskScreenPalette:
@@ -14039,7 +14016,7 @@ TScrClear:   sta VRAM_Buffer-1,x
              dex
              bne TScrClear
              jsr DrawMenuCursor         ;draw player select cursor
-             ;jsr DrawTitleScreenStars
+             jsr DrawTitleScreenStars   ;draw stars for beaten games
              inc ScreenRoutineTask      ;move onto next task
              rts
 
@@ -14050,46 +14027,6 @@ ClearTopScore:
       dey                      ;loop until done
       bpl :-
       jmp ResetTitle           ;reset the title screen
-
-;-------------------------------------------------------------------------------------
-;$00 - used to store low byte of VRAM address
-;$01 - used to store number of title screen stars drawn per line
-
-;DrawTitleScreenStars:
-;            lda #$d1                 ;set the VRAM address for the first line of stars
-;            sta $00
-;            lda GamesBeatenCount     ;have we beaten the game at least once?
-;            beq NoStars              ;if not, we don't need to be here
-;            cmp #$0a                 ;do we have more than 9 stars?
-;            bcc DrawLine             ;if not, draw the first line as-is
-;            lda #$09                 ;otherwise, we need 9 stars for the first line
-;            jsr DrawLine
-;            lda #$29                 ;now set the VRAM address for the second line
-;            sta $00
-;            lda GamesBeatenCount     ;get the correct number of stars to draw for the second line
-;            sec
-;            sbc #$09
-;            cmp #$0a                 ;do we have somehow have more than 18 stars total?
-;            bcc DrawLine             ;if not, draw the second line normally
-;            lda #$09                 ;if we do, force the second line to only have 9 stars
-;DrawLine:   ora #%01000000           ;add bit to indicate repeated tile
-;            sta $01                  ;and store in temp variable
-;            ldx VRAM_Buffer_Offset
-;            lda #$20                 ;write proper address for title screen stars
-;            sta VRAM_Buffer,x
-;            lda $00
-;            sta VRAM_Buffer+1,x
-;            lda $01                  ;write how many stars to draw for this line
-;            sta VRAM_Buffer+2,x
-;            lda #$29
-;            sta VRAM_Buffer+3,x
-;            lda #$00                 ;put null terminator at the end
-;            sta VRAM_Buffer+4,x
-;            txa                      ;move the buffer offset up by four bytes
-;            clc
-;            adc #$04
-;            sta VRAM_Buffer_Offset
-;NoStars:    rts                      ;now we're done!
 
 ;-------------------------------------------------------------------------------------
 
@@ -14137,6 +14074,57 @@ PrimaryGameSetup:
 :     sta NumberofLives           ;give each player five lives
 GoToSecondary:
       jmp SecondaryGameSetup
+
+;-------------------------------------------------------------------------------------
+;$00 - used to store low byte of VRAM address
+;$01 - used to store number of title screen stars drawn per line
+
+; (TO-DO: Move this to loader like tons of other per-game constants)
+TSStars_VRAMLow:
+      .byte $d1, $d1, $d0
+
+TSStars_MaxPerLine:
+      .byte 9, 9, 12
+
+DrawTitleScreenStars:
+            ldy CurrentGame               ;current game affects location of stars
+            lda TSStars_VRAMLow,y         ;set the VRAM address for the first row of stars
+            sta $00
+            lda GamesBeatenCount,y        ;have we beaten the game at least once?
+            beq NoStars                   ;if not, we don't need to be here
+            cmp TSStars_MaxPerLine,y      ;do we have a full first row of stars?
+            bcc DrawLine                  ;if not, draw the first line as-is
+            lda TSStars_MaxPerLine,y      ;otherwise, draw a full first row of stars
+            jsr DrawLine
+            lda TSStars_VRAMLow,y         ;now set the VRAM address for the second row
+            clc
+            adc #$20
+            sta $00
+            lda GamesBeatenCount,y        ;get the correct number of stars to draw for the second row
+            sec
+            sbc TSStars_MaxPerLine,y
+            beq NoStars                   ;if the second row is empty, leave
+            cmp TSStars_MaxPerLine,y      ;do we have a full second row of stars?
+            bcc DrawLine                  ;if not, draw the second row normally
+            lda TSStars_MaxPerLine,y      ;if we do, draw a full second row of stars
+DrawLine:   ora #%01000000                ;add bit to indicate repeated tile
+            sta $01                       ;and store in temp variable
+            ldx VRAM_Buffer_Offset
+            lda #$20                      ;write proper address for title screen stars
+            sta VRAM_Buffer,x
+            lda $00
+            sta VRAM_Buffer+1,x
+            lda $01                       ;write how many stars to draw for this line
+            sta VRAM_Buffer+2,x
+            lda #$ff                      ;write tile for title screen stars
+            sta VRAM_Buffer+3,x
+            lda #$00                      ;put null terminator at the end
+            sta VRAM_Buffer+4,x
+            txa                           ;move the buffer offset up by four bytes
+            clc
+            adc #$04
+            sta VRAM_Buffer_Offset
+NoStars:    rts                           ;now we're done!
 
 ;-------------------------------------------------------------------------------------
 
@@ -14370,40 +14358,49 @@ PrintVictoryMsgsForWorld8:
          lda WorldNumber            ;branch to alt sub if doing world D messages
          cmp #WorldD
          beq PrintVictoryMsgsForWorldD
-         cpy #$01                   ;stall between messages to delay music appropriately
-         beq IncVMC                 ;(TO-DO: better fix that doesn't delay "THANK YOU" message)
-         cpy #$04                   ;if message counter gone past a certain
+         cpy #$00                   ;if set to zero, branch to print first message
+         beq @ChkL
+         cpy #$03                   ;if not at 3 yet, branch to increment
+         bcc IncVMC
+         dey                        ;otherwise subtract 3 and use as message counter
+         dey
+         dey
+         cpy #$03                   ;if message counter gone past a certain
          bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
-         cpy #$02                   ;wait for specific message to start music
-         bne :+
+         cpy #$01                   ;wait for specific message to start music
+         bne GetVMID
          lda #VictoryMusic          ;residual code from original smb source, this will not
          sta EventMusicQueue        ;be checked due to alternate vector for sound engine
-:        cpy #$00
          bne GetVMID
-         lda SelectedPlayer         ;check selected player
+@ChkL:   lda SelectedPlayer         ;check selected player
          beq GetVMID                ;if mario, use standard message offset
          ldy #$04                   ;otherwise use alt offset for luigi
 GetVMID: tya
          clc
-         adc #VRAM_NT_PEACH_1ST-1   ;get appropriate range for victory messages
+         adc #VRAM_NT_PEACH_1ST     ;get appropriate range for victory messages
          jmp StoreVM                ;jump to set message ID and increment fractional
 
 PrintVictoryMsgsForWorldD:
+         cpy #$02                   ;if less than 2, branch to print palette or final message
+         bcc @ChkL
+         cpy #$03                   ;if not at 3 yet, branch to increment
+         bcc IncVMC
+         dey                        ;otherwise decrement and use as message counter
          cpy #$08                   ;if message counter gone past a certain
          bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
          cpy #$02                   ;wait for specific message to start music
-         bne :+
+         bne @ChkL
          lda #VictoryMusic          ;residual code from original smb source, this will not
          sta EventMusicQueue        ;be checked due to alternate vector for sound engine
-:        lda SelectedPlayer         ;check selected player
+@ChkL:   lda SelectedPlayer         ;check selected player
          beq PrintVM                ;if mario, use standard message offset
          cpy #$01                   ;are we thanking the player?
-         bne :+
+         bne @ChkL2
          ldy #$08                   ;if so, use alt offset for luigi
-:        cpy #$02                   ;are we thanking the player?
-         bne :+
+@ChkL2:  cpy #$02                   ;are we thanking the player?
+         bne @ChkL3
          ldy #$09                   ;if so, use alt offset for luigi
-:        cpy #$05                   ;are we printing the hurrah message?
+@ChkL3:  cpy #$05                   ;are we printing the hurrah message?
          bne PrintVM
          ldy #$0a                   ;if so, use alt offset for luigi
 PrintVM: tya
@@ -14529,21 +14526,22 @@ RunMushroomRetainers:
 ExRMR: rts
 
 EndingDiskRoutines:
-    ;lda DiskIOTask
-    ;jsr JumpEngine
+    lda DiskIOTask
+    jsr JumpEngine
 
-    ;.word DiskScreen
-    ;.word UpdateGamesBeaten
+    .word DiskScreen
+    .word UpdateGamesBeaten
 
 UpdateGamesBeaten:
-    ;lda GamesBeatenCount     ;get the new count of games beaten
-    ;clc                      ;note that this code is skipped if not on world D
-    ;adc #$01                 ;add one to it, to a maximum of 18/$12
-    ;cmp #19
-    ;bcc SetS2S
-    ;lda #18                  ;sorry, only 18 stars allowed
+    ldy CurrentGame
+    lda GamesBeatenCount,y   ;get the new count of games beaten
+    clc                      ;note that this code is skipped if not on world D
+    adc #1                   ;add one to it, to a maximum of 24/$18
+    cmp #25
+    bcc SetS2S
+    lda #24                  ;sorry, only 24 stars allowed
 SetS2S:
-    ;sta GamesBeatenCount
+    sta GamesBeatenCount,y
 
 BackToNormal:
     lda #$00
@@ -14570,7 +14568,7 @@ EndTheGame:
     lda #$00
     ldx CurrentGame
     sta CompletedWorlds      ;init completed worlds flag
-    sta ContinueWorld,x        ;reset saved progress
+    sta ContinueWorld,x      ;reset saved progress
     sta ContinueLevel,x
     sta ContinueArea,x
     sta SavedLevelSet

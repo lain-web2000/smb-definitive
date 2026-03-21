@@ -553,7 +553,7 @@ AreaMusicBuffer_Alt   = $07c5
 PauseModeFlag         = $07c6
 GroundMusicHeaderOfs  = $07c7
 AltRegContentFlag     = $07ca
-SilenceSuppression    = $07cb
+ContinueMusicFlag     = $07cb
 
 ;-------------------------------------------------------------------------------------
 ;CONSTANTS
