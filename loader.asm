@@ -15,8 +15,10 @@ StartLoader:
         jsr InitializeMemory
         sta ContinueMenuSelect      ;reset menu selection
         jsr CheckSaveData
+		lda #$03
+		sta FME7Command
         lda #CHR_MENU               ;load CHR tiles for menu
-        jsr FetchCHRPacketGroup
+        sta FME7Parameter
         lda #VRAM_PAL_MENU          ;queue menu palette
         sta VRAM_Buffer_AddrCtrl
         inc DisableScreenFlag       ;tell NMI to keep rendering disabled

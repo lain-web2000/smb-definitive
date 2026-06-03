@@ -687,16 +687,15 @@ FME7_IRQTimer_Low	  = $0e
 FME7_IRQTimer_High	  = $0f
 FME7_IRQTimer_Ctrl	  = $0d
 
-WaterAnimCurrentTile  = $013a
+WaterAnimCurrentBank  = $013a
 WaterAnimTimer		  = $0788
 
 PrincessGfxOffset     = $1760
 TitleScreenGfxOffset  = $0f30
 
-CHR_MENU              = 0
-CHR_MAIN              = 1
-CHR_SMB1              = 2
-CHR_SMB2              = 3
+CHR_MENU              = 12
+CHR_SMB1              = 0
+CHR_SMB2              = 1
 
 VRAM_STANDARD         = 0
 VRAM_PAL_WATER        = 1

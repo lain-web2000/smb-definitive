@@ -8,20 +8,17 @@
 
   .byte $4E,$45,$53,$1A                           ;  magic signature
   .byte 8                                         ;  PRG ROM size in 16384 byte units
-  .byte 0                                         ;  CHR
+  .byte 2                                         ;  CHR
   .byte $52                                       ;  mirroring type and mapper number lower nibble
   .byte $48                                       ;  mapper number upper nibble
-  .byte $00,$00,$70,$07,$00,$00,$00,$01
+  .byte $00,$00,$70,$00,$00,$00,$00,$01
 
 .segment "UNUSEDPRG"
 .org $8000
 .res $c000 - *, $ff
 .org $8000
 .res $c000 - *, $ff
-
-.segment "CHRBANK"
 .org $8000
-.include "chrram.asm"
 .res $c000 - *, $ff
 
 .segment "SOUNDPRG"
@@ -175,11 +172,14 @@ ChkPauseTimer: lda GamePauseTimer     ;check if pause timer is still counting do
                cmp #33                ;load pause graphics
                bcc ExitPause
                sbc #33
-               jmp QueueCHRTransfer
+			   lda #$04
+			   sta FME7Command
+               lda #$0b
+			   sta FME7Parameter
 UnpausingCHR:  cmp #33                ;reload normal tiles
                bcc ExitPause
                sbc #23
-               jmp QueueCHRTransfer
+			   jmp LoadGameTileset
 ExitPause:     rts
 
 ChkPauseState: lda GamePauseStatus    ;is game currently paused?
@@ -1243,9 +1243,9 @@ ExitColorRot: rts                      ;leave
 ;$06, $07 - block buffer address low/high
 
 BlockGfxData:
-       .byte $39, $39, $3a, $3a
-       .byte $3a, $3a, $3a, $3a
-       .byte $6f, $70, $71, $72
+       .byte $79, $79, $7a, $7a
+       .byte $7a, $7a, $7a, $7a
+       .byte $2f, $30, $31, $32
        .byte $24, $24, $24, $24
        .byte $5d, $5d, $5d, $5d
 
@@ -1352,38 +1352,38 @@ MetatileGraphics_High:
 Palette0_MTiles:
   .byte $24, $24, $24, $24 ;blank
   .byte $27, $27, $27, $27 ;black metatile
-  .byte $24, $24, $24, $31 ;bush left
-  .byte $32, $5c, $33, $5c ;bush middle
-  .byte $24, $34, $24, $24 ;bush right
-  .byte $24, $2c, $2c, $5d ;mountain left
-  .byte $5d, $5d, $30, $5d ;mountain left bottom/middle center
-  .byte $24, $2d, $24, $2e ;mountain middle top
-  .byte $2f, $5d, $24, $2f ;mountain right
-  .byte $30, $5d, $5d, $5d ;mountain right bottom
+  .byte $24, $24, $24, $71 ;bush left
+  .byte $72, $5c, $73, $5c ;bush middle
+  .byte $24, $74, $24, $24 ;bush right
+  .byte $24, $6c, $6c, $5d ;mountain left
+  .byte $5d, $5d, $70, $5d ;mountain left bottom/middle center
+  .byte $24, $6d, $24, $6e ;mountain middle top
+  .byte $6f, $5d, $24, $6f ;mountain right
+  .byte $70, $5d, $5d, $5d ;mountain right bottom
   .byte $5d, $5d, $5d, $5d ;mountain middle bottom
   .byte $24, $5a, $24, $5a ;bridge guardrail
-  .byte $24, $a9, $a9, $24 ;chain
+  .byte $24, $6a, $6a, $24 ;chain
   .byte $54, $56, $55, $57 ;tall tree top, top half
   .byte $54, $58, $55, $59 ;short tree top
   .byte $56, $58, $57, $59 ;tall tree top, bottom half
-  .byte $73, $77, $74, $78 ;warp pipe end left, points up
-  .byte $75, $79, $76, $7a ;warp pipe end right, points up
-  .byte $73, $77, $74, $78 ;decoration pipe end left, points up
-  .byte $75, $79, $76, $7a ;decoration pipe end right, points up
-  .byte $7b, $7b, $7c, $7c ;pipe shaft left
-  .byte $5d, $5d, $7d, $7d ;pipe shaft right
+  .byte $33, $37, $34, $38 ;warp pipe end left, points up
+  .byte $35, $39, $36, $3a ;warp pipe end right, points up
+  .byte $33, $37, $34, $38 ;decoration pipe end left, points up
+  .byte $35, $39, $36, $3a ;decoration pipe end right, points up
+  .byte $3b, $3b, $3c, $3c ;pipe shaft left
+  .byte $5d, $5d, $3d, $3d ;pipe shaft right
   .byte $41, $43, $9b, $44 ;tree ledge left edge
   .byte $9b, $45, $9b, $45 ;tree ledge middle
   .byte $9b, $44, $42, $46 ;tree ledge right edge
   .byte $8d, $93, $8e, $94 ;mushroom left edge
   .byte $8f, $95, $90, $96 ;mushroom middle
   .byte $91, $97, $92, $98 ;mushroom right edge
-  .byte $7e, $82, $7f, $83 ;sideways pipe end top
+  .byte $3e, $82, $3f, $83 ;sideways pipe end top
   .byte $80, $84, $80, $84 ;sideways pipe shaft top
-  .byte $81, $85, $7c, $7c ;sideways pipe joint top
+  .byte $81, $85, $3c, $3c ;sideways pipe joint top
   .byte $86, $89, $87, $8a ;sideways pipe end bottom
   .byte $5d, $8b, $5d, $8b ;sideways pipe shaft bottom
-  .byte $88, $8c, $7c, $7c ;sideways pipe joint bottom
+  .byte $88, $8c, $3c, $3c ;sideways pipe joint bottom
   .byte $ae, $b0, $af, $b1 ;seaplant
   .byte $24, $24, $24, $24 ;blank, used on bricks or blocks that are hit
   .byte $24, $61, $24, $62 ;flagpole ball
@@ -1396,33 +1396,33 @@ Palette1_MTiles:
   .byte $24, $68, $63, $66 ;left pulley
   .byte $65, $67, $24, $69 ;right pulley
   .byte $24, $24, $24, $24 ;blank used for balance rope
-  .byte $3d, $3a, $3e, $3a ;castle top
-  .byte $3a, $3a, $5e, $5e ;castle window left
-  .byte $3a, $3a, $3a, $3a ;castle brick wall
-  .byte $5e, $5e, $3a, $3a ;castle window right
-  .byte $3f, $3a, $40, $3a ;castle top w/ brick
-  .byte $3b, $5e, $3c, $5e ;entrance top
+  .byte $7d, $7a, $7e, $7a ;castle top
+  .byte $7a, $7a, $5e, $5e ;castle window left
+  .byte $7a, $7a, $7a, $7a ;castle brick wall
+  .byte $5e, $5e, $7a, $7a ;castle window right
+  .byte $7f, $7a, $40, $7a ;castle top w/ brick
+  .byte $7b, $5e, $7c, $5e ;entrance top
   .byte $5e, $5e, $5e, $5e ;entrance bottom
   .byte $47, $47, $47, $47 ;green ledge stump
   .byte $4c, $4e, $4d, $4f ;fence
   .byte $c2, $c2, $c3, $c3 ;tree trunk
   .byte $4a, $56, $4b, $57 ;mushroom stump top
   .byte $56, $56, $57, $57 ;mushroom stump bottom
-  .byte $39, $3a, $39, $3a ;breakable brick w/ line
-  .byte $3a, $3a, $3a, $3a ;breakable brick
-  .byte $39, $3a, $39, $3a ;breakable brick (not used)
-  .byte $39, $3a, $39, $3a ;brick with line (power-up)
-  .byte $39, $3a, $39, $3a ;brick with line (poison shroom)
-  .byte $39, $3a, $39, $3a ;brick with line (vine)
-  .byte $39, $3a, $39, $3a ;brick with line (star)
-  .byte $39, $3a, $39, $3a ;brick with line (coins)
-  .byte $39, $3a, $39, $3a ;brick with line (1-up)
-  .byte $3a, $3a, $3a, $3a ;brick (power-up)
-  .byte $3a, $3a, $3a, $3a ;brick (poison shroom)
-  .byte $3a, $3a, $3a, $3a ;brick (vine)
-  .byte $3a, $3a, $3a, $3a ;brick (star)
-  .byte $3a, $3a, $3a, $3a ;brick (coins)
-  .byte $3a, $3a, $3a, $3a ;brick (1-up)
+  .byte $79, $7a, $79, $7a ;breakable brick w/ line
+  .byte $7a, $7a, $7a, $7a ;breakable brick
+  .byte $79, $7a, $79, $7a ;breakable brick (not used)
+  .byte $79, $7a, $79, $7a ;brick with line (power-up)
+  .byte $79, $7a, $79, $7a ;brick with line (poison shroom)
+  .byte $79, $7a, $79, $7a ;brick with line (vine)
+  .byte $79, $7a, $79, $7a ;brick with line (star)
+  .byte $79, $7a, $79, $7a ;brick with line (coins)
+  .byte $79, $7a, $79, $7a ;brick with line (1-up)
+  .byte $7a, $7a, $7a, $7a ;brick (power-up)
+  .byte $7a, $7a, $7a, $7a ;brick (poison shroom)
+  .byte $7a, $7a, $7a, $7a ;brick (vine)
+  .byte $7a, $7a, $7a, $7a ;brick (star)
+  .byte $7a, $7a, $7a, $7a ;brick (coins)
+  .byte $7a, $7a, $7a, $7a ;brick (1-up)
   .byte $24, $24, $24, $24 ;hidden block (1 coin)
   .byte $24, $24, $24, $24 ;hidden block (1-up)
   .byte $24, $24, $24, $24 ;hidden block (poison shroom)
@@ -1443,13 +1443,13 @@ Palette1_MTiles:
   .byte $24, $2f, $24, $3d ;flag ball (residual object)
 
 Palette2_MTiles:
-  .byte $24, $24, $24, $31 ;cloud left
-  .byte $32, $5c, $33, $5c ;cloud middle
-  .byte $24, $34, $24, $24 ;cloud right
-  .byte $24, $24, $35, $24 ;cloud bottom left
-  .byte $36, $24, $37, $24 ;cloud bottom middle
-  .byte $38, $24, $24, $24 ;cloud bottom right
-  .byte $6a, $5d, $6a, $5d ;water/lava top
+  .byte $24, $24, $24, $71 ;cloud left
+  .byte $72, $5c, $73, $5c ;cloud middle
+  .byte $24, $74, $24, $24 ;cloud right
+  .byte $24, $24, $75, $24 ;cloud bottom left
+  .byte $76, $24, $77, $24 ;cloud bottom middle
+  .byte $78, $24, $24, $24 ;cloud bottom right
+  .byte $a9, $5d, $a9, $5d ;water/lava top
   .byte $5d, $5d, $5d, $5d ;water/lava
   .byte $be, $c0, $bf, $c1 ;cloud level terrain
   .byte $a3, $a4, $a3, $a4 ;bowser's bridge
@@ -1458,12 +1458,12 @@ Palette2_MTiles:
   .byte $9b, $a1, $9c, $a2 ;cloud ledge right edge
 
 Palette3_MTiles:
-  .byte $6b, $6d, $6c, $6e ;question block (coin)
-  .byte $6b, $6d, $6c, $6e ;question block (power-up)
-  .byte $6b, $6d, $6c, $6e ;question block (poison shroom)
+  .byte $6b, $2d, $2c, $2e ;question block (coin)
+  .byte $6b, $2d, $2c, $2e ;question block (power-up)
+  .byte $6b, $2d, $2c, $2e ;question block (poison shroom)
   .byte $b2, $b4, $b3, $b5 ;coin
   .byte $b6, $b8, $b7, $b9 ;underwater coin
-  .byte $6f, $71, $70, $72 ;empty block
+  .byte $2f, $31, $30, $32 ;empty block
   .byte $a5, $a7, $a6, $a8 ;axe
 
 ;------------------------------------------------------------------------------------
@@ -3429,25 +3429,8 @@ GameCoreRoutine:
 WaterAnimIntervals:              ;lookup table for water animation speed
         .byte 10, 16, 16, 16     ;10 frames for water area types, 16 frames for everything else
 
-WaterAnimOffsets:
-        .byte WaterAnimFrame1-WaterAnimTiles
-        .byte WaterAnimFrame2-WaterAnimTiles
-        .byte WaterAnimFrame3-WaterAnimTiles
-        .byte WaterAnimFrame4-WaterAnimTiles
-
-WaterAnimTiles:
-WaterAnimFrame1:
-        .byte $06, $a0, $10
-        .incbin "chr/water_frame1.chr"
-WaterAnimFrame2:
-        .byte $06, $a0, $10
-        .incbin "chr/water_frame2.chr"
-WaterAnimFrame3:
-        .byte $06, $a0, $10
-        .incbin "chr/water_frame3.chr"
-WaterAnimFrame4:
-        .byte $06, $a0, $10
-        .incbin "chr/water_frame4.chr"
+WaterAnimBanks:
+        .byte $0d, $02, $0e, $1f
 
 GameEngine:
               jsr ProcFireball_Bubble    ;process fireballs and air bubbles
@@ -3477,31 +3460,20 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr SimulateWind           ;otherwise, simulate wind where needed
 NoWind:       lda AnimatedTiles
               beq NoWAnim
-              lda WaterAnimTimer
-              bne NoWAnim
-              ldy AreaType
-              lda WaterAnimIntervals,y
-              sta WaterAnimTimer
-              inc WaterAnimCurrentTile
-              lda WaterAnimCurrentTile
-              and #$03
-              sta WaterAnimCurrentTile
-              tay
-              lda WaterAnimOffsets,y
-              tay
-              ldx VRAM_Buffer_Offset
-              lda #19
-              sta $00
-:             lda WaterAnimTiles,y
-              sta VRAM_Buffer,x
-              iny
-              inx
-              dec $00
-              bne :-
-              lda #$00
-              sta VRAM_Buffer,x
-              txa
-              sta VRAM_Buffer_Offset
+              lda WaterAnimTimer		 
+			  bne NoWAnim
+			  ldy AreaType
+			  lda WaterAnimIntervals,y
+			  sta WaterAnimTimer
+			  inc WaterAnimCurrentBank
+			  lda WaterAnimCurrentBank
+			  and #$03
+			  sta WaterAnimCurrentBank
+			  tay
+			  lda #$02
+			  sta FME7Command
+			  lda WaterAnimBanks,y
+			  sta FME7Parameter
 NoWAnim:      lda Player_Y_HighPos
               cmp #$02                   ;if player is below the screen, don't bother with the music
               bpl NoChgMus
@@ -15095,27 +15067,18 @@ SaveLp: lda SaveHeader,x        ;write save data header
         rts                     ;otherwise we have reset save data, leave
 
 ;-------------------------------------------------------------------------------------
-
-LoadFontTileset:
-      ; load font based on menu selection
-      lda #$00
-      ldy FontSelection
-      bne @static_fonts
-      ldy CurrentGame
-      cpy #$01
-      beq @write_font
-      bne @smb2_font
-@static_fonts:
-      cpy #$01
-      beq @write_font
-@smb2_font:
-      lda #$03
-@write_font:
-      jmp FetchCHRPacket
-
+BGTiles:
+      .byte $09,$01
+SprTiles:
+      .byte $0a,$04
+FontTiles:
+      .byte $08,$00
+	  
 LoadGameTileset:
       ; load tileset based on menu selection
       ; if per-game, tilset depends on levels played
+	  lda #$01
+	  sta FME7Command
       lda #CHR_SMB1
       ldy TilesetSelection
       bne @static_tileset
@@ -15128,165 +15091,35 @@ LoadGameTileset:
 @smb2_tileset:
       lda #CHR_SMB2
 @write_tileset:
-      jmp FetchCHRPacketGroup
+      tay
+	  lda BGTiles,y
+	  sta FME7Parameter
+	  lda #$04
+	  sta FME7Command
+	  lda SprTiles,y
+	  sta FME7Parameter
+	  rts
 
-;-------------------------------------------------------------------------------------
-
-CHRPacketGroups:
-      .word CHR_MENU_PACKETS
-      .word CHR_MAIN_PACKETS
-      .word CHR_SMB1_PACKETS
-      .word CHR_SMB2_PACKETS
-
-CHR_MENU_PACKETS:
-      .byte $03, $05, $06, $07, $08, $09, $ff  ; MENU BG and SPR
-CHR_MAIN_PACKETS:
-      .byte $06, $07, $08, $ff  ; MAIN BG and SPR
-CHR_SMB1_PACKETS:
-      .byte $01, $02, $ff ; SMB1 BG and SPR
-CHR_SMB2_PACKETS:
-      .byte $04, $05, $ff  ; SMB2 BG and SPR
-
-FetchCHRPacketGroup:
-            asl
-            tax
-            lda CHRPacketGroups,x
-            sta $04
-            lda CHRPacketGroups+1,x
-            sta $05
-            lda #$00
-            sta $06
-:           ldy $06
-            lda ($04),y
-            cmp #$ff
-            beq :+
-            jsr FetchCHRPacket
-            inc $06
-            bne :-
-:           rts
-
-CHRPacket_Src:
-      .word font_smb1, bg_smb1, spr_smb1
-      .word font_smb2, bg_smb2, spr_smb2
-      .word bg_main, bg_title, spr_main
-      .word bg_border
-CHRPacket_Len:
-      .word $02c0, $0300, $00e0
-      .word $02c0, $0300, $00e0
-      .word $0730, $0310, $0f20
-      .word $0060
-CHRPacket_Dest:
-      .word $0000, $02c0, $1000
-      .word $0000, $02c0, $1000
-      .word $05c0, $0cf0, $10e0
-      .word $0c90
-
-;$00-$01: source address
-;$02-$03: size of packet
-;X,Y: destination address
-FetchCHRPacket:
-            asl
-            tay
-            lda CHRPacket_Src,y
-            sta $00
-            lda CHRPacket_Len,y
-            sta $02
-            lda CHRPacket_Dest,y
-            tax
-            iny
-            lda CHRPacket_Src,y
-            sta $01
-            lda CHRPacket_Len,y
-            sta $03
-            lda CHRPacket_Dest,y
-            tay
-WriteCHRPacket:
-            lda Mirror_PPU_CTRL   ;disable NMI while updating graphics
-            and #%01111111        ;(TO-DO: Hacky, may want to move into NMI handler)
-            sta PPU_CTRL
-            lda #CHRBank          ;switch bank
-            jsr TempSwitch16KBank
-            lda Mirror_PPU_MASK
-            and #%11100111
-            sta PPU_MASK
-            lda PPU_STATUS
-            sty PPU_ADDRESS
-            stx PPU_ADDRESS
-            ldx #$00
-            ldy #$00
-@chklen:    cpx $03
-            bcc @copy
-            cpy $02
-            bcs @done
-@copy:      lda ($00),y
-            sta PPU_DATA
-            iny
-            bne @chklen
-            inc $01
-            inx
-            bne @chklen
-@done:      lda Mirror_PPU_CTRL    ;re-enable NMI
-            sta PPU_CTRL
-            lda ShadowPRGBank      ;restore original bank
-            jmp TempSwitch16KBank
-
-CHRTransfer_Src:
-      .word spr_pause, spr_pause+32, spr_pause+32*2
-      .word spr_pause+32*3, spr_pause+32*4, spr_pause+32*5
-      .word spr_pause+32*6, spr_pause+32*7, spr_pause+32*8
-      .word spr_pause+32*9
-      .word spr_main, spr_main+32, spr_main+32*2
-      .word spr_main+32*3, spr_main+32*4, spr_main+32*5
-      .word spr_main+32*6, spr_main+32*7, spr_main+32*8
-      .word spr_main+32*9
-CHRTransfer_Len:
-      .byte 32, 32, 32, 32, 32
-      .byte 32, 32, 32, 32, 32
-      .byte 32, 32, 32, 32, 32
-      .byte 32, 32, 32, 32, 32
-CHRTransfer_Dest:
-      .word $10e0, $10e0+32, $10e0+32*2, $10e0+32*3
-      .word $10e0+32*4, $10e0+32*5, $10e0+32*6, $10e0+32*7
-      .word $10e0+32*8, $10e0+32*9
-      .word $10e0, $10e0+32, $10e0+32*2, $10e0+32*3
-      .word $10e0+32*4, $10e0+32*5, $10e0+32*6, $10e0+32*7
-      .word $10e0+32*8, $10e0+32*9
-
-QueueCHRTransfer:
-            ldx VRAM_Buffer_Offset
-            tay
-            lda CHRTransfer_Len,y
-            sta VRAM_Buffer+2,x
-            sta $02
-            tya
-            asl
-            tay
-            lda CHRTransfer_Dest,y
-            sta VRAM_Buffer+1,x
-            lda CHRTransfer_Dest+1,y
-            sta VRAM_Buffer,x
-            lda CHRTransfer_Src,y
-            sta $00
-            lda CHRTransfer_Src+1,y
-            sta $01
-            lda #CHRBank          ; load CHR data bank
-            jsr TempSwitch16KBank
-            ldy #$00
-QueueCHRLoop:
-            lda ($00),y
-            sta VRAM_Buffer+3,x
-            inx
-            iny
-            cpy $02
-            bcc QueueCHRLoop
-            lda #$00
-            sta VRAM_Buffer+3,x
-            txa
-            clc
-            adc #3
-            sta VRAM_Buffer_Offset
-            lda ShadowPRGBank      ;restore original bank
-            jmp TempSwitch16KBank
+LoadFontTileset:
+      ; load font based on menu selection
+      lda #$00
+	  sta FME7Command
+      ldy FontSelection
+      bne @static_fonts
+      ldy CurrentGame
+      cpy #$01
+      beq @write_font
+      bne @smb2_font
+@static_fonts:
+      cpy #$01
+      beq @write_font
+@smb2_font:
+      lda #CHR_SMB2
+@write_font:
+      tay
+	  lda FontTiles,y
+      sta FME7Parameter
+	  rts
 
 ;------------------------------------------------------------------------------------
 
@@ -15340,8 +15173,10 @@ RunGetAreaPointer:
     jmp LoadMainBank      ;and return to main bank
 
 BootIntoGame:
-        lda #CHR_MAIN
-        jsr FetchCHRPacketGroup
+		lda #$03
+		sta FME7Command
+        lda #$03
+		sta FME7Parameter
         lda #MainBank
         jsr Switch16KBank           ;switch PRG banks
         jsr CheckSaveData           ;check validity of save data
@@ -15532,12 +15367,6 @@ WaitForVBLANK:
       txs                         ;reset stack pointer
 
       ; Init FME7
-      ldx #$07                    ;set up CHR bank registers
-CHRBankLoop:        
-      stx FME7Command
-      stx FME7Parameter
-      dex
-      bpl CHRBankLoop
       lda #$08                    ;enable PRG-RAM
       sta FME7Command
       lda #%11000000
@@ -15555,6 +15384,12 @@ ReturnToLoader:
       sta FME7Command
       lda #$00
       sta FME7Parameter
+      ldx #$07                    ;set up CHR bank registers
+CHRBankLoop:        
+      stx FME7Command
+      stx FME7Parameter
+      dex
+      bpl CHRBankLoop
       cli                         ;enable IRQs
       lda #LoaderBank             ;switch to loader bank
       jsr Switch16KBank
@@ -15584,42 +15419,45 @@ IRQHandler:
 
 ;-------------------------------------------------------------------------------------
 
-;NINTENDO HEADER (NON-FUNCTIONAL)
-.res $FFE0 - *, $FF
-
-;TITLE
-    .byte $20, $20, $4D, $41, $52, $49, $4F, $20, $43, $4F, $4D, $50, $4C, $45, $54, $45
-
-;PRG CHECKSUM
-    .byte $31, $A9
-
-;CHR CHECKSUM (Not needed since we are using CHR-RAM)
-    .res $02, $00
-
-;DATA SIZE & TYPE
-    .byte %00111000    ;128K PRG-ROM, CHR-RAM, 8K CHR
-
-;BOARD TYPE
-    .byte %10000100 ;Vertical Arrangement, MMC3 mapper
-
-;TITLE ENCODING
-    .byte $01
-
-;TITLE LENGTH
-    .byte 13
-
-;LICENSEE CODE
-    .byte $00
-
-;HEADER VALIDATION BYTE
-    .byte $36
-
-;-------------------------------------------------------------------------------------
-;INTERRUPT VECTORS
-
 .res $FFFA - *, $FF
 
 ;"VECTORS"
         .word NMIHandler
         .word RESETHandler
         .word IRQHandler
+		
+.segment "CHRROM"
+
+;SMB2 FONT
+.incbin "chr/fonts/smb2.chr"
+
+;SMB2 BG
+.incbin "chr/bg/smb2.chr"
+.incbin "chr/bg/main-1f2.chr"
+.incbin "chr/bg/main-2.chr"
+
+;SMB2 SPR
+.incbin "chr/spr/smb2.chr"
+.incbin "chr/spr/main-1.chr"
+.incbin "chr/spr/main-2.chr"
+.incbin "chr/spr/main-3.chr"
+
+;SMB1 FONT
+.incbin "chr/fonts/smb1.chr"
+
+;SMB1 BG
+.incbin "chr/bg/smb1.chr"
+
+;SMB1 SPR
+.incbin "chr/spr/smb1.chr"
+
+;PAUSE SPR
+.incbin "chr/spr/pause.chr"
+
+;TITLE BG
+.incbin "chr/bg/title.chr"
+
+;WATER ANIMATION FRAMES
+.incbin "chr/bg/main-1f1.chr"
+.incbin "chr/bg/main-1f3.chr"
+.incbin "chr/bg/main-1f4.chr"
