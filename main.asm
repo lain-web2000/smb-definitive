@@ -1434,11 +1434,11 @@ Palette1_MTiles:
   .byte $c8, $ca, $c9, $cb ;bullet bill cannon top
   .byte $cc, $cc, $cd, $cd ;bullet bill cannon bottom
   .byte $24, $24, $24, $24 ;blank used for jumpspring
-  .byte $24, $3a, $24, $3a ;half brick used for jumpspring
+  .byte $24, $7a, $24, $7a ;half brick used for jumpspring
   .byte $aa, $ac, $ab, $ad ;solid block (water level, green rock)
   .byte $50, $52, $51, $53 ;cracked rock terrain
-  .byte $24, $3a, $24, $3a ;half brick (not used)
-  .byte $7e, $82, $7f, $83 ;water pipe top
+  .byte $24, $7a, $24, $7a ;half brick (not used)
+  .byte $3e, $82, $3f, $83 ;water pipe top
   .byte $86, $89, $87, $8a ;water pipe bottom
   .byte $24, $2f, $24, $3d ;flag ball (residual object)
 
