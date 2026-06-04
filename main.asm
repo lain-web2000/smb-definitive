@@ -3701,16 +3701,10 @@ SaveJoyp:   lda SavedJoypadBits         ;otherwise store A and B buttons in $0a
             sta A_B_Buttons
             lda SavedJoypadBits         ;store left and right buttons in $0c
             and #%00000011
-            cmp #%00000011
-            bne :+
-            lda #$00
-:           sta Left_Right_Buttons
+            sta Left_Right_Buttons
             lda SavedJoypadBits         ;store up and down buttons in $0b
             and #%00001100
-            cmp #%00001100
-            bne :+
-            lda #$00
-:           sta Up_Down_Buttons
+            sta Up_Down_Buttons
             and #%00000100              ;check for pressing down
             beq SizeChk                 ;if not, branch
             lda Player_State            ;check player's state
@@ -14854,10 +14848,12 @@ InitATLoop:   sta PPU_DATA
               jmp InitScroll            ;initialize scroll registers to zero
 
 ;------------------------------------------------------------------------------------
+ValidDirections:
+	.byte $00, $01, $02, $00, $04, $05, $06, $04, $08, $09, $0a, $08, $00, $01, $02, $00
 
 ReadJoypads: ; taken from https://www.nesdev.org/wiki/Controller_reading_code
     lda RawJoypad1Bits ; save inputs from previous frame
-    tax
+    sta $00
     lda RawJoypad2Bits
     tay
     lda #$01
@@ -14874,8 +14870,15 @@ ReadJoypads: ; taken from https://www.nesdev.org/wiki/Controller_reading_code
     cmp #$01
     rol RawJoypad2Bits
     bcc :-
+	lda RawJoypad1Bits
+	and #$0f
+	tax
+	lda RawJoypad1Bits
+	and #$f0
+	ora ValidDirections,x
+	sta RawJoypad1Bits
     ; newly pressed buttons: not held last frame, and held now
-    txa
+    lda $00
     eor #%11111111
     and RawJoypad1Bits
     sta PressedJoypad1Bits
