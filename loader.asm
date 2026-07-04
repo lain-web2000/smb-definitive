@@ -1,3 +1,4 @@
+.include "inc/famistudio.inc"
 .segment "LOADER"
 .org $8000
 
@@ -469,8 +470,12 @@ RenderSubTilemap:
         dex
         bpl :-
         inc OperMode_Task
-        lda #SettingsMusic
-        sta AreaMusicQueue
+		lda #0 ; for famistudio_init
+		ldy #>music_data_smb_complete_menu
+		ldx #<music_data_smb_complete_menu
+		jsr famistudio_init
+		lda #0
+		jsr famistudio_music_play
         rts
 
 SubMenuCursorY:
@@ -945,3 +950,6 @@ HardPreset:
       .byte $02, $00, $00, $00, $00, $00, $01, $00, $00, $01
 ExpertPreset:
       .byte $02, $00, $00, $00, $01, $01, $01, $00, $00, $01
+
+.include "famistudio_ca65.s"
+.include "music/menu.s"

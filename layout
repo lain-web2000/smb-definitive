@@ -1,5 +1,7 @@
 MEMORY
 {
+	SOUND_ZP: start = $0, size = $0a;
+	SOUND_RAM: start = $0500, size = $012b;
 	INES:		start =     0, size =    $10, fill=yes, fillval=$00, type = rw;
 	UNUSEDPRG:	start = $8000, size =  $C000, fill=yes, fillval=$FF, type = ro;
 	SOUNDPRG:	start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
@@ -11,6 +13,8 @@ MEMORY
 
 SEGMENTS
 {
+	SOUND_ZP: load = SOUND_ZP, type = zp, define = yes;
+	SOUND_RAM: load = SOUND_RAM, type = bss, define = yes;
 	INES:       load = INES,  type = ro;
 	UNUSEDPRG:	load = UNUSEDPRG, type = ro;
 	SOUNDPRG:   load = SOUNDPRG, type = ro;

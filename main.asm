@@ -15333,7 +15333,7 @@ ScrnSwch:
       sta $00
 SkipVRAMJoypad:
       jsr RunSoundEngine        ;run sound engine every frame
-      lda PPU_STATUS            ;reset flip-flop
+	  lda PPU_STATUS            ;reset flip-flop
       lda Mirror_PPU_CTRL       ;reenable NMIs
       ora #$80
       sta Mirror_PPU_CTRL
