@@ -69,6 +69,8 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             sta IRQTimer_Low
             lda #$16
             sta IRQTimer_High
+			lda #1
+			sta SoundEngineSet 			;hack
             lda #%10001000              ;set up pattern table arrangment
             jsr WritePPUReg1            ;and enable NMIs
 WaitForNMI: lda NMIAckFlag              ;spin until NMI routine has executed
@@ -15151,6 +15153,10 @@ TempSwitch16KBank:
     rts
 
 RunSoundEngine:
+	lda SoundEngineSet
+	bne InGame
+	jmp famistudio_update
+InGame:
     lda #SoundBank        ;switch bank
     jsr TempSwitch16KBank
     jsr SoundEngine       ;run relevant routine

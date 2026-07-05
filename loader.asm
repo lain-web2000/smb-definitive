@@ -27,6 +27,13 @@ StartLoader:
         sta IRQTimer_Low
         lda #$32
         sta IRQTimer_High
+		lda #0 ; for famistudio_init
+		sta SoundEngineSet
+		ldy #>music_data_smb_complete_menu
+		ldx #<music_data_smb_complete_menu
+		jsr famistudio_init
+		lda #0
+		jsr famistudio_music_play
         lda #%10001000              ;set up pattern table arrangment
         jsr WritePPUReg1            ;and enable NMIs
 @nmi_wait:
@@ -470,12 +477,6 @@ RenderSubTilemap:
         dex
         bpl :-
         inc OperMode_Task
-		lda #0 ; for famistudio_init
-		ldy #>music_data_smb_complete_menu
-		ldx #<music_data_smb_complete_menu
-		jsr famistudio_init
-		lda #0
-		jsr famistudio_music_play
         rts
 
 SubMenuCursorY:
@@ -519,8 +520,8 @@ ExitSubMenu:
         sta OperMode
         sta OperMode_Task
         sta ContinueMenuSelect
-        lda #Silence
-        sta AreaMusicQueue
+		sta NameTableDestination
+		sta ScreenEdge_PageLoc
         inc DisableScreenFlag
         rts
 DrawSubmenuCursor:
@@ -764,6 +765,8 @@ LoadIntoGame:
         jsr CopyPaletteData
         jsr CopyDemoData
         jsr CopyTopScoreDisplay
+		jsr famistudio_music_stop
+		jsr famistudio_update
         jmp BootIntoGame
 
 CopyTopScoreDisplay:

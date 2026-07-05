@@ -131,7 +131,8 @@ PlayerFireColors:
       .byte $22, $37, $27, $16 ;mario's colors after grabbing fire flower
       .byte $22, $29, $27, $16 ;luigi's colors after grabbing fire flower
 	  
-	  
+SoundEngineSet:
+      .byte $00 ;hack
 	  
 AreaDataCopy:
 	.res $100, $00
