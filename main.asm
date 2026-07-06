@@ -69,8 +69,8 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             sta IRQTimer_Low
             lda #$16
             sta IRQTimer_High
-			lda #1
-			sta SoundEngineSet 			;hack
+            lda #1
+            sta SoundEngineSet 			;hack
             lda #%10001000              ;set up pattern table arrangment
             jsr WritePPUReg1            ;and enable NMIs
 WaitForNMI: lda NMIAckFlag              ;spin until NMI routine has executed
@@ -174,14 +174,14 @@ ChkPauseTimer: lda GamePauseTimer     ;check if pause timer is still counting do
                cmp #33                ;load pause graphics
                bcc ExitPause
                sbc #33
-			   lda #$04
-			   sta FME7Command
+               lda #$04
+               sta FME7Command
                lda #$0b
-			   sta FME7Parameter
+               sta FME7Parameter
 UnpausingCHR:  cmp #33                ;reload normal tiles
                bcc ExitPause
                sbc #23
-			   jmp LoadGameTileset
+               jmp LoadGameTileset
 ExitPause:     rts
 
 ChkPauseState: lda GamePauseStatus    ;is game currently paused?
@@ -3459,8 +3459,8 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr FlagpoleRoutine        ;process the flagpole
               jsr RunGameTimer           ;count down the game timer
               jsr ColorRotation          ;cycle one of the background colors
-              jsr SimulateWind           ;otherwise, simulate wind where needed
-NoWind:       lda AnimatedTiles
+              jsr SimulateWind           ;simulate wind where needed
+              lda AnimatedTiles
               beq NoWAnim
               lda WaterAnimTimer		 
 			  bne NoWAnim
@@ -5236,6 +5236,7 @@ JCoinC: lda #$fb
         lda #$01
         sta Misc_Y_HighPos,y   ;set vertical high byte
         sta Misc_State,y       ;set state for misc object
+        lda #Sfx_CoinGrab
         sta Square2SoundQueue  ;load coin grab sound
         stx ObjectOffset       ;store current control bit as misc object offset
         jsr GiveOneCoin        ;update coin tally on the screen and coin amount variable
@@ -5589,7 +5590,7 @@ PoisonMushBlock:
 
 ExtraLifeMushBlock:
       lda #$03                ;load 1-up mushroom type
-      sta $39                 ;store correct power-up type
+      sta PowerUpType         ;store correct power-up type
       jmp SetupPowerUp
 
 VineBlock:
@@ -5621,8 +5622,9 @@ MatchBump:   rts                         ;note carry is set if found match
 
 BrickShatter:
       jsr CheckTopOfBlock    ;check to see if there's a coin directly above this block
-      lda #Sfx_BrickShatter
+      lda #$01
       sta Block_RepFlag,x    ;set flag for block object to immediately replace metatile
+      lda #Sfx_BrickShatter
       sta NoiseSoundQueue    ;load brick shatter sound
       jsr SpawnBrickChunks   ;create brick chunk objects
       lda #$00
@@ -6119,6 +6121,8 @@ FindLoopJ: dey
            lda Player_State          ;check to see if the player is
            cmp #$00                  ;on solid ground (i.e. not jumping or falling)
            bne WrongChkJ              ;if not, player fails to pass loop, and loopback
+           lda #Sfx_CorrectPath      ;(TO-DO: fix lazy)
+           sta Square2SoundQueue
            inc MultiLoopCorrectCntr  ;increment counter for correct progression
 WrongChkJ: inc MultiLoopPassCntr     ;increment master multi-part counter
            lda MultiLoopPassCntr     ;have we done all parts?
@@ -6151,6 +6155,8 @@ FindLoop: dey
           lda Player_State          ;check to see if the player is
           cmp #$00                  ;on solid ground (i.e. not jumping or falling)
           bne WrongChk              ;if not, player fails to pass loop, and loopback
+          lda #Sfx_CorrectPath      ;(TO-DO: fix lazy)
+          sta Square2SoundQueue
           inc MultiLoopCorrectCntr  ;increment counter for correct progression
 WrongChk: inc MultiLoopPassCntr     ;increment master multi-part counter
           lda MultiLoopPassCntr     ;have we done all parts?
@@ -6874,8 +6880,7 @@ InitBowserFlame:
         lda FrenzyEnemyTimer        ;if timer not expired yet, branch to leave
         bne FlmEx
         sta Enemy_Y_MoveForce,x     ;reset something here
-        lda NoiseSoundQueue
-        ora #Sfx_BowserFlame        ;load bowser's flame sound into queue
+        lda #Sfx_BowserFlame        ;load bowser's flame sound into queue
         sta NoiseSoundQueue
         ldy BowserFront_Offset      ;get bowser's buffer offset
         lda Enemy_ID,y              ;check for bowser
@@ -7061,8 +7066,7 @@ BB_SLoop: iny                        ;move onto the next slot
 ExF17:    rts                        ;if found, leave
 
 FireBulletBill:
-      lda Square2SoundQueue
-      ora #Sfx_Blast            ;play fireworks/gunfire sound
+      lda #Sfx_Blast            ;play fireworks/gunfire sound
       sta Square2SoundQueue
       lda #BulletBill_FrenzyVar ;load identifier for bullet bill object
       bne Set17ID               ;unconditional branch
@@ -9763,7 +9767,7 @@ ForceInjury:
 PlyrStat: sta PlayerStatus          ;set player's status appropiately
           lda #$08
           sta InjuryTimer           ;set injured invincibility timer
-          asl
+          lda #Sfx_PipeDown_Injury
           sta Square1SoundQueue     ;play pipedown/injury sound
           jsr GetPlayerColors       ;change player's palette if necessary
           lda #$0a                  ;set subroutine to run on next frame
@@ -10583,7 +10587,7 @@ FlagpoleCollision:
       jsr KillEnemies           ;get rid of them
       lda #Silence
       sta EventMusicQueue       ;silence music
-      lsr
+      lda #Sfx_Flagpole
       sta FlagpoleSoundQueue    ;load flagpole sound into flagpole sound queue
       ldx #$04                  ;start at end of vertical coordinate data
       lda Player_Y_Position
@@ -13128,7 +13132,7 @@ ProcOnGroundActs:
          lda GameEngineSubroutine
          cmp #$09                   ;if running the change size, fire flower, injure
          bcs NoSkidS                ;or death game engine subroutines, skip this
-         lda #$80                   ;otherwise play skid sound
+         lda #Sfx_Skid              ;otherwise play skid sound
          sta NoiseSoundQueue
 NoSkidS: iny                        ;increment to skid offset ($03)
 
@@ -14239,9 +14243,11 @@ LeavesTile:
 SimulateWind:
           lda WindFlag             ;if no wind, branch to leave
           beq ExSimW
-          lda #$04                 ;play wind sfx
+          lda NoiseSoundBuffer     ;if noise sfx playing, branch
+          bne MoveLeaf
+          lda #Sfx_Wind            ;play wind sfx
           sta NoiseSoundQueue
-          jsr ModifyLeavesPos      ;modify X and Y position data of leaves
+MoveLeaf: jsr ModifyLeavesPos      ;modify X and Y position data of leaves
           ldx #$00                 ;use mostly unused sprite data offset
           ldy Alt_SprDataOffset-1  ;for first six leaves
 DrawLeaf: lda LeavesYPosCopy,x

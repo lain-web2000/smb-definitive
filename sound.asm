@@ -191,40 +191,42 @@ Square1SfxHandler:
        ldy Square1SoundQueue   ;check for sfx in queue
        beq CheckSfx1Buffer
        sty Square1SoundBuffer  ;if found, put in buffer
-       bmi PlaySmallJump       ;small jump
-       lsr Square1SoundQueue
-       bcs PlayBigJump         ;big jump
-       lsr Square1SoundQueue
-       bcs PlayBump            ;bump
-       lsr Square1SoundQueue
-       bcs PlaySwimStomp       ;swim/stomp
-       lsr Square1SoundQueue
-       bcs PlaySmackEnemy      ;smack enemy
-       lsr Square1SoundQueue
-       bcs PlayPipeDownInj     ;pipedown/injury
-       lsr Square1SoundQueue
-       bcs PlayFireballThrow   ;fireball throw
-       lsr Square1SoundQueue
-       bcs PlayFlagpoleSlide   ;slide flagpole
+       dey
+       beq PlayBigJump         ;big jump
+       dey
+       beq PlayBump            ;bump
+       dey
+       beq PlaySwimStomp       ;swim/stomp
+       dey
+       beq PlaySmackEnemy      ;smack enemy
+       dey
+       beq PlayPipeDownInj     ;pipedown/injury
+       dey
+       beq PlayFireballThrow   ;fireball throw
+       dey
+       beq PlayFlagpoleSlide   ;slide flagpole
+       dey
+       beq PlaySmallJump       ;small jump
 
 CheckSfx1Buffer:
-       lda Square1SoundBuffer   ;check for sfx in buffer 
+       ldy Square1SoundBuffer   ;check for sfx in buffer 
        beq ExS1H                ;if not found, exit sub
-       bmi ContinueSndJump      ;small mario jump 
-       lsr
-       bcs ContinueSndJump      ;big mario jump 
-       lsr
-       bcs ContinueBumpThrow    ;bump
-       lsr
-       bcs ContinueSwimStomp    ;swim/stomp
-       lsr
-       bcs ContinueSmackEnemy   ;smack enemy
-       lsr
-       bcs ContinuePipeDownInj  ;pipedown/injury
-       lsr
-       bcs ContinueBumpThrow    ;fireball throw
-       lsr
-       bcs DecrementSfx1Length  ;slide flagpole
+       dey
+       beq ContinueSndJump      ;big mario jump 
+       dey
+       beq ContinueBumpThrow    ;bump
+       dey
+       beq ContinueSwimStomp    ;swim/stomp
+       dey
+       beq ContinueSmackEnemy   ;smack enemy
+       dey
+       beq ContinuePipeDownInj  ;pipedown/injury
+       dey
+       beq ContinueBumpThrow    ;fireball throw
+       dey
+       beq DecrementSfx1Length  ;slide flagpole
+       dey
+       beq ContinueSndJump      ;small mario jump 
 ExS1H: rts
 
 
@@ -267,19 +269,7 @@ ContinueSmackEnemy:
         bne SmTick
 SmSpc:  lda #$90                ;this creates spaces in the sound, giving it its distinct noise
 SmTick: sta SND_SQUARE1_REG
-
-DecrementSfx1Length:
-      dec Squ1_SfxLenCounter    ;decrement length of sfx
-      bne ExSfx1
-
-StopSquare1Sfx:
-        ldx #$00                ;if end of sfx reached, clear buffer
-        stx $f1                 ;and stop making the sfx
-        ldx #$0e
-        stx SND_MASTERCTRL_REG
-        ldx #$0f
-        stx SND_MASTERCTRL_REG
-ExSfx1: rts
+        jmp DecrementSfx1Length
 
 PlayPipeDownInj:  
       lda #$2f                ;load length of pipedown sound
@@ -298,6 +288,19 @@ ContinuePipeDownInj:
          lda #$44
          jsr PlaySqu1Sfx
 NoPDwnL: jmp DecrementSfx1Length
+
+DecrementSfx1Length:
+      dec Squ1_SfxLenCounter    ;decrement length of sfx
+      bne ExSfx1
+
+StopSquare1Sfx:
+        ldx #$00                ;if end of sfx reached, clear buffer
+        stx Square1SoundBuffer  ;and stop making the sfx
+        ldx #$0e
+        stx SND_MASTERCTRL_REG
+        ldx #$0f
+        stx SND_MASTERCTRL_REG
+ExSfx1: rts
 
 ;--------------------------------
 
@@ -354,7 +357,7 @@ ContinueBlast:
         bne DecrementSfx2Length
         ldy #$93                ;load second part reg contents then
         lda #$18
-SBlasJ: bne BlstSJp             ;unconditional branch to load rest of reg contents
+SBlasJ: jmp PBFRegs             ;jump to load rest of reg contents
 
 PlayPowerUpGrab:
         lda #$36                    ;load length of power-up grab sound
@@ -389,45 +392,49 @@ ExSfx2: rts
 
 Square2SfxHandler:
         lda Square2SoundBuffer ;special handling for the 1-up sound to keep it
-        and #Sfx_ExtraLife     ;from being interrupted by other sounds on square 2
-        bne ContinueExtraLife
+        cmp #Sfx_ExtraLife     ;from being interrupted by other sounds on square 2
+        beq ContinueExtraLife
         ldy Square2SoundQueue  ;check for sfx in queue
         beq CheckSfx2Buffer
         sty Square2SoundBuffer ;if found, put in buffer and check for the following
-        bmi PlayBowserFall     ;bowser fall
-        lsr Square2SoundQueue
-        bcs PlayCoinGrab       ;coin grab
-        lsr Square2SoundQueue
-        bcs PlayGrowPowerUp    ;power-up reveal
-        lsr Square2SoundQueue
-        bcs PlayGrowVine       ;vine grow
-        lsr Square2SoundQueue
-        bcs PlayBlast          ;fireworks/gunfire
-        lsr Square2SoundQueue
-        bcs PlayTimerTick      ;timer tick
-        lsr Square2SoundQueue
-        bcs PlayPowerUpGrab    ;power-up grab
-        lsr Square2SoundQueue
-        bcs PlayExtraLife      ;1-up
+        dey
+        beq PlayCoinGrab       ;coin grab
+        dey
+        beq PlayGrowPowerUp    ;power-up reveal
+        dey
+        beq PlayGrowVine       ;vine grow
+        dey
+        beq PlayBlast          ;fireworks/gunfire
+        dey
+        beq PlayTimerTick      ;timer tick
+        dey
+        beq PlayPowerUpGrab    ;power-up grab
+        dey
+        beq PlayExtraLife      ;1-up
+        dey
+        beq PlayBowserFall     ;bowser fall
+        jmp PlayCorrectPath    ;correct maze path
 
 CheckSfx2Buffer:
-        lda Square2SoundBuffer   ;check for sfx in buffer
+        ldy Square2SoundBuffer   ;check for sfx in buffer
         beq ExS2H                ;if not found, exit sub
-        bmi ContinueBowserFall   ;bowser fall
-        lsr
-        bcs Cont_CGrab_TTick     ;coin grab
-        lsr
-        bcs ContinueGrowItems    ;power-up reveal
-        lsr
-        bcs ContinueGrowItems    ;vine grow
-        lsr
-        bcs ContinueBlast        ;fireworks/gunfire
-        lsr
-        bcs Cont_CGrab_TTick     ;timer tick
-        lsr
-        bcs ContinuePowerUpGrab  ;power-up grab
-        lsr
-        bcs ContinueExtraLife    ;1-up
+        dey
+        beq Cont_CGrab_TTick     ;coin grab
+        dey
+        beq ContinueGrowItems    ;power-up reveal
+        dey
+        beq ContinueGrowItems    ;vine grow
+        dey
+        beq ContinueBlast        ;fireworks/gunfire
+        dey
+        beq Cont_CGrab_TTick     ;timer tick
+        dey
+        beq ContinuePowerUpGrab  ;power-up grab
+        dey
+        beq ContinueExtraLife    ;1-up
+        dey
+        beq ContinueBowserFall   ;bowser fall
+        jmp ContinueCorrectPath  ;correct maze path
 ExS2H:  rts
 
 Cont_CGrab_TTick:
@@ -441,7 +448,7 @@ PlayBowserFall:
          sta Squ2_SfxLenCounter
          ldy #$c4                ;load contents of reg for bowser defeat sound
          lda #$18
-BlstSJp: bne PBFRegs
+         bne PBFRegs
 
 ContinueBowserFall:
           lda Squ2_SfxLenCounter   ;check for almost near the end
@@ -493,11 +500,40 @@ ContinueGrowItems:
         lda #$9d                  ;load contents of other reg directly
         sta SND_SQUARE2_REG
         lda PUp_VGrow_FreqData,y  ;use secondary counter / 2 as offset for frequency regs
-        jsr SetFreq_Squ2
-        rts
+        jmp SetFreq_Squ2
 
 StopGrowItems:
         jmp EmptySfx2Buffer       ;branch to stop playing sounds
+
+CorrectPathVolData:
+        .byte $91, $91, $92, $92, $93, $93, $94, $94
+        .byte $95, $95, $93, $94, $94, $95, $95, $94
+        .byte $95, $95, $96, $96, $97, $97, $98, $98
+        .byte $99, $99, $97, $98, $98, $99, $99, $97
+        .byte $98, $98, $99, $99, $9a, $9a, $9b, $9b
+        .byte $9c, $9c, $9a, $9b, $9b, $9c, $9c
+
+PlayCorrectPath:
+        lda #$2f
+        sta Squ2_SfxLenCounter
+ContinueCorrectPath:
+        ldx Squ2_SfxLenCounter
+        lda CorrectPathVolData-1,x
+        tax
+        lda Squ2_SfxLenCounter
+        and #$0f
+        cmp #$0f
+        beq CPath1
+        cmp #$0a
+        beq CPath2
+        jmp DecrementSfx2Length
+CPath1: lda #$44
+        bne :+
+CPath2: lda #$64
+:       ldy #$7f
+        jmp LoadSqu2Regs
+
+;--------------------------------
 
 WindFreqEnvData:
         .byte $37, $46, $55, $64, $74, $83, $93, $a2
@@ -512,7 +548,6 @@ SkidSfxFreqData:
         .byte $47, $49, $42, $4a, $43, $4b
 
 PlaySkidSfx:
-        sty NoiseSoundBuffer
         lda #$06
         sta Noise_SfxLenCounter
 
@@ -527,7 +562,6 @@ ContinueSkidSfx:
         bne DecrementSfx3Length
 
 PlayBrickShatter:
-        sty NoiseSoundBuffer
         lda #$20                 ;load length of brick shatter sound
         sta Noise_SfxLenCounter
 
@@ -558,25 +592,34 @@ ExSfx3: rts
 
 NoiseSfxHandler:
         lda NoiseSoundBuffer
-        bmi ContinueSkidSfx
+        cmp #Sfx_Skid
+        beq ContinueSkidSfx
         ldy NoiseSoundQueue
-        bmi PlaySkidSfx
-        lsr NoiseSoundQueue
-        bcs PlayBrickShatter
-        lsr
-        bcs ContinueBrickShatter
-        lsr NoiseSoundQueue
-        bcs PlayBowserFlame
-        lsr
-        bcs ContinueBowserFlame
-        lsr
-        bcs ContinueWindSfx
-        lsr NoiseSoundQueue
-        bcs PlayWindSfx
-        rts
+        beq CheckNoiseBuffer
+        sty NoiseSoundBuffer
+        dey
+        beq PlayBrickShatter
+        dey
+        beq PlayBowserFlame
+        dey
+        beq PlayWindSfx
+        dey
+        beq PlaySkidSfx
+
+CheckNoiseBuffer:
+        ldy NoiseSoundBuffer
+        beq ExNH
+        dey
+        beq ContinueBrickShatter
+        dey
+        beq ContinueBowserFlame
+        dey
+        beq ContinueWindSfx
+        dey
+        beq ContinueSkidSfx
+ExNH:   rts
 
 PlayBowserFlame:
-        sty NoiseSoundBuffer
         lda #$40                    ;load length of bowser flame sound
         sta Noise_SfxLenCounter
 
@@ -590,12 +633,9 @@ WindBranch:
         bne PlayNoiseSfx            ;unconditional branch here
 
 PlayWindSfx:
-        sty NoiseSoundBuffer
         lda #$c0
         sta Noise_SfxLenCounter
 ContinueWindSfx:
-        lsr NoiseSoundQueue         ;get bit for the wind sfx, note that it must
-        bcc ExSfx3                  ;be continuously set in order for it to play
         lda Noise_SfxLenCounter
         lsr
         lsr                         ;divide length counter by 8
@@ -684,9 +724,9 @@ LoadHeader:
         lda MusicHeaderData,y        ;now load the header
         sta NoteLenLookupTblOfs
         lda MusicHeaderData+1,y
-        sta MusicDataLow
+        sta MusicData
         lda MusicHeaderData+2,y
-        sta MusicDataHigh
+        sta MusicData+1
         lda MusicHeaderData+3,y
         sta MusicOffset_Triangle
         lda MusicHeaderData+4,y

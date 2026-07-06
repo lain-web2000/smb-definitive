@@ -26,11 +26,225 @@ JOYPAD_PORT           = $4016
 JOYPAD_PORT1          = $4016
 JOYPAD_PORT2          = $4017
 
+.segment "MAIN_ZP" : zeropage
+    .res 8 ; $00-$07
+
+ObjectOffset:
+    .res 1 ; $08
+
+FrameCounter:
+    .res 1 ; $09
+
+A_B_Buttons:
+    .res 1 ; $0a
+Up_Down_Buttons:
+    .res 1 ; $0b
+Left_Right_Buttons:
+    .res 1 ; $0c
+PreviousA_B_Buttons:
+    .res 1 ; $0d
+
+GameEngineSubroutine:
+    .res 1 ; $0e
+
+Enemy_Flag:
+    .res 6 ; $0f-$14
+    .res 1 ; $15 (only read by SpawnHammerObj)
+Enemy_ID:
+    .res 6 ; $16-$1b
+    .res 1 ; $1c (unused)
+
+Player_State:
+    .res 1 ; $1d
+Enemy_State:
+    .res 6 ; $1e-$23
+Fireball_State:
+    .res 2 ; $24-$25
+Block_State:
+    .res 2 ; $26-$27
+    .res 2 ; $28-$29 (unused)
+Misc_State:
+    .res 9 ; $2a-$32
+
+PlayerFacingDir:
+    .res 1 ; $33
+DestinationPageLoc:
+    .res 1 ; $34
+VictoryWalkControl:
+    .res 1 ; $35
+    .res 3 ; $36-$38 (unused)
+
+PowerUpType:
+    .res 1 ; $39
+
+FireballBouncingFlag:
+    .res 2 ; $3a-$3b
+
+HammerBroJumpTimer:
+    .res 5 ; $3c-$40
+    .res 4 ; $41-$44 (unused)
+
+Player_MovingDir:
+    .res 1 ; $45
+Enemy_MovingDir:
+    .res 6 ; $46-$4b
+    .res 11 ; $4c-$56 (unused)
+
+SprObject_X_Speed:
+Player_X_Speed:
+    .res 1 ; $57
+Enemy_X_Speed:
+YPlatformCenterYPos:
+Jumpspring_FixedYPos:
+RedPTroopaCenterYPos:
+XMoveSecondaryCounter:
+CheepCheepMoveMFlag:
+LakituMoveSpeed:
+FirebarSpinState_Low:
+BlooperMoveSpeed:
+PiranhaPlant_Y_Speed:
+ExplosionGfxCounter:
+    .res 6 ; $58-$5d
+Fireball_X_Speed:
+    .res 2 ; $5e-$5f
+Block_X_Speed:
+    .res 2 ; $60-$61
+    .res 2 ; $62-$63
+Misc_X_Speed:
+    .res 9 ; $64-$6c
+
+SprObject_PageLoc:
+Player_PageLoc:
+    .res 1 ; $6d
+Enemy_PageLoc:
+    .res 6 ; $6e-$73
+Fireball_PageLoc:
+    .res 2 ; $74-$75
+Block_PageLoc:
+    .res 2 ; $76-$77
+    .res 2 ; $78-$79
+Misc_PageLoc:
+    .res 9 ; $7a-$82
+Bubble_PageLoc:
+    .res 3 ; $83-$85
+
+SprObject_X_Position:
+Player_X_Position:
+    .res 1 ; $86
+Enemy_X_Position:
+    .res 6 ; $87-$8c
+Fireball_X_Position:
+    .res 2 ; $8d-$8e
+Block_X_Position:
+    .res 2 ; $8f-$90
+    .res 2 ; $91-$92
+Misc_X_Position:
+    .res 9 ; $93-$9b
+Bubble_X_Position:
+    .res 3 ; $9c-$9e
+
+SprObject_Y_Speed:
+Player_Y_Speed:
+    .res 1 ; $9f
+Enemy_Y_Speed:
+XMovePrimaryCounter:
+LakituMoveDirection:
+FirebarSpinState_High:
+BlooperMoveCounter:
+PiranhaPlant_MoveFlag:
+ExplosionTimerCounter:
+    .res 6 ; $a0-$a5
+Fireball_Y_Speed:
+    .res 2 ; $a6-$a7
+Block_Y_Speed:
+    .res 2 ; $a8-$a9
+    .res 2 ; $aa-$ab
+Misc_Y_Speed:
+    .res 9 ; $ac-$b4
+
+SprObject_Y_HighPos:
+Player_Y_HighPos:
+    .res 1 ; $b5
+Enemy_Y_HighPos:
+    .res 6 ; $b6-$bb
+Fireball_Y_HighPos:
+    .res 2 ; $bc-$bd
+Block_Y_HighPos:
+    .res 2 ; $be-$bf
+    .res 2 ; $c0-$c1
+Misc_Y_HighPos:
+    .res 9 ; $c2-$ca
+Bubble_Y_HighPos:
+    .res 3 ; $cb-$cd
+
+SprObject_Y_Position:
+Player_Y_Position:
+    .res 1 ; $ce
+Enemy_Y_Position:
+    .res 6 ; $cf-$d4
+Fireball_Y_Position:
+    .res 2 ; $d5-$d6
+Block_Y_Position:
+    .res 2 ; $d7-$d8
+    .res 2 ; $d9-$da
+Misc_Y_Position:
+    .res 9 ; $db-$e3
+Bubble_Y_Position:
+    .res 3 ; $e4-$e6
+
+AreaData:
+    .res 2 ; $e7-$e8
+EnemyData:
+    .res 2 ; $e9-$ea
+
+    .res 5 ; $eb-$ef
+
+NoteLenLookupTblOfs:
+    .res 1 ; $f0
+Square1SoundBuffer:
+    .res 1 ; $f1
+Square2SoundBuffer:
+    .res 1 ; $f2
+NoiseSoundBuffer:
+    .res 1 ; $f3
+AreaMusicBuffer:
+    .res 1 ; $f4
+MusicData:
+    .res 2 ; $f5-$f6
+MusicOffset_Square2:
+    .res 1 ; $f7
+MusicOffset_Square1:
+    .res 1 ; $f8
+MusicOffset_Triangle:
+    .res 1 ; $f9
+PauseSoundQueue:
+    .res 1 ; $fa
+AreaMusicQueue:
+    .res 1 ; $fb
+EventMusicQueue:
+    .res 1 ; $fc
+NoiseSoundQueue:
+    .res 1 ; $fd
+Square2SoundQueue:
+    .res 1 ; $fe
+Square1SoundQueue:
+    .res 1 ; $ff
+
+.segment "MAIN_RAM" : absolute
+    .res 9 ; $0100-$0108 (unused)
+
+VerticalFlipFlag:
+    .res 1 ; $0109
+    .res 3 ; $010a-$010c (unused)
+
+FlagpoleFNum_Y_Pos:
+    .res 1 ; $010d
+FlagpoleFNum_YMFDummy:
+    .res 1 ; $010e
+FlagpoleScore:
+    .res 1 ; $010f
+
 ; GAME SPECIFIC DEFINES
-
-ObjectOffset          = $08
-
-FrameCounter          = $09
 
 SavedJoypadBits       = $06fc
 SavedJoypad1Bits      = $06fc
@@ -49,16 +263,8 @@ IRQTimer_High         = $077e
 IRQUpdateFlag		  = $0722
 NMIAckFlag            = $077c
 
-A_B_Buttons           = $0a
-PreviousA_B_Buttons   = $0d
-Up_Down_Buttons       = $0b
-Left_Right_Buttons    = $0c
-
-GameEngineSubroutine  = $0e
-
 Mirror_PPU_CTRL       = $0778
 Mirror_PPU_MASK       = $0779
-Mirror_FDS_CTRL_REG   = $fa
 NameTableSelect       = $077a
 FileListNumber        = $07f7
 
@@ -117,9 +323,6 @@ ScreenRight_PageLoc   = $071b
 ScreenLeft_X_Pos      = $071c
 ScreenRight_X_Pos     = $071d
 
-PlayerFacingDir       = $33
-DestinationPageLoc    = $34
-VictoryWalkControl    = $35
 ScrollFractional      = $0768
 SecondaryMsgCounter   = $0749
 MsgCounter            = $0719
@@ -139,13 +342,6 @@ ScrollThirtyTwo       = $073d
 Player_X_Scroll       = $06ff
 Player_Pos_ForScroll  = $0755
 ScrollAmount          = $0775
-
-AreaData              = $e7
-AreaDataLow           = $e7
-AreaDataHigh          = $e8
-EnemyData             = $e9
-EnemyDataLow          = $e9
-EnemyDataHigh         = $ea
 
 AreaParserTaskNum     = $071f
 ColumnSets            = $071e
@@ -180,15 +376,11 @@ GameTimerDisplay      = $07ec
 CoinDisplay           = $07e7
 DigitModifier         = $0134
 
-VerticalFlipFlag      = $0109
 FloateyNum_Control    = $0110
 ShellChainCounter     = $0125
 FloateyNum_Timer      = $012c
 FloateyNum_X_Pos      = $0117
 FloateyNum_Y_Pos      = $011e
-FlagpoleFNum_Y_Pos    = $010d
-FlagpoleFNum_YMFDummy = $010e
-FlagpoleScore         = $010f
 FlagpoleCollisionYPos = $070f
 StompChainCounter     = $0484
 FlagpoleMusicFlag     = $07f6
@@ -250,7 +442,6 @@ BalPlatformAlignment  = $03a0
 Platform_X_Scroll     = $03a1
 PlatformCollisionFlag = $03a2
 YPlatformTopYPos      = $0401
-YPlatformCenterYPos   = $58
 
 BrickCoinTimerFlag    = $06bc
 StarFlagTaskControl   = $0746
@@ -270,64 +461,8 @@ FBall_SprDataOffset   = $06f1
 Misc_SprDataOffset    = $06f3
 SprDataOffset_Ctrl    = $03ee
 
-Player_State          = $1d
-Enemy_State           = $1e
-Fireball_State        = $24
-Block_State           = $26
-Misc_State            = $2a
-
-Player_MovingDir      = $45
-Enemy_MovingDir       = $46
-
-SprObject_X_Speed     = $57
-Player_X_Speed        = $57
-Enemy_X_Speed         = $58
-Fireball_X_Speed      = $5e
-Block_X_Speed         = $60
-Misc_X_Speed          = $64
-
-Jumpspring_FixedYPos  = $58
 JumpspringAnimCtrl    = $070e
 JumpspringForce       = $06db
-
-SprObject_PageLoc     = $6d
-Player_PageLoc        = $6d
-Enemy_PageLoc         = $6e
-Fireball_PageLoc      = $74
-Block_PageLoc         = $76
-Misc_PageLoc          = $7a
-Bubble_PageLoc        = $83
-
-SprObject_X_Position  = $86
-Player_X_Position     = $86
-Enemy_X_Position      = $87
-Fireball_X_Position   = $8d
-Block_X_Position      = $8f
-Misc_X_Position       = $93
-Bubble_X_Position     = $9c
-
-SprObject_Y_Speed     = $9f
-Player_Y_Speed        = $9f
-Enemy_Y_Speed         = $a0
-Fireball_Y_Speed      = $a6
-Block_Y_Speed         = $a8
-Misc_Y_Speed          = $ac
-
-SprObject_Y_HighPos   = $b5
-Player_Y_HighPos      = $b5
-Enemy_Y_HighPos       = $b6
-Fireball_Y_HighPos    = $bc
-Block_Y_HighPos       = $be
-Misc_Y_HighPos        = $c2
-Bubble_Y_HighPos      = $cb
-
-SprObject_Y_Position  = $ce
-Player_Y_Position     = $ce
-Enemy_Y_Position      = $cf
-Fireball_Y_Position   = $d5
-Block_Y_Position      = $d7
-Misc_Y_Position       = $db
-Bubble_Y_Position     = $e4
 
 SprObject_Rel_XPos    = $03ad
 Player_Rel_XPos       = $03ad
@@ -374,8 +509,6 @@ Misc_BoundBoxCtrl     = $04a2
 
 EnemyFrenzyBuffer     = $06cb
 EnemyFrenzyQueue      = $06cd
-Enemy_Flag            = $0f
-Enemy_ID              = $16
 
 PlayerGfxOffset       = $06d5
 PlayerDamageFlag      = $06d8
@@ -443,9 +576,6 @@ BoundingBox_UL_Corner = $04ac
 BoundingBox_LR_Corner = $04ae
 EnemyBoundingBoxCoord = $04b0
 
-PowerUpType           = $39
-
-FireballBouncingFlag  = $3a
 FireballCounter       = $06ce
 FireballThrowingTimer = $0711
 
@@ -456,33 +586,20 @@ Block_Buffer_1        = $0500
 Block_Buffer_2        = $05d0
 
 HammerThrowingTimer   = $03a2
-HammerBroJumpTimer    = $3c
 Misc_Collision_Flag   = $06be
 
 RedPTroopaOrigXPos    = $0401
-RedPTroopaCenterYPos  = $58
 
-XMovePrimaryCounter   = $a0
-XMoveSecondaryCounter = $58
-
-CheepCheepMoveMFlag   = $58
 CheepCheepOrigYPos    = $0434
 BitMFilter            = $06dd
 
 LakituReappearTimer   = $06d1
-LakituMoveSpeed       = $58
-LakituMoveDirection   = $a0
 
-FirebarSpinState_Low  = $58
-FirebarSpinState_High = $a0
 FirebarSpinSpeed      = $0388
 FirebarSpinDirection  = $34
 
 DuplicateObj_Offset   = $06cf
 NumberofGroupEnemies  = $06d3
-
-BlooperMoveCounter    = $a0
-BlooperMoveSpeed      = $58
 
 BowserBodyControls    = $0363
 BowserFeetCounter     = $0364
@@ -499,12 +616,8 @@ BowserFlamePRandomOfs = $0417
 
 PiranhaPlantUpYPos    = $0417
 PiranhaPlantDownYPos  = $0434
-PiranhaPlant_Y_Speed  = $58
-PiranhaPlant_MoveFlag = $a0
 
 FireworksCounter      = $06d7
-ExplosionGfxCounter   = $58
-ExplosionTimerCounter = $a0
 
 
 ;sound related defines
@@ -521,31 +634,13 @@ Squ2_SfxLenCounter    = $07bd
 Sfx_SecondaryCounter  = $07be
 Noise_SfxLenCounter   = $07bf
 
-PauseSoundQueue       = $fa
-Square1SoundQueue     = $ff
-Square2SoundQueue     = $fe
-NoiseSoundQueue       = $fd
-AreaMusicQueue        = $fb
-EventMusicQueue       = $fc
-
-Square1SoundBuffer    = $f1
-Square2SoundBuffer    = $f2
-NoiseSoundBuffer      = $f3
-AreaMusicBuffer       = $f4
 EventMusicBuffer      = $07b1
 PauseSoundBuffer      = $07b2
 
 PatternNumber         = $061d
 
-MusicData             = $f5
-MusicDataLow          = $f5
-MusicDataHigh         = $f6
-MusicOffset_Square2   = $f7
-MusicOffset_Square1   = $f8
-MusicOffset_Triangle  = $f9
 MusicOffset_Noise     = $07b0
 
-NoteLenLookupTblOfs   = $f0
 DAC_Counter           = $07c0
 NoiseDataLoopbackOfs  = $07c1
 NoteLengthTblAdder    = $07c4
@@ -559,26 +654,29 @@ ContinueMusicFlag     = $07cb
 ;CONSTANTS
 
 ;sound effects constants
-Sfx_SmallJump         = %10000000
-Sfx_Flagpole          = %01000000
-Sfx_Fireball          = %00100000
-Sfx_PipeDown_Injury   = %00010000
-Sfx_EnemySmack        = %00001000
-Sfx_EnemyStomp        = %00000100
-Sfx_Bump              = %00000010
-Sfx_BigJump           = %00000001
+Sfx_BigJump           = $01
+Sfx_Bump              = $02
+Sfx_EnemyStomp        = $03
+Sfx_EnemySmack        = $04
+Sfx_PipeDown_Injury   = $05
+Sfx_Fireball          = $06
+Sfx_Flagpole          = $07
+Sfx_SmallJump         = $08
 
-Sfx_BowserFall        = %10000000
-Sfx_ExtraLife         = %01000000
-Sfx_PowerUpGrab       = %00100000
-Sfx_TimerTick         = %00010000
-Sfx_Blast             = %00001000
-Sfx_GrowVine          = %00000100
-Sfx_GrowPowerUp       = %00000010
-Sfx_CoinGrab          = %00000001
+Sfx_CoinGrab          = $01
+Sfx_GrowPowerUp       = $02
+Sfx_GrowVine          = $03
+Sfx_Blast             = $04
+Sfx_TimerTick         = $05
+Sfx_PowerUpGrab       = $06
+Sfx_ExtraLife         = $07
+Sfx_BowserFall        = $08
+Sfx_CorrectPath       = $09
 
-Sfx_BowserFlame       = %00000010
-Sfx_BrickShatter      = %00000001
+Sfx_BrickShatter      = $01
+Sfx_BowserFlame       = $02
+Sfx_Wind              = $03
+Sfx_Skid              = $04
 
 ;music constants
 Silence               = %10000000

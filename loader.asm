@@ -16,8 +16,8 @@ StartLoader:
         jsr InitializeMemory
         sta ContinueMenuSelect      ;reset menu selection
         jsr CheckSaveData
-		lda #$03
-		sta FME7Command
+        lda #$03
+        sta FME7Command
         lda #CHR_MENU               ;load CHR tiles for menu
         sta FME7Parameter
         lda #VRAM_PAL_MENU          ;queue menu palette
@@ -27,13 +27,13 @@ StartLoader:
         sta IRQTimer_Low
         lda #$32
         sta IRQTimer_High
-		lda #0 ; for famistudio_init
-		sta SoundEngineSet
-		ldy #>music_data_smb_complete_menu
-		ldx #<music_data_smb_complete_menu
-		jsr famistudio_init
-		lda #0
-		jsr famistudio_music_play
+        lda #0 ; for famistudio_init
+        sta SoundEngineSet
+        ldy #>music_data_smb_complete_menu
+        ldx #<music_data_smb_complete_menu
+        jsr famistudio_init
+        lda #0
+        jsr famistudio_music_play
         lda #%10001000              ;set up pattern table arrangment
         jsr WritePPUReg1            ;and enable NMIs
 @nmi_wait:
