@@ -81,8 +81,8 @@ FireballBouncingFlag:
     .res 2 ; $3a-$3b
 
 HammerBroJumpTimer:
-    .res 5 ; $3c-$40
-    .res 4 ; $41-$44 (unused)
+    .res 6 ; $3c-$41
+    .res 3 ; $42-$44 (unused)
 
 Player_MovingDir:
     .res 1 ; $45
@@ -194,8 +194,12 @@ Bubble_Y_Position:
 
 AreaData:
     .res 2 ; $e7-$e8
+AreaDataLow = AreaData
+AreaDataHigh = AreaData+1
 EnemyData:
     .res 2 ; $e9-$ea
+EnemyDataLow = EnemyData
+EnemyDataHigh = EnemyData+1
 
     .res 5 ; $eb-$ef
 
@@ -243,6 +247,58 @@ FlagpoleFNum_YMFDummy:
     .res 1 ; $010e
 FlagpoleScore:
     .res 1 ; $010f
+
+FloateyNum_Control:
+    .res 6 ; $0110-$0115
+    .res 1 ; $0116 (unused)
+FloateyNum_X_Pos:
+    .res 6 ; $0117-$011c
+    .res 1 ; $011d (unused)
+FloateyNum_Y_Pos:
+    .res 6 ; $011e-$0123
+    .res 1 ; $0124 (unused)
+ShellChainCounter:
+    .res 6 ; $0125-$012a
+    .res 1 ; $012b (unused)
+FloateyNum_Timer:
+    .res 6 ; $012c-$0131
+    .res 1 ; $0132 (unused)
+
+    .res 1 ; $0133 (only used by DigitsMathRoutine)
+DigitModifier:
+    .res 6 ; $0134-$0139
+
+    .res 38 ; $013a-$015f (unused)
+    .res 160 ; $0160-$01ff (stack)
+
+Sprite_Data:
+    .res 256 ; $0200-$02ff (shadow OAM)
+Sprite_Y_Position = Sprite_Data
+Sprite_Tilenumber = Sprite_Data+1
+Sprite_Attributes = Sprite_Data+2
+Sprite_X_Position = Sprite_Data+3
+
+VRAM_Buffer_Offset:
+    .res 1 ; $0300
+VRAM_Buffer:
+    .res 98 ; $0301-$0362
+
+BowserBodyControls:
+    .res 1 ; $0363
+BowserFeetCounter:
+    .res 1 ; $0364
+BowserMovementSpeed:
+    .res 1 ; $0365
+BowserOrigXPos:
+    .res 1 ; $0366
+BowserFlameTimerCtrl:
+    .res 1 ; $0367
+BowserFront_Offset:
+    .res 1 ; $0368
+BridgeCollapseOffset:
+    .res 1 ; $0369
+BowserGfxFlag:
+    .res 1 ; $036a
 
 ; GAME SPECIFIC DEFINES
 
@@ -309,13 +365,6 @@ WorldEndTimer         = $07a1
 DemoTimer             = $07a2
 GameOverMsgFlag       = $07f5
 
-Sprite_Data           = $0200
-
-Sprite_Y_Position     = $0200
-Sprite_Tilenumber     = $0201
-Sprite_Attributes     = $0202
-Sprite_X_Position     = $0203
-
 ScreenEdge_PageLoc    = $071a
 ScreenEdge_X_Pos      = $071c
 ScreenLeft_PageLoc    = $071a
@@ -374,19 +423,11 @@ ScoreAndCoinDisplay   = $07dd
 PlayerScoreDisplay    = $07dd
 GameTimerDisplay      = $07ec
 CoinDisplay           = $07e7
-DigitModifier         = $0134
 
-FloateyNum_Control    = $0110
-ShellChainCounter     = $0125
-FloateyNum_Timer      = $012c
-FloateyNum_X_Pos      = $0117
-FloateyNum_Y_Pos      = $011e
 FlagpoleCollisionYPos = $070f
 StompChainCounter     = $0484
 FlagpoleMusicFlag     = $07f6
 
-VRAM_Buffer_Offset    = $0300
-VRAM_Buffer           = $0301
 VRAM_Buffer_AddrCtrl  = $0773
 Sprite0HitDetectFlag  = $0722
 DisableScreenFlag     = $0774
@@ -601,14 +642,6 @@ FirebarSpinDirection  = $34
 DuplicateObj_Offset   = $06cf
 NumberofGroupEnemies  = $06d3
 
-BowserBodyControls    = $0363
-BowserFeetCounter     = $0364
-BowserMovementSpeed   = $0365
-BowserOrigXPos        = $0366
-BowserFlameTimerCtrl  = $0367
-BowserFront_Offset    = $0368
-BridgeCollapseOffset  = $0369
-BowserGfxFlag         = $036a
 BowserHitPoints       = $0483
 MaxRangeFromOrigin    = $06dc
 

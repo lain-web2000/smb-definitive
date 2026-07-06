@@ -520,18 +520,19 @@ ContinueCorrectPath:
         ldx Squ2_SfxLenCounter
         lda CorrectPathVolData-1,x
         tax
+        ldy #$7f
         lda Squ2_SfxLenCounter
         and #$0f
         cmp #$0f
         beq CPath1
         cmp #$0a
         beq CPath2
+        jsr Dump_Sq2_Regs
         jmp DecrementSfx2Length
 CPath1: lda #$44
         bne :+
 CPath2: lda #$64
-:       ldy #$7f
-        jmp LoadSqu2Regs
+:       jmp LoadSqu2Regs
 
 ;--------------------------------
 

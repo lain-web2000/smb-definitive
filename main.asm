@@ -2117,7 +2117,7 @@ ForeSceneryData:
    .byte $00, $00, $00, $00, $86, $87
 
 TerrainMetatiles:
-      .byte $6c, $6d, $52, $65
+      .byte $6c, $64, $52, $65
 
 TerrainRenderBits:
       .byte %00000000, %00000000 ;no ceiling or floor
@@ -2236,9 +2236,10 @@ TerrBChk: lda Bitmasks,y             ;load bitmask, then perform AND on contents
 NextTBit: inx                        ;continue until end of buffer
           cpx #$0d
           beq RendBBuf               ;if we're at the end, break out of this loop
-          lda AreaType               ;check world type for underground area
-          cmp #$02
-          bne EndUChk                ;if not underground, skip this part
+          lda AreaType               ;check world type for ground or underground area
+          beq EndUChk
+          cmp #$03
+          bcs EndUChk                ;if not ground or underground, skip this part
           cpx #$0b
           bne EndUChk                ;if we're at the bottom of the screen, override
           lda #$6d                   ;old terrain type with ground level terrain type
@@ -14294,6 +14295,10 @@ WindOn:
      bne WOn
 WindOff:
      lda #$00             ;turn the wind off
+     ldy NoiseSoundBuffer ;stop wind sound effect, if playing
+     cpy #Sfx_Wind
+     bne WOn
+     sta NoiseSoundBuffer
 WOn: sta WindFlag
      rts
 
@@ -14347,7 +14352,7 @@ PrintVictoryMsgsForWorld8:
          bne GetVMID
 @ChkL:   lda SelectedPlayer         ;check selected player
          beq GetVMID                ;if mario, use standard message offset
-         ldy #$04                   ;otherwise use alt offset for luigi
+         ldy #$03                   ;otherwise use alt offset for luigi
 GetVMID: tya
          clc
          adc #VRAM_NT_PEACH_1ST     ;get appropriate range for victory messages
@@ -14777,8 +14782,8 @@ ThanksForPlayingMsg:
     .byte "OUR FIRST DEMO!"
 
     ;"DEVELOPED BY:"
-    .byte $22, $85, 20
-    .byte "DEVELOPED BY WEB2000"
+    .byte $22, $85, 21
+    .byte "DEVELOPED BY ALEXYWEB"
 
     ;"-SIMPLISTIC6502"
     .byte $22, $c5, 18
@@ -14878,13 +14883,14 @@ ReadJoypads: ; taken from https://www.nesdev.org/wiki/Controller_reading_code
     cmp #$01
     rol RawJoypad2Bits
     bcc :-
-	lda RawJoypad1Bits
-	and #$0f
-	tax
-	lda RawJoypad1Bits
-	and #$f0
-	ora ValidDirections,x
-	sta RawJoypad1Bits
+    ; mask out invalid directions
+    lda RawJoypad1Bits
+    and #$0f
+    tax
+    lda RawJoypad1Bits
+    and #$f0
+    ora ValidDirections,x
+    sta RawJoypad1Bits
     ; newly pressed buttons: not held last frame, and held now
     lda $00
     eor #%11111111
@@ -14946,6 +14952,53 @@ UpdateScreen:  ldy #$00                  ;load first byte from indirect as a poi
 InitScroll:    sta PPU_SCROLL            ;store contents of A into scroll registers
                sta PPU_SCROLL            ;and end whatever subroutine led us here
                rts
+
+FlushVRAMBuffer:
+               ldy #$ff                  ;init offset into buffer
+FlushBufferLp: iny
+               lda VRAM_Buffer,y         ;terminator found ($00)?
+               beq InitScroll            ;if so, branch to leave
+               sta PPU_ADDRESS           ;write high byte of PPU address
+               and #%00111111
+               pha                       ;save for palette workaround check
+               iny
+               lda VRAM_Buffer,y
+               sta PPU_ADDRESS           ;write low byte of PPU address
+               iny
+               ldx #%00001000            ;horizontal writes by default
+               lda VRAM_Buffer,y
+               bpl SetIncFlag
+               ldx #%00001100            ;if d7 set, vertical writes
+SetIncFlag:    stx PPU_CTRL              ;update PPUCTRL increment flag
+               asl
+               bpl LiteralBuffer
+               lsr                       ;d6 set, repeated writes
+               and #%00111111
+               tax
+               iny
+               lda VRAM_Buffer,y         ;read byte from buffer
+RepeatData:    sta PPU_DATA              ;write it repeatedly
+               dex
+               bne RepeatData
+               beq CheckPPUAddr
+LiteralBuffer: lsr                       ;d6 clear, unique writes
+               and #%00111111
+               tax
+WriteData:     iny
+               lda VRAM_Buffer,y         ;read byte from buffer
+               sta PPU_DATA              ;write it to the PPU
+               dex
+               bne WriteData
+CheckPPUAddr:  pla                       ;if base address was in palette RAM,
+               cmp #$3f                  ;work around possible palette corruption
+               bne FlushBufferLp
+               lda #$3f                  ;set address to $3f00, then move out of palette RAM
+               sta PPU_ADDRESS
+               lda #$00
+               sta PPU_ADDRESS
+               sta PPU_ADDRESS
+               sta PPU_ADDRESS
+               beq FlushBufferLp
 
 ;------------------------------------------------------------------------------------
 
@@ -15088,8 +15141,8 @@ FontTiles:
 LoadGameTileset:
       ; load tileset based on menu selection
       ; if per-game, tilset depends on levels played
-	  lda #$01
-	  sta FME7Command
+      lda #$01
+      sta FME7Command
       lda #CHR_SMB1
       ldy TilesetSelection
       bne @static_tileset
@@ -15103,18 +15156,18 @@ LoadGameTileset:
       lda #CHR_SMB2
 @write_tileset:
       tay
-	  lda BGTiles,y
-	  sta FME7Parameter
-	  lda #$04
-	  sta FME7Command
-	  lda SprTiles,y
-	  sta FME7Parameter
-	  rts
+      lda BGTiles,y
+      sta FME7Parameter
+      lda #$04
+      sta FME7Command
+      lda SprTiles,y
+      sta FME7Parameter
+      rts
 
 LoadFontTileset:
       ; load font based on menu selection
       lda #$00
-	  sta FME7Command
+      sta FME7Command
       ldy FontSelection
       bne @static_fonts
       ldy CurrentGame
@@ -15159,9 +15212,9 @@ TempSwitch16KBank:
     rts
 
 RunSoundEngine:
-	lda SoundEngineSet
-	bne InGame
-	jmp famistudio_update
+    lda SoundEngineSet
+    bne InGame
+    jmp famistudio_update
 InGame:
     lda #SoundBank        ;switch bank
     jsr TempSwitch16KBank
@@ -15188,10 +15241,10 @@ RunGetAreaPointer:
     jmp LoadMainBank      ;and return to main bank
 
 BootIntoGame:
-		lda #$03
-		sta FME7Command
         lda #$03
-		sta FME7Parameter
+        sta FME7Command
+        lda #$03
+        sta FME7Parameter
         lda #MainBank
         jsr Switch16KBank           ;switch PRG banks
         jsr CheckSaveData           ;check validity of save data
@@ -15201,7 +15254,7 @@ BootIntoGame:
 ; VRAM TABLE AND DATA
 
 VRAM_AddrTable:
-   ; general-use buffer in system RAM
+   ; general-use buffer in system RAM (dummy entry)
    .word VRAM_Buffer
 
    ; level palettes
@@ -15310,13 +15363,18 @@ ScrnSwch:
       sta Mirror_PPU_MASK
       and #%11100111            ;turn screen off regardless of mirror reg
       sta PPU_MASK
-      ldx PPU_STATUS
       lda #$00
-      jsr InitScroll
       sta PPU_SPR_ADDR
       lda #$02                  ;dump OAM data to PPU's sprite RAM
       sta SPR_DMA
-      lda VRAM_Buffer_AddrCtrl
+      lda PPU_STATUS            ;reset flip-flop
+      lda VRAM_Buffer_AddrCtrl  ;check if transfer from ROM was requested
+      bne AltVRAMTransfer       ;if so, branch to alternate handler
+      jsr FlushVRAMBuffer
+      sta VRAM_Buffer_Offset    ;erase the VRAM buffer offset, init VRAM buffer
+      sta VRAM_Buffer           ;by writing end terminator at the first byte
+      beq RestorePPUMASK        ;unconditional branch
+AltVRAMTransfer:
       asl
       tax
       lda VRAM_AddrTable,x      ;get pointer to VRAM data
@@ -15325,12 +15383,8 @@ ScrnSwch:
       lda VRAM_AddrTable,x
       sta $01
       jsr UpdateScreen          ;now update the screen with it
-      lda #$00                  ;erase the VRAM buffer offset, init first VRAM buffer
-      ldx VRAM_Buffer_AddrCtrl
-      bne :+
-      sta VRAM_Buffer_Offset    ;by writing end terminator at the first byte, and
-      sta VRAM_Buffer           ;init address control to point at first VRAM buffer
-:     sta VRAM_Buffer_AddrCtrl
+      sta VRAM_Buffer_AddrCtrl  ;init address control to point at VRAM buffer
+RestorePPUMASK:
       lda Mirror_PPU_MASK
       sta PPU_MASK              ;dump PPU control register 2
       lda ScreenEdge_PageLoc    ;update IRQ scroll position
@@ -15345,7 +15399,7 @@ ScrnSwch:
       sta $00
 SkipVRAMJoypad:
       jsr RunSoundEngine        ;run sound engine every frame
-	  lda PPU_STATUS            ;reset flip-flop
+      lda PPU_STATUS            ;reset flip-flop
       lda Mirror_PPU_CTRL       ;reenable NMIs
       ora #$80
       sta Mirror_PPU_CTRL

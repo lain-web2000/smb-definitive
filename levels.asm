@@ -25,16 +25,16 @@ FindAreaPointer:
 FindAreaPointerJ:
       lda WorldAddrOffsetsJ,y
       clc
-      adc AreaNumber         ;add area number used to find data
+      adc AreaNumber          ;add area number used to find data
       tay
       lda AreaAddrOffsetsJ,y  ;from there we have our area pointer
       rts
 
 GetAreaPointer:
-     lda LevelSet              ;are we playing 2J levels?
-     bne GetAreaPointerJ       ;yes, use 2J offsets instead
-     ldx WorldAddrOffsets,y    ;get offset to where this world's area offsets are
-     ldy AreaAddrOffsets,x     ;get area offset based on world offset
+     lda LevelSet               ;are we playing 2J levels?
+     bne GetAreaPointerJ        ;yes, use 2J offsets instead
+     ldx WorldAddrOffsets,y     ;get offset to where this world's area offsets are
+     ldy AreaAddrOffsets,x      ;get area offset based on world offset
      rts
 GetAreaPointerJ:
      ldx WorldAddrOffsetsJ,y    ;get offset to where this world's area offsets are
@@ -56,9 +56,9 @@ GetAreaDataAddrs:
             asl
             tay
             lda EnemyDataAddrs+1,y     ;use offset to load pointer
-            sta EnemyData+1
+            sta EnemyDataHigh
             lda EnemyDataAddrs,y
-            sta EnemyData
+            sta EnemyDataLow
             ldy AreaType               ;use area type as offset
             lda AreaDataHOffsets,y     ;do the same thing but with different base value
             clc
@@ -66,9 +66,9 @@ GetAreaDataAddrs:
             asl
             tay
             lda AreaDataAddrs+1,y      ;use this offset to load another pointer
-            sta AreaData+1
+            sta AreaDataHigh
             lda AreaDataAddrs,y
-            sta AreaData
+            sta AreaDataLow
             jmp ContinueAreaDataAddrs
 GetAreaDataAddrsJ:
             lda HardWorldFlag          ;playing 2J letter worlds?
@@ -79,9 +79,9 @@ GetAreaDataAddrsJ:
             asl
             tay
             lda EnemyDataAddrsJ+1,y    ;use offset to load pointer
-            sta EnemyData+1
+            sta EnemyDataHigh
             lda EnemyDataAddrsJ,y
-            sta EnemyData
+            sta EnemyDataLow
             ldy AreaType               ;use area type as offset
             lda AreaDataHOffsetsJ,y    ;do the same thing but with different base value
             clc
@@ -89,9 +89,9 @@ GetAreaDataAddrsJ:
             asl
             tay
             lda AreaDataAddrsJ+1,y     ;use this offset to load another pointer
-            sta AreaData+1
+            sta AreaDataHigh
             lda AreaDataAddrsJ,y
-            sta AreaData
+            sta AreaDataLow
             jmp ContinueAreaDataAddrs
 GetAreaDataAddrsL:
             lda EnemyAddrHOffsetsL,y   ;load base value with 2 altered MSB,
@@ -100,9 +100,9 @@ GetAreaDataAddrsL:
             asl
             tay
             lda EnemyDataAddrsL+1,y    ;use offset to load pointer
-            sta EnemyData+1
+            sta EnemyDataHigh
             lda EnemyDataAddrsL,y
-            sta EnemyData
+            sta EnemyDataLow
             ldy AreaType               ;use area type as offset
             lda AreaDataHOffsetsL,y    ;do the same thing but with different base value
             clc
@@ -110,84 +110,84 @@ GetAreaDataAddrsL:
             asl
             tay
             lda AreaDataAddrsL+1,y     ;use this offset to load another pointer
-            sta AreaData+1
+            sta AreaDataHigh
             lda AreaDataAddrsL,y
-            sta AreaData
+            sta AreaDataLow
 ContinueAreaDataAddrs:
-            ldy #$00                   ;load first byte of header
+            ldy #$00                 ;load first byte of header
             lda (AreaData),y     
-            pha                        ;save it to the stack for now
-            and #%00000111             ;save 3 LSB for foreground scenery or bg color control
+            pha                      ;save it to the stack for now
+            and #%00000111           ;save 3 LSB for foreground scenery or bg color control
             cmp #$04
             bcc StoreFore
-            sta BackgroundColorCtrl    ;if 4 or greater, save value here as bg color control
+            sta BackgroundColorCtrl  ;if 4 or greater, save value here as bg color control
             lda #$00
-StoreFore:  sta ForegroundScenery      ;if less, save value here as foreground scenery
-            pla                        ;pull byte from stack and push it back
+StoreFore:  sta ForegroundScenery    ;if less, save value here as foreground scenery
+            pla                      ;pull byte from stack and push it back
             pha
-            and #%00111000             ;save player entrance control bits
-            lsr                        ;shift bits over to LSBs
+            and #%00111000           ;save player entrance control bits
+            lsr                      ;shift bits over to LSBs
             lsr
             lsr
-            sta PlayerEntranceCtrl     ;save value here as player entrance control
-            pla                        ;pull byte again but do not push it back
-            and #%11000000             ;save 2 MSB for game timer setting
+            sta PlayerEntranceCtrl   ;save value here as player entrance control
+            pla                      ;pull byte again but do not push it back
+            and #%11000000           ;save 2 MSB for game timer setting
             clc
-            rol                        ;rotate bits over to LSBs
+            rol                      ;rotate bits over to LSBs
             rol
             rol
-            sta GameTimerSetting       ;save value here as game timer setting
+            sta GameTimerSetting     ;save value here as game timer setting
             iny
-            lda (AreaData),y           ;load second byte of header
-            pha                        ;save to stack
-            and #%00001111             ;mask out all but lower nybble
+            lda (AreaData),y         ;load second byte of header
+            pha                      ;save to stack
+            and #%00001111           ;mask out all but lower nybble
             sta TerrainControl
-            pla                        ;pull and push byte to copy it to A
+            pla                      ;pull and push byte to copy it to A
             pha
-            and #%00110000             ;save 2 MSB for background scenery type
+            and #%00110000           ;save 2 MSB for background scenery type
             lsr
-            lsr                        ;shift bits to LSBs
+            lsr                      ;shift bits to LSBs
             lsr
             lsr
-            sta BackgroundScenery      ;save as background scenery
+            sta BackgroundScenery    ;save as background scenery
             pla           
             and #%11000000
             clc
-            rol                        ;rotate bits over to LSBs
+            rol                      ;rotate bits over to LSBs
             rol
             rol
-            cmp #%00000011             ;if set to 3, store here
-            bne StoreStyle             ;and nullify other value
-            sta CloudTypeOverride      ;otherwise store value in other place
+            cmp #%00000011           ;if set to 3, store here
+            bne StoreStyle           ;and nullify other value
+            sta CloudTypeOverride    ;otherwise store value in other place
             lda #$00
 StoreStyle: sta AreaStyle
-            ldy #$00                   ;init counter
-ADataLoop:  lda (AreaData),y           ;store area data into region of RAM
+            ldy #$00                 ;init counter
+ADataLoop:  lda (AreaData),y         ;store area data into region of RAM
             sta AreaDataCopy,y
-            iny                        ;increment Y for next byte
-            cmp #$fd                   ;did we just store a $fd byte?
-            bne ADataLoop              ;if not, we aren't done storing area data yet
-            lda #>AreaDataCopy         ;now move area data pointers to RAM
-            sta AreaData+1
+            iny                      ;increment Y for next byte
+            cmp #$fd                 ;did we just store a $fd byte?
+            bne ADataLoop            ;if not, we aren't done storing area data yet
+            lda #>AreaDataCopy       ;now move area data pointers to RAM
+            sta AreaDataHigh
             lda #<AreaDataCopy
-            sta AreaData
-            ldy #$00                   ;init counter
-EDataLoop:  lda (EnemyData),y          ;store enemy data into region of RAM
+            sta AreaDataLow
+            ldy #$00                 ;init counter
+EDataLoop:  lda (EnemyData),y        ;store enemy data into region of RAM
             sta EnemyDataCopy,y
-            iny                        ;increment Y for next byte
-            cmp #$ff                   ;did we just store a $ff byte?
-            bne EDataLoop              ;if not, we aren't done storing enemy data yet
-            lda #>EnemyDataCopy        ;now move enemy data pointers to RAM
-            sta EnemyData+1
+            iny                      ;increment Y for next byte
+            cmp #$ff                 ;did we just store a $ff byte?
+            bne EDataLoop            ;if not, we aren't done storing enemy data yet
+            lda #>EnemyDataCopy      ;now move enemy data pointers to RAM
+            sta EnemyDataHigh
             lda #<EnemyDataCopy
-            sta EnemyData              ;(credit to threecreepio for this code)
-            lda AreaData               ;increment area data address by 2 bytes
+            sta EnemyDataLow         ;(credit to threecreepio for this code)
+            lda AreaDataLow          ;increment area data address by 2 bytes
             clc
             adc #$02
-            sta AreaData
-            lda AreaData+1
+            sta AreaDataLow
+            lda AreaDataHigh
             adc #$00
-            sta AreaData+1
+            sta AreaDataHigh
             rts
 
 ;-------------------------------------------------------------------------------------
