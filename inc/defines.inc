@@ -235,7 +235,27 @@ Square1SoundQueue:
     .res 1 ; $ff
 
 .segment "MAIN_RAM" : absolute
-    .res 9 ; $0100-$0108 (unused)
+NMISelect:
+    .res 1 ; $0100
+IRQSelect:
+    .res 1 ; $0101
+RESETFlag:
+    .res 1 ; $0102
+RESETType:
+    .res 1 ; $0103
+
+IRQTimer_Low:
+    .res 1 ; $0104
+IRQTimer_High:
+    .res 1 ; $0105
+
+; hacky!
+Mirror_PPU_SCROLL1:
+    .res 1 ; $0106
+Mirror_PPU_SCROLL2:
+    .res 1 ; $0107
+
+    .res 1 ; $0108 (unused)
 
 VerticalFlipFlag:
     .res 1 ; $0109
@@ -314,8 +334,6 @@ PressedJoypad2Bits    = $074d
 JoypadOverride        = $0758
 
 IRQAckFlag			  = $077b
-IRQTimer_Low          = $077d
-IRQTimer_High         = $077e
 IRQUpdateFlag		  = $0722
 NMIAckFlag            = $077c
 

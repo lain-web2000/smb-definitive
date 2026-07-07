@@ -2,15 +2,16 @@ MEMORY
 {
 	MAIN_ZP:	start =   $00, size =   $100;
 	MAIN_RAM:	start = $0100, size =   $600;
-	SOUND_ZP:	start =   $f0, size =    $0a;
-	SOUND_RAM:	start = $0500, size =  $012b;
+	SOUND_ZP:	start =   $F0, size =    $0A;
+	SOUND_RAM:	start = $0500, size =  $012B;
 	
 	INES:		start =     0, size =    $10, fill=yes, fillval=$00, type = rw;
 	UNUSEDPRG:	start = $8000, size =  $C000, fill=yes, fillval=$FF, type = ro;
 	SOUNDPRG:	start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
 	LEVELPRG:  	start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
 	LOADER:		start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
-	SM2MAIN:	start = $8000, size =  $8000, fill=yes, fillval=$FF, type = ro;
+	MAIN:		start = $8000, size =  $7FFA, fill=yes, fillval=$FF, type = ro;
+	VECTORS:	start = $FFFA, size =     $6, fill=yes, fillval=$FF, type = ro;
 	CHRROM:		start = $8000, size =  $4000, fill=yes, fillval=$FF, type = ro;
 }
 
@@ -26,6 +27,7 @@ SEGMENTS
 	SOUNDPRG:   load = SOUNDPRG, type = ro;
 	LEVELPRG:   load = LEVELPRG, type = ro;
 	LOADER:		load = LOADER,	type = ro;
-	SM2MAIN:    load = SM2MAIN, type = ro;
+	MAIN:		load = MAIN, type = ro;
+	VECTORS:	load = VECTORS, type = ro;
 	CHRROM:		load = CHRROM, 	type = ro;
 }

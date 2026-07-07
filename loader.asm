@@ -6,15 +6,17 @@ NameTableDestination = $08
 TitleScrollOffset = $0a
 TitleScrollAmount = $0b
 
+temp_mem = $eb
+
 StartLoader:
         ldx #$00                    ;disable NMIs and rendering
         stx PPU_CTRL
         stx PPU_MASK
         dex
         txs                         ;reset stack pointer
-        ldy #ColdBootOffset         ;clear memory up to $07fe
+        ldy #<Memory_ColdBoot       ;clear memory up to $07fe
+        ldx #>Memory_ColdBoot
         jsr InitializeMemory
-        sta ContinueMenuSelect      ;reset menu selection
         jsr CheckSaveData
         lda #$03
         sta FME7Command
@@ -23,16 +25,15 @@ StartLoader:
         lda #VRAM_PAL_MENU          ;queue menu palette
         sta VRAM_Buffer_AddrCtrl
         inc DisableScreenFlag       ;tell NMI to keep rendering disabled
-        lda #$e7                    ;set IRQ timer value for scroll split
-        sta IRQTimer_Low
-        lda #$32
-        sta IRQTimer_High
-        lda #0 ; for famistudio_init
+        lda #0
+        sta Mirror_PPU_SCROLL1      ;set scroll before split
+        sta Mirror_PPU_SCROLL2
+        lda #0                      ;init famistudio sound driver
         sta SoundEngineSet
         ldy #>music_data_smb_complete_menu
         ldx #<music_data_smb_complete_menu
         jsr famistudio_init
-        lda #0
+        lda #0                      ;play menu song
         jsr famistudio_music_play
         lda #%10001000              ;set up pattern table arrangment
         jsr WritePPUReg1            ;and enable NMIs
@@ -70,9 +71,13 @@ SubMenuStateMachine:
         lda OperMode_Task
         jsr JumpEngine
 
-        .word RenderSubTilemap
-        .word RunSubmenu
-        .word DoNothing
+        .word Opt_Init
+        .word Opt_ClearScreen
+        .word Opt_Prep
+        .word Opt_Run
+
+DoNothing:
+        rts
 
 ;-------------------------------------------------------------------------------------
 
@@ -105,6 +110,8 @@ RenderMainTilemap:
         dex
         stx VRAM_Buffer_Offset
         inc OperMode_Task
+        lda #0
+        sta IRQUpdateFlag
         rts
 
 RenderTitleScreen:
@@ -135,7 +142,16 @@ PrepMenu:
         lda #$00
         sta DisableScreenFlag
         jsr DrawMainMenuCursor
+        lda #$40                    ;set IRQ select for scroll split
+        sta IRQSelect
+        lda #$e7                    ;set IRQ timer value for scroll split
+        sta IRQTimer_Low
+        lda #$32
+        sta IRQTimer_High
         inc IRQUpdateFlag
+        lda #$00                    ;set scroll position before split
+        sta Mirror_PPU_SCROLL1
+        sta Mirror_PPU_SCROLL2
         inc OperMode_Task
         rts
 
@@ -418,168 +434,263 @@ OptionsGraphic:
 
 ;-------------------------------------------------------------------------------------
 
-SubMenuSelections:
-        ; header
-        .byte $20,$6a,12,"GAME OPTIONS"
-        ; selection names
-        .byte $20,$a6,10,"DIFFICULTY"
-        .byte $20,$c6,13,"MARIO PALETTE"
-        .byte $20,$e6,13,"LUIGI PALETTE"
-        .byte $21,$06,13,"LUIGI PHYSICS"
-        .byte $21,$26,18,"SPINY EGG BEHAVIOR"
-        .byte $21,$46,16,"WARP ZONE SCROLL"
-        .byte $21,$66,11,"TIMER SPEED"
-        .byte $21,$86,14,"FONT SELECTION"
-        .byte $21,$a6,17,"TILESET SELECTION"
-        .byte $21,$c6,14,"ANIMATED TILES"
-        .byte $00
+Opt_RowIndex = $e0
+Opt_GfxAddr = $e1
+Opt_GfxPtr = $e3
+Opt_TopRow = $e5
+Opt_TargetRow = $e6
+Opt_CursorY = $e7
 
-        ;note to self - FIX THE BUFFER OVERFLOW!!!
-SubMenuSelections_End:
+Opt_GfxAddrLo = Opt_GfxAddr
+Opt_GfxAddrHi = Opt_GfxAddr+1
+Opt_GfxPtrLo = Opt_GfxPtr
+Opt_GfxPtrHi = Opt_GfxPtr+1
 
-RenderSubTilemap:
-        jsr MoveAllSpritesOffscreen
-        jsr InitializeNameTables
-        ; draw box
-        ldx #4
-        ldy #4
-        lda #22
-        sta $00
-        lda #10
-        sta $01
-        jsr DrawArbitraryTextbox
-        ; copy selection names over
-        ldy #0
-        ldx VRAM_Buffer_Offset
-:       lda SubMenuSelections,y
-        sta VRAM_Buffer,x
-        inx
-        iny
-        cpy #SubMenuSelections_End-SubMenuSelections
-        bcc :-
-        dex
-        stx VRAM_Buffer_Offset
-        ; draw option numbers
-        ldy #$00
-        ldx #9*2
-:       txa
-        pha
-        lda SubMenuOptions,x
-        sta $00
-        lda SubMenuOptions+1,x
-        sta $01
-        txa
-        lsr
-        jsr RenderOptionNum
-        pla
-        tax
-        dex
-        dex
-        bpl :-
-        inc OperMode_Task
-        rts
+Opt_GfxBlank:
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+Opt_GfxTop:
+        .byte $c9, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb
+        .byte $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb
+        .byte $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cc
+Opt_GfxEmpty:
+        .byte $cd, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $cd
+Opt_GfxBottom:
+        .byte $ca, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb
+        .byte $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb
+        .byte $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $cb, $ce
 
-SubMenuCursorY:
-  .byte $27, $2f, $37, $3f, $47, $4f, $57, $5f, $67, $6f
+Opt_GfxDifficulty:
+        .byte $cd, $24
+        .byte "DIFFICULTY"
+        .byte "................"
+        .byte $24, $cd
+Opt_GfxMarioPalette:
+        .byte $cd, $24
+        .byte "MARIO PALETTE"
+        .byte "............."
+        .byte $24, $cd
+Opt_GfxLuigiPalette:
+        .byte $cd, $24
+        .byte "LUIGI PALETTE"
+        .byte "............."
+        .byte $24, $cd
+Opt_GfxLuigiPhysics:
+        .byte $cd, $24
+        .byte "LUIGI PHYSICS"
+        .byte "............."
+        .byte $24, $cd
 
-SubMenuCursorX:
-  .byte $27, $27, $27, $27, $27, $27, $27, $27, $27, $27
+Opt_GfxTable:
+        .word Opt_GfxBlank              ; 0
+        .word Opt_GfxBlank              ; 1
+        .word Opt_GfxTop                ; 2
+        .word Opt_GfxEmpty              ; 3
+        .word Opt_GfxDifficulty         ; 4
+        .word Opt_GfxEmpty              ; 5
+        .word Opt_GfxMarioPalette       ; 6
+        .word Opt_GfxEmpty              ; 7
+        .word Opt_GfxLuigiPalette       ; 8
+        .word Opt_GfxEmpty              ; 9
+        .word Opt_GfxLuigiPhysics       ; 10
+        .word Opt_GfxEmpty              ; 11
+        .word Opt_GfxEmpty              ; 12
+        .word Opt_GfxEmpty              ; 13
+        .word Opt_GfxEmpty              ; 14
+        .word Opt_GfxEmpty              ; 15
+        .word Opt_GfxEmpty              ; 16
+        .word Opt_GfxEmpty              ; 17
+        .word Opt_GfxEmpty              ; 18
+        .word Opt_GfxEmpty              ; 19
+        .word Opt_GfxEmpty              ; 20
+        .word Opt_GfxEmpty              ; 21
+        .word Opt_GfxEmpty              ; 22
+        .word Opt_GfxEmpty              ; 23
+        .word Opt_GfxEmpty              ; 24
+        .word Opt_GfxEmpty              ; 25
+        .word Opt_GfxEmpty              ; 26
+        .word Opt_GfxEmpty              ; 27
+        .word Opt_GfxEmpty              ; 28
+        .word Opt_GfxEmpty              ; 29
+        .word Opt_GfxEmpty              ; 30
+        .word Opt_GfxEmpty              ; 31
+        .word Opt_GfxEmpty              ; 32
+        .word Opt_GfxEmpty              ; 33
+        .word Opt_GfxEmpty              ; 34
+        .word Opt_GfxEmpty              ; 35
+        .word Opt_GfxEmpty              ; 36
+        .word Opt_GfxEmpty              ; 37
+        .word Opt_GfxEmpty              ; 38
+        .word Opt_GfxEmpty              ; 39
+        .word Opt_GfxBottom             ; 40
 
-SubMenuOptions:
-  .word DifficultyFlag, MarioPalette, LuigiPalette
-  .word LuigiPhysics, SpinyEggBehavior, WarpZoneScroll
-  .word CountdownSpeed, FontSelection, TilesetSelection
-  .word AnimatedTiles
-
-SubMenuOptionCount:
-  .byte 3, 3, 4
-  .byte 2, 2, 2
-  .byte 3, 3, 3
-  .byte 2
-
-RunSubmenu:
-        ; (TO-DO: Implement proper nesting of menus)
-        lda #$00
-        sta DisableScreenFlag
-        lda #<ContinueMenuSelect
-        sta $00
-        lda #>ContinueMenuSelect
-        sta $01
-        lda #$09
-        jsr MenuSelectionLogic
-        bcc DrawSubmenuCursor
-        lda PressedJoypadBits
-        and #B_Button
-        bne ExitSubMenu
-        lda PressedJoypadBits
-        and #A_Button
-        bne AdvanceOption
-        rts
-ExitSubMenu:
-        lda #$00
-        sta OperMode
-        sta OperMode_Task
-        sta ContinueMenuSelect
-		sta NameTableDestination
-		sta ScreenEdge_PageLoc
-        inc DisableScreenFlag
-        rts
-DrawSubmenuCursor:
-        ldy #$01
-:       lda MenuCursorData,y     ;set up cursor sprite tile, attribute
-        sta Sprite_Data+1,y      ;and X position in sprite OAM data
-        dey
-        bpl :-
-        ldy ContinueMenuSelect
-        lda SubMenuCursorY,y        ;set Y position based on the selection
-        sta Sprite_Data
-        lda SubMenuCursorX,y        ;set X position based on the selection
-        sta Sprite_Data+3
-        rts
-AdvanceOption:
-        lda ContinueMenuSelect
-        tax
-        asl
-        tay
-        lda SubMenuOptions,y
-        sta $00
-        lda SubMenuOptions+1,y
-        sta $01
-        ldy #$00
-        lda ($00),y
-        clc
-        adc #$01
-        cmp SubMenuOptionCount,x
-        bcc :+
-        lda #$00
-:       sta ($00),y
-        lda ContinueMenuSelect
-RenderOptionNum:
-        ldx #$02
+Opt_QueueRowGfx:
+        lda Opt_RowIndex        ; mult index by 32
+        ldx #Opt_GfxAddr
         ldy #5
         jsr MultByPow2
-        lda #$b9
+        lda Opt_GfxAddrLo
         clc
-        adc $02
-        ldx VRAM_Buffer_Offset
-        sta VRAM_Buffer+1,x
-        lda #$20
-        adc $03
-        sta VRAM_Buffer,x
-        lda #$01
-        sta VRAM_Buffer+2,x
-        lda ($00),y
-        sta VRAM_Buffer+3,x
-        lda #$00
-        sta VRAM_Buffer+4,x
-        txa
+        adc #$01
+        sta Opt_GfxAddrLo
+        lda Opt_GfxAddrHi
+        adc #$20
+        sta Opt_GfxAddrHi
+Opt_AddrRangeChk:
+        cmp #$23
+        bcc Opt_FetchRowGfx     ; addr in range
+        bne Opt_SubFromAddr     ; addr outside range
+        lda Opt_GfxAddrLo
+        cmp #$c0
+        bcc Opt_FetchRowGfx     ; addr in range
+Opt_SubFromAddr:
+        lda Opt_GfxAddrLo       ; keep addr in range
+        sbc #$c0
+        sta Opt_GfxAddrLo
+        lda Opt_GfxAddrHi
+        sbc #$03
+        sta Opt_GfxAddrHi
+        bne Opt_AddrRangeChk
+Opt_FetchRowGfx:
+        lda Opt_RowIndex
+        asl                     ; get gfx pointer
+        tax
+        lda Opt_GfxTable,x
+        sta Opt_GfxPtrLo
+        lda Opt_GfxTable+1,x
+        sta Opt_GfxPtrHi
+        lda VRAM_Buffer_Offset  ; adjust buffer offset
         clc
-        adc #$04
+        adc #33
+        tax
         sta VRAM_Buffer_Offset
+        lda Opt_GfxAddrHi       ; ppu hi
+        sta VRAM_Buffer-33,x
+        lda Opt_GfxAddrLo       ; ppu lo
+        sta VRAM_Buffer-32,x
+        lda #30
+        sta VRAM_Buffer-31,x    ; literal 30
+        ldy #29                 ; prep Y for loop
+Opt_WriteBuffer:
+        lda (Opt_GfxPtr),y      ; write option line
+        sta VRAM_Buffer-1,x
+        dex
+        dey
+        bpl Opt_WriteBuffer
         rts
 
-DoNothing:
+Opt_Init:
+        lda #0                  ; init opt index
+        sta Opt_RowIndex
+        inc DisableScreenFlag   ; disable rendering
+        inc OperMode_Task       ; next task
         rts
+
+Opt_ClearScreen:
+        jsr MoveAllSpritesOffscreen     ; init all sprites
+        jsr InitializeNameTables        ; init nametables
+        inc OperMode_Task               ; next task
+        rts
+
+Opt_Prep:
+        lda Opt_RowIndex
+        cmp #18
+        bcs Opt_Prep_Done
+        jsr Opt_QueueRowGfx             ; draw one row
+        inc Opt_RowIndex                ; next row next frame
+        rts
+Opt_Prep_Done:
+        lda #0
+        sta Opt_TopRow                  ; set top row
+        sta Opt_TargetRow               ; set target row
+        sta Mirror_PPU_SCROLL1          ; set scroll
+        sta Mirror_PPU_SCROLL2
+        sta DisableScreenFlag           ; enable rendering
+        lda #$1f
+        sta Opt_CursorY                 ; set cursor Y position
+        inc OperMode_Task               ; next task
+        rts
+
+Opt_Run:
+        lda #<Opt_TargetRow
+        sta $00
+        lda #>Opt_TargetRow
+        sta $01
+        lda #40
+        jsr MenuSelectionLogic   ; change row
+        cpx #$00
+        beq Opt_Exit             ; no change
+        cpx #$01
+        beq CursorUp             ; previous row
+        lda Opt_CursorY          ; next row
+        clc
+        adc #$08
+        sta Opt_CursorY
+        jmp DrawCursor
+CursorUp:
+        lda Opt_CursorY
+        sec
+        sbc #$08
+        sta Opt_CursorY
+DrawCursor:
+        sta Sprite_Data
+        lda #$04
+        sta Sprite_Data+1        ;and X position in sprite OAM data
+        lda #$02
+        sta Sprite_Data+2
+        lda #$0f
+        sta Sprite_Data+3
+Opt_CheckDist:
+        lda Opt_TargetRow       ; get dist from target to top
+        sec
+        sbc Opt_TopRow
+        cmp #8                  ; scroll up if less than 8 rows
+        bcc CloseDist
+        cmp #13                 ; scroll down if greater than 12 rows
+        bcs FarDist
+Opt_Exit:
+        rts                     ; otherwise leave
+CloseDist:
+        lda Opt_TopRow          ; can't scroll if row 0 is top
+        beq Opt_Exit
+        lda Opt_CursorY         ; keep cursor in place
+        clc
+        adc #8
+        sta Opt_CursorY
+        lda Mirror_PPU_SCROLL2  ; scroll up 4 pixels
+        sec
+        sbc #8
+        sta Mirror_PPU_SCROLL2
+        and #%00000111          ; draw new row if divisible by 8
+        bne Opt_Exit
+        ldy Opt_TopRow
+        dey
+        sty Opt_TopRow
+        sty Opt_RowIndex
+        jmp Opt_QueueRowGfx
+FarDist:
+        lda Opt_TopRow          ; can't scroll if hit bottom row
+        cmp #40-17
+        bcs Opt_Exit
+        lda Opt_CursorY         ; keep cursor in place
+        sec
+        sbc #8
+        sta Opt_CursorY
+        lda Mirror_PPU_SCROLL2  ; scroll down 4 pixels
+        clc
+        adc #8
+        sta Mirror_PPU_SCROLL2
+        and #%00000111          ; draw new row if divisible by 8
+        bne Opt_Exit
+        lda Opt_TopRow
+        clc
+        adc #18
+        sta Opt_RowIndex
+        inc Opt_TopRow
+        jmp Opt_QueueRowGfx
 
 ;-------------------------------------------------------------------------------------
 
@@ -765,8 +876,8 @@ LoadIntoGame:
         jsr CopyPaletteData
         jsr CopyDemoData
         jsr CopyTopScoreDisplay
-		jsr famistudio_music_stop
-		jsr famistudio_update
+        jsr famistudio_music_stop
+        jsr famistudio_update
         jmp BootIntoGame
 
 CopyTopScoreDisplay:

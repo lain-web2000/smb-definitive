@@ -36,7 +36,7 @@
 .include "loader.asm"
 .res $c000 - *, $ff
 
-.segment "SM2MAIN"
+.segment "MAIN"
 .org $8000
 ;-------------------------------------------------------------------------------------
 
@@ -45,18 +45,9 @@ Start:      ldx #$00                    ;disable NMIs and rendering
             stx PPU_MASK
             dex
             txs                         ;reset stack pointer
-;            ldy #ColdBootOffset         ;load default cold boot pointer
-;            ldx #$05
-;WBootCheck: lda TopScoreDisplay,x       ;first checkpoint, check each score digit
-;            cmp #10                     ;in the top score for a valid digit
-;            bcs ColdBoot                ;if even one digit isn't valid (greater than 10 decimal)
-;            dex                         ;then branch to perform cold boot
-;            bpl WBootCheck
-;            lda WarmBootValidation      ;second checkpoint, check to see if
-;            cmp #$a5                    ;another location has a specific value
-;            bne ColdBoot
-            ldy #WarmBootOffset         ;if passed both, load warm boot pointer
-ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
+            ldy #<Memory_ColdBoot       ;load cold boot pointer
+            ldx #>Memory_ColdBoot
+            jsr InitializeMemory        ;clear memory using pointer in Y
             sta SND_DELTA_REG+1         ;reset DMC output level
             sta DiskIOTask              ;reset disk IO task
             lda #$a5                    ;set warm boot flag in case the player hits reset
@@ -65,12 +56,14 @@ ColdBoot:   jsr InitializeMemory        ;clear memory using pointer in Y
             jsr MoveAllSpritesOffscreen ;reset OAM and nametable memory
             jsr InitializeNameTables
             inc DisableScreenFlag       ;tell NMI to keep rendering disabled
-            lda #$e7                    ;set IRQ timer value for scroll split
+            lda #$40                    ;set IRQ select for scroll split
+            sta IRQSelect
+            lda #$f7                    ;set IRQ timer value for scroll split
             sta IRQTimer_Low
             lda #$16
             sta IRQTimer_High
             lda #1
-            sta SoundEngineSet 			;hack
+            sta SoundEngineSet          ;hack
             lda #%10001000              ;set up pattern table arrangment
             jsr WritePPUReg1            ;and enable NMIs
 WaitForNMI: lda NMIAckFlag              ;spin until NMI routine has executed
@@ -925,7 +918,7 @@ WriteGameText:
                pha                       ;save text number to stack and use as offset
                tay
                ldx GameTextOffsets,y     ;get offset to game text we want to print
-               ldy #$00
+               ldy VRAM_Buffer_Offset
 GameTextLoop:  lda GameText,x            ;load game text data
                cmp #$ff                  ;check for terminator
                beq EndGameText           ;branch to end text if found
@@ -933,8 +926,7 @@ GameTextLoop:  lda GameText,x            ;load game text data
                inx                       ;and increment increment
                iny
                bne GameTextLoop          ;do this for 256 bytes if no terminator found
-EndGameText:   lda #$00                  ;put null terminator at end
-               sta VRAM_Buffer,y
+EndGameText:   sty VRAM_Buffer_Offset    ;update VRAM buffer offset
                pla                       ;pull original text number from stack
                beq CheckPlayerName       ;if printing top status bar, branch to check player's name
                tax
@@ -1673,8 +1665,9 @@ DefaultSprOffsets:
 ;-------------------------------------------------------------------------------------
 
 InitializeArea:
-               ldy #$4b                 ;clear all memory again, only as far as $074b
-               jsr ClearMemory          ;this is only necessary in game mode
+               ldy #<Memory_InitializeArea ;clear all memory again, only as far as $074b
+               ldx #>Memory_InitializeArea
+               jsr InitializeMemory
                ldx #$21
                lda #$00
 ClrTimersLoop: sta Timers,x             ;clear out timer memory
@@ -14022,7 +14015,8 @@ InitializeGame:
             lda #$01
 :           sta LevelSet
             jsr LoadGameTileset      ;load game-appropiate CHR data
-            ldy #$6f                 ;clear all memory as in initialization procedure,
+            ldy #<Memory_InitializeGame ;clear all memory as in initialization procedure,
+            ldx #>Memory_InitializeGame
             jsr InitializeMemory     ;but this time, clear only as far as $076f
             ldy #$1f
 ClrSndLoop: sta SoundMemory,y        ;clear out memory used
@@ -14858,7 +14852,9 @@ InitATLoop:   sta PPU_DATA
               bne InitATLoop
               sta HorizontalScroll      ;reset scroll variables
               sta VerticalScroll
-              jmp InitScroll            ;initialize scroll registers to zero
+              sta PPU_SCROLL            ;initialize scroll registers to zero
+              sta PPU_SCROLL
+              rts
 
 ;------------------------------------------------------------------------------------
 ValidDirections:
@@ -14949,11 +14945,15 @@ UpdateAddr:    sec
 UpdateScreen:  ldy #$00                  ;load first byte from indirect as a pointer
                lda ($00),y
                bne WriteBufferToScreen   ;if byte is zero we have no further updates to make here
-InitScroll:    sta PPU_SCROLL            ;store contents of A into scroll registers
+InitScroll:    lda Mirror_PPU_SCROLL1
+               sta PPU_SCROLL            ;store contents of A into scroll registers
+               lda Mirror_PPU_SCROLL2
                sta PPU_SCROLL            ;and end whatever subroutine led us here
                rts
 
 FlushVRAMBuffer:
+               ldy VRAM_Buffer_Offset    ;place terminator at end just in case
+               sta VRAM_Buffer,y
                ldy #$ff                  ;init offset into buffer
 FlushBufferLp: iny
                lda VRAM_Buffer,y         ;terminator found ($00)?
@@ -15009,50 +15009,67 @@ WritePPUReg1:
 
 ;------------------------------------------------------------------------------------
 
+;$04 - memory table low
+;$05 - memory table high
 ;$06 - RAM address low
 ;$07 - RAM address high
+;$0160 - lower bound for page
 
 InitializeMemory:
+              sty $04           ;set pointer to memory table
+              stx $05
               ldx #$07          ;set initial high byte to $0700-$07ff
               lda #$00          ;set initial low byte to start of page (at $00 of page)
               sta $06
 InitPageLoop: stx $07
-InitByteLoop: cpx #$01          ;check to see if we're on the stack ($0100-$01ff)
-              bne InitByte      ;if not, go ahead anyway
-              cpy #$60          ;otherwise, check to see if we're at $0160-$01ff
-              bcs SkipByte      ;if so, skip write
-InitByte:     sta ($06),y       ;otherwise, initialize byte with current low byte in Y
+              txa               ;set lower bound for this page
+              asl
+              tay
+              lda ($04),y
+              sta $0160
+              iny               ;set upper bound for this page
+              lda ($04),y
+              tay
+              lda #$00
+InitByte:     sta ($06),y       ;initialize memory
 SkipByte:     dey
-              cpy #$ff          ;do this until all bytes in page have been erased
-              bne InitByteLoop
+              cpy $0160         ;do this until all bytes in page have been erased
+              bne InitByte
               dex               ;go onto the next page
-              bpl InitPageLoop  ;do this until all pages of memory have been erased
+              bpl InitPageLoop  ;do this until all desired pages of memory have been erased
               rts
 
-; Skips over sound memory at $f0-$ff
-ClearMemory:
-              lda #$07
-              sta $07
-              lda #$00
-              sta $06
-ClearNextPage:
-              lda #$00
-              tax
-              jsr InitByteLoop
-              dec $07
-              beq PrepZeroPage
-              lda $07
-              cmp #$01
-              beq PrepStack
-              cmp #$00
-              bpl ClearNextPage
-              rts
-PrepStack:
-              ldy #$5f
-              bne ClearNextPage
-PrepZeroPage:
-              ldy #$ef
-              bne ClearNextPage
+; tables are formatted as such:
+; lower bound exclusive, upper bound inclusive
+Memory_ColdBoot:
+      .byte $ff, $ff ; page 0
+      .byte $08, $5f ; page 1
+      .byte $ff, $ff ; page 2
+      .byte $ff, $ff ; page 3
+      .byte $ff, $ff ; page 4
+      .byte $ff, $ff ; page 5
+      .byte $ff, $ff ; page 6
+      .byte $ff, $fe ; page 7
+
+Memory_InitializeArea:
+      .byte $ff, $ef ; page 0
+      .byte $08, $5f ; page 1
+      .byte $ff, $ff ; page 2
+      .byte $ff, $ff ; page 3
+      .byte $ff, $ff ; page 4
+      .byte $ff, $ff ; page 5
+      .byte $ff, $ff ; page 6
+      .byte $ff, $4b ; page 7
+
+Memory_InitializeGame:
+      .byte $ff, $ff ; page 0
+      .byte $08, $5f ; page 1
+      .byte $ff, $ff ; page 2
+      .byte $ff, $ff ; page 3
+      .byte $ff, $ff ; page 4
+      .byte $ff, $ff ; page 5
+      .byte $ff, $ff ; page 6
+      .byte $ff, $6f ; page 7
 
 ;-------------------------------------------------------------------------------------
 
@@ -15327,7 +15344,7 @@ NMIHandler:
       lda #FME7_IRQTimer_Low
       sta FME7Command
       lda IRQTimer_Low
-      sta FME7Parameter         ;set FDS IRQ timer to occur at the end of the status bar
+      sta FME7Parameter         ;set IRQ to occur at the end of the status bar
       lda #FME7_IRQTimer_High
       sta FME7Command
       lda IRQTimer_High
@@ -15371,9 +15388,10 @@ ScrnSwch:
       lda VRAM_Buffer_AddrCtrl  ;check if transfer from ROM was requested
       bne AltVRAMTransfer       ;if so, branch to alternate handler
       jsr FlushVRAMBuffer
+      lda #$00
       sta VRAM_Buffer_Offset    ;erase the VRAM buffer offset, init VRAM buffer
       sta VRAM_Buffer           ;by writing end terminator at the first byte
-      beq RestorePPUMASK        ;unconditional branch
+      beq RestorePPURegs        ;unconditional branch
 AltVRAMTransfer:
       asl
       tax
@@ -15383,8 +15401,11 @@ AltVRAMTransfer:
       lda VRAM_AddrTable,x
       sta $01
       jsr UpdateScreen          ;now update the screen with it
+      lda #$00
       sta VRAM_Buffer_AddrCtrl  ;init address control to point at VRAM buffer
-RestorePPUMASK:
+RestorePPURegs:
+      lda Mirror_PPU_CTRL
+      sta PPU_CTRL              ;dump PPU control register 1
       lda Mirror_PPU_MASK
       sta PPU_MASK              ;dump PPU control register 2
       lda ScreenEdge_PageLoc    ;update IRQ scroll position
@@ -15435,6 +15456,29 @@ WaitForVBLANK:
       bpl WaitForVBLANK
       txs                         ;reset stack pointer
 
+      ; Init FDS BIOS style pseudo-registers
+      lda #$c0
+      sta NMISelect               ;PC action on NMI
+      lda #$80
+      sta IRQSelect               ;PC action on IRQ
+      lda RESETFlag               ;check reset type
+      cmp #$35
+      bne ColdBoot                ;cold boot if RESETFlag != 0x35
+      lda RESETType
+      cmp #$53
+      beq WarmBoot                ;warm boot if RESETType == 0x53
+      cmp #$ac
+      bne ColdBoot                ;cold boot if RESETType != 0xac
+      lda #$53
+      sta RESETType               ;indicate soft reset
+      bne WarmBoot
+ColdBoot:
+      lda #$35
+      sta RESETFlag               ;set reset flag
+      lda #$ac
+      sta RESETType               ;indicate first boot
+WarmBoot:
+
       ; Init FME7
       lda #$08                    ;enable PRG-RAM
       sta FME7Command
@@ -15465,17 +15509,60 @@ CHRBankLoop:
       jmp StartLoader             ;now start the game!
 
 IRQHandler:
+      bit IRQSelect
+      bmi AcknowledgeIRQ       ;disable and acknowledge IRQ (%1xxxxxxx)
+      bvc :+
+      jmp IRQHandler_SplitX    ;change X scroll mid-frame (%01xxxxxx)
+:     jmp IRQHandler_SplitXY   ;change X and Y scroll mid-frame (%00xxxxxx)
+AcknowledgeIRQ:
+      pha
+      lda #FME7_IRQTimer_Ctrl
+      sta FME7Command
+      lda #$00
+      sta FME7Parameter
+      pla
+      rti
+
+; split X scroll
+IRQHandler_SplitX:
+      pha                      ;save accumulator
+      lda HorizontalScroll     ;set scroll position for the screen under the status bar
+      sta PPU_SCROLL
+      lda Mirror_PPU_CTRL
+      ora NameTableSelect      ;set appropiate nametable for rendering
+      sta PPU_CTRL
+      lda PPU_STATUS           ;reset flip-flop
+      lda #FME7_IRQTimer_Ctrl  ;disable IRQ timer for the rest of the frame
+      sta FME7Command
+      lda #$00
+      sta FME7Parameter
+      sta IRQAckFlag           ;indicate IRQ was acknowledged
+      pla                      ;restore accumulator, then leave
+      rti
+
+; split X/Y scroll
+IRQHandler_SplitXY:
       pha                      ;save accumulator and Y
       tya
       pha
-      lda Mirror_PPU_CTRL
-      ora NameTableSelect      ;set appropiate nametable for rendering
-      sta Mirror_PPU_CTRL      ;update the register and its mirror
-      sta PPU_CTRL
-      lda HorizontalScroll
-      sta PPU_SCROLL           ;set scroll position for the screen under the status bar
-      lda PPU_STATUS           ;reset flip-flop
-      lda #$00
+      lda NameTableSelect
+      asl
+      asl
+      sta PPU_ADDRESS          ;write nametable number << 2 to PPU_ADDRESS
+      lda VerticalScroll
+      sta PPU_SCROLL           ;write Y scroll to PPU_SCROLL
+      and #%11111000
+      asl
+      asl
+      ldy HorizontalScroll
+      sta HorizontalScroll
+      tya
+      lsr
+      lsr
+      lsr
+      ora HorizontalScroll
+      sty PPU_SCROLL           ;write X scroll to PPU_SCROLL
+      sta PPU_ADDRESS          ;write ((Y scroll & $F8) << 2) | (X scroll >> 3) to PPU_ADDRESS
       lda #FME7_IRQTimer_Ctrl  ;disable IRQ timer for the rest of the frame
       sta FME7Command
       lda #$00
@@ -15490,7 +15577,7 @@ IRQHandler:
 
 .res $FFFA - *, $FF
 
-;"VECTORS"
+.segment "VECTORS"
         .word NMIHandler
         .word RESETHandler
         .word IRQHandler
