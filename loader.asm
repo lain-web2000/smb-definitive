@@ -6,8 +6,6 @@ NameTableDestination = $08
 TitleScrollOffset = $0a
 TitleScrollAmount = $0b
 
-temp_mem = $eb
-
 StartLoader:
         ldx #$00                    ;disable NMIs and rendering
         stx PPU_CTRL
@@ -440,6 +438,8 @@ Opt_GfxPtr = $e3
 Opt_TopRow = $e5
 Opt_TargetRow = $e6
 Opt_CursorY = $e7
+Opt_SelIndex = $e8
+Opt_ScrollType = $e9
 
 Opt_GfxAddrLo = Opt_GfxAddr
 Opt_GfxAddrHi = Opt_GfxAddr+1
@@ -483,6 +483,41 @@ Opt_GfxLuigiPhysics:
         .byte "LUIGI PHYSICS"
         .byte "............."
         .byte $24, $cd
+Opt_GfxSpinyEggBehavior1:
+        .byte $cd, $24
+        .byte "SPINY EGG"
+        .byte "                 "
+        .byte $24, $cd
+Opt_GfxSpinyEggBehavior2:
+        .byte $cd, $24
+        .byte "BEHAVIOR"
+        .byte ".................."
+        .byte $24, $cd
+Opt_GfxWarpZoneScroll:
+        .byte $cd, $24
+        .byte "WARP ZONE SCROLL"
+        .byte ".........."
+        .byte $24, $cd
+Opt_GfxTimerSpeed:
+        .byte $cd, $24
+        .byte "TIMER SPEED"
+        .byte "..............."
+        .byte $24, $cd
+Opt_GfxFontSelection:
+        .byte $cd, $24
+        .byte "FONT SELECTION"
+        .byte "............"
+        .byte $24, $cd
+Opt_GfxTilesetSelection:
+        .byte $cd, $24
+        .byte "TILESET SELECTION"
+        .byte "........."
+        .byte $24, $cd
+Opt_GfxAnimatedTiles:
+        .byte $cd, $24
+        .byte "ANIMATED TILES"
+        .byte "............"
+        .byte $24, $cd
 
 Opt_GfxTable:
         .word Opt_GfxBlank              ; 0
@@ -497,39 +532,25 @@ Opt_GfxTable:
         .word Opt_GfxEmpty              ; 9
         .word Opt_GfxLuigiPhysics       ; 10
         .word Opt_GfxEmpty              ; 11
-        .word Opt_GfxEmpty              ; 12
-        .word Opt_GfxEmpty              ; 13
+        .word Opt_GfxSpinyEggBehavior1  ; 12
+        .word Opt_GfxSpinyEggBehavior2  ; 13
         .word Opt_GfxEmpty              ; 14
-        .word Opt_GfxEmpty              ; 15
+        .word Opt_GfxWarpZoneScroll     ; 15
         .word Opt_GfxEmpty              ; 16
-        .word Opt_GfxEmpty              ; 17
+        .word Opt_GfxTimerSpeed         ; 17
         .word Opt_GfxEmpty              ; 18
-        .word Opt_GfxEmpty              ; 19
+        .word Opt_GfxFontSelection      ; 19
         .word Opt_GfxEmpty              ; 20
-        .word Opt_GfxEmpty              ; 21
+        .word Opt_GfxTilesetSelection   ; 21
         .word Opt_GfxEmpty              ; 22
-        .word Opt_GfxEmpty              ; 23
+        .word Opt_GfxAnimatedTiles      ; 23
         .word Opt_GfxEmpty              ; 24
-        .word Opt_GfxEmpty              ; 25
-        .word Opt_GfxEmpty              ; 26
-        .word Opt_GfxEmpty              ; 27
-        .word Opt_GfxEmpty              ; 28
-        .word Opt_GfxEmpty              ; 29
-        .word Opt_GfxEmpty              ; 30
-        .word Opt_GfxEmpty              ; 31
-        .word Opt_GfxEmpty              ; 32
-        .word Opt_GfxEmpty              ; 33
-        .word Opt_GfxEmpty              ; 34
-        .word Opt_GfxEmpty              ; 35
-        .word Opt_GfxEmpty              ; 36
-        .word Opt_GfxEmpty              ; 37
-        .word Opt_GfxEmpty              ; 38
-        .word Opt_GfxEmpty              ; 39
-        .word Opt_GfxBottom             ; 40
+        .word Opt_GfxBottom             ; 25
+Opt_GfxTableEnd:
 
 Opt_QueueRowGfx:
-        lda Opt_RowIndex        ; mult index by 32
-        ldx #Opt_GfxAddr
+        pha
+        ldx #Opt_GfxAddr        ; mult index by 32
         ldy #5
         jsr MultByPow2
         lda Opt_GfxAddrLo
@@ -555,7 +576,7 @@ Opt_SubFromAddr:
         sta Opt_GfxAddrHi
         bne Opt_AddrRangeChk
 Opt_FetchRowGfx:
-        lda Opt_RowIndex
+        pla
         asl                     ; get gfx pointer
         tax
         lda Opt_GfxTable,x
@@ -599,8 +620,14 @@ Opt_Prep:
         lda Opt_RowIndex
         cmp #18
         bcs Opt_Prep_Done
-        jsr Opt_QueueRowGfx             ; draw one row
-        inc Opt_RowIndex                ; next row next frame
+        jsr Opt_QueueRowGfx             ; draw three rows
+        inc Opt_RowIndex
+        lda Opt_RowIndex
+        jsr Opt_QueueRowGfx
+        inc Opt_RowIndex
+        lda Opt_RowIndex
+        jsr Opt_QueueRowGfx
+        inc Opt_RowIndex
         rts
 Opt_Prep_Done:
         lda #0
@@ -609,33 +636,48 @@ Opt_Prep_Done:
         sta Mirror_PPU_SCROLL1          ; set scroll
         sta Mirror_PPU_SCROLL2
         sta DisableScreenFlag           ; enable rendering
+        sta Opt_ScrollType              ; disable scrolling
         lda #$1f
         sta Opt_CursorY                 ; set cursor Y position
         inc OperMode_Task               ; next task
         rts
 
+Opt_SelTable:
+        .byte 4         ; difficulty
+        .byte 6         ; mario palette
+        .byte 8         ; luigi palette
+        .byte 10        ; luigi physics
+        .byte 12        ; spiny egg behavior
+        .byte 15        ; warp zone scroll
+        .byte 17        ; timer speed
+        .byte 19        ; font selection
+        .byte 21        ; tileset selection
+        .byte 23        ; animated tiles
+Opt_SelTableEnd:
+
 Opt_Run:
-        lda #<Opt_TargetRow
+        lda #<Opt_SelIndex      ; change selection
         sta $00
-        lda #>Opt_TargetRow
+        lda #>Opt_SelIndex
         sta $01
-        lda #40
-        jsr MenuSelectionLogic   ; change row
-        cpx #$00
-        beq Opt_Exit             ; no change
-        cpx #$01
-        beq CursorUp             ; previous row
-        lda Opt_CursorY          ; next row
-        clc
-        adc #$08
-        sta Opt_CursorY
-        jmp DrawCursor
-CursorUp:
-        lda Opt_CursorY
+        lda #Opt_SelTableEnd-Opt_SelTable-1
+        jsr MenuSelectionLogic
+        ldy Opt_SelIndex        ; update target row
+        lda Opt_SelTable,y
+        sta Opt_TargetRow
         sec
-        sbc #$08
-        sta Opt_CursorY
+        sbc Opt_TopRow
+        ldy Opt_ScrollType      ; hide cursor if scrolling
+        beq DrawCursor
+        lda #$f8
+        bne CursorOffscreen
 DrawCursor:
+        asl
+        asl
+        asl
+        sec
+        sbc #1
+CursorOffscreen:
         sta Sprite_Data
         lda #$04
         sta Sprite_Data+1        ;and X position in sprite OAM data
@@ -643,52 +685,64 @@ DrawCursor:
         sta Sprite_Data+2
         lda #$0f
         sta Sprite_Data+3
+
+        lda Opt_ScrollType       ; check scroll type
+        beq Opt_CheckDist
+        bpl Opt_ScrollUp
+        lda Mirror_PPU_SCROLL2  ; scroll 2 pixels downwards
+        clc
+        adc #2
+        sta Mirror_PPU_SCROLL2
+        cmp #240
+        bcc :+
+        lda #0
+:       and #%00000111          ; check to stop if Y scroll div 8
+        beq Opt_CheckDist
+        rts
+Opt_ScrollUp:
+        lda Mirror_PPU_SCROLL2  ; scroll 2 pixels upwards
+        sec
+        sbc #2
+        cmp #240
+        bcc :+
+        lda #238
+:       sta Mirror_PPU_SCROLL2
+        and #%00000111          ; check to stop if Y scroll div 8
+        beq Opt_CheckDist
+        rts
 Opt_CheckDist:
         lda Opt_TargetRow       ; get dist from target to top
         sec
         sbc Opt_TopRow
-        cmp #8                  ; scroll up if less than 8 rows
-        bcc CloseDist
+        cmp #8                  ; scroll up if less than 8 rows or past top
+        bmi CloseDist
         cmp #13                 ; scroll down if greater than 12 rows
         bcs FarDist
-Opt_Exit:
-        rts                     ; otherwise leave
+Opt_DisableScroll:
+        lda #0
+        sta Opt_ScrollType
+        rts
 CloseDist:
         lda Opt_TopRow          ; can't scroll if row 0 is top
-        beq Opt_Exit
-        lda Opt_CursorY         ; keep cursor in place
-        clc
-        adc #8
-        sta Opt_CursorY
-        lda Mirror_PPU_SCROLL2  ; scroll up 4 pixels
-        sec
-        sbc #8
-        sta Mirror_PPU_SCROLL2
-        and #%00000111          ; draw new row if divisible by 8
-        bne Opt_Exit
-        ldy Opt_TopRow
-        dey
-        sty Opt_TopRow
-        sty Opt_RowIndex
+        beq Opt_DisableScroll
+        lda #1
+        sta Opt_ScrollType
+        lda #$f8                 ; hide cursor
+        sta Sprite_Data
+        dec Opt_TopRow
+        lda Opt_TopRow
         jmp Opt_QueueRowGfx
 FarDist:
-        lda Opt_TopRow          ; can't scroll if hit bottom row
-        cmp #40-17
-        bcs Opt_Exit
-        lda Opt_CursorY         ; keep cursor in place
-        sec
-        sbc #8
-        sta Opt_CursorY
-        lda Mirror_PPU_SCROLL2  ; scroll down 4 pixels
-        clc
-        adc #8
-        sta Mirror_PPU_SCROLL2
-        and #%00000111          ; draw new row if divisible by 8
-        bne Opt_Exit
+        lda Opt_TopRow           ; can't scroll if hit bottom row
+        cmp #((Opt_GfxTableEnd-Opt_GfxTable)/2)-18
+        bcs Opt_DisableScroll
+        lda #255
+        sta Opt_ScrollType
+        lda #$f8                 ; hide cursor
+        sta Sprite_Data
         lda Opt_TopRow
         clc
         adc #18
-        sta Opt_RowIndex
         inc Opt_TopRow
         jmp Opt_QueueRowGfx
 
