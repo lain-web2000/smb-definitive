@@ -58,7 +58,7 @@ Start:      ldx #$00                    ;disable NMIs and rendering
             inc DisableScreenFlag       ;tell NMI to keep rendering disabled
             lda #$40                    ;set IRQ select for scroll split
             sta IRQSelect
-            lda #$f7                    ;set IRQ timer value for scroll split
+            lda #$eb                    ;set IRQ timer value for scroll split
             sta IRQTimer_Low
             lda #$16
             sta IRQTimer_High
