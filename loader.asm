@@ -871,14 +871,17 @@ Opt_SelTimerSpeed:
         .word CountdownSpeed            ; memory addr
         .byte 17                        ; text row
         .byte 8                         ; text length
-        .byte 2                         ; option count
+        .byte 3                         ; option count
         .word Opt_TxtTimerSpeed0        ; text addr #0
         .word Opt_TxtTimerSpeed1        ; text addr #1
+        .word Opt_TxtTimerSpeed2        ; text addr #2
 Opt_TxtTimerSpeed0:
         .byte "ORIGINAL"
 Opt_TxtTimerSpeed1:
-        .byte "....FAST"
-
+        .byte ".VS.SLOW"
+Opt_TxtTimerSpeed2:
+        .byte ".VS.FAST"
+		
 Opt_SelFontSelection:
         .byte 19                        ; cursor row
         .word FontSelection             ; memory addr
