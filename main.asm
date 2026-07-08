@@ -15540,29 +15540,15 @@ IRQHandler_SplitX:
       pla                      ;restore accumulator, then leave
       rti
 
-; split X/Y scroll
+; quick coarse X/Y split
 IRQHandler_SplitXY:
       pha                      ;save accumulator and Y
       tya
       pha
-      lda NameTableSelect
-      asl
-      asl
-      sta PPU_ADDRESS          ;write nametable number << 2 to PPU_ADDRESS
-      lda VerticalScroll
-      sta PPU_SCROLL           ;write Y scroll to PPU_SCROLL
-      and #%11111000
-      asl
-      asl
-      ldy HorizontalScroll
-      sta HorizontalScroll
-      tya
-      lsr
-      lsr
-      lsr
-      ora HorizontalScroll
-      sty PPU_SCROLL           ;write X scroll to PPU_SCROLL
-      sta PPU_ADDRESS          ;write ((Y scroll & $F8) << 2) | (X scroll >> 3) to PPU_ADDRESS
+      lda #%00000110           ;set Y position for text box
+      sta PPU_ADDRESS
+      lda #%10000000
+      sta PPU_ADDRESS
       lda #FME7_IRQTimer_Ctrl  ;disable IRQ timer for the rest of the frame
       sta FME7Command
       lda #$00

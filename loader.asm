@@ -96,6 +96,8 @@ RenderMainTilemap:
         sta $00
         lda #4
         sta $01
+        lda #0
+        sta $06
         jsr DrawArbitraryTextbox
         ldy #0
         ldx VRAM_Buffer_Offset
@@ -435,16 +437,27 @@ OptionsGraphic:
 Opt_RowIndex = $e0
 Opt_GfxAddr = $e1
 Opt_GfxPtr = $e3
-Opt_TopRow = $e5
-Opt_TargetRow = $e6
+Opt_TopRow = $e6
 Opt_CursorY = $e7
-Opt_SelIndex = $e8
-Opt_ScrollType = $e9
+Opt_ScrollType = $e8
+Opt_TargetRow = $e9
+
+Opt_SelIndex = $ea
+; sel struct
+Opt_SelStruct = $eb
+Opt_SelMemory = $ed
+Opt_OptionCount = $ef
 
 Opt_GfxAddrLo = Opt_GfxAddr
 Opt_GfxAddrHi = Opt_GfxAddr+1
 Opt_GfxPtrLo = Opt_GfxPtr
 Opt_GfxPtrHi = Opt_GfxPtr+1
+Opt_SelStructLo = Opt_SelStruct
+Opt_SelStructHi = Opt_SelStruct+1
+Opt_SelMemoryLo = Opt_SelMemory
+Opt_SelMemoryHi = Opt_SelMemory+1
+
+Opt_VisibleRows = 20
 
 Opt_GfxBlank:
         .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
@@ -486,7 +499,8 @@ Opt_GfxLuigiPhysics:
 Opt_GfxSpinyEggBehavior1:
         .byte $cd, $24
         .byte "SPINY EGG"
-        .byte "                 "
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24
         .byte $24, $cd
 Opt_GfxSpinyEggBehavior2:
         .byte $cd, $24
@@ -508,10 +522,16 @@ Opt_GfxFontSelection:
         .byte "FONT SELECTION"
         .byte "............"
         .byte $24, $cd
-Opt_GfxTilesetSelection:
+Opt_GfxTilesetSelection1:
         .byte $cd, $24
-        .byte "TILESET SELECTION"
-        .byte "........."
+        .byte "TILESET"
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $24, $24, $24, $24, $24, $24, $24, $24
+        .byte $24, $cd
+Opt_GfxTilesetSelection2:
+        .byte $cd, $24
+        .byte "SELECTION"
+        .byte "................."
         .byte $24, $cd
 Opt_GfxAnimatedTiles:
         .byte $cd, $24
@@ -541,42 +561,18 @@ Opt_GfxTable:
         .word Opt_GfxEmpty              ; 18
         .word Opt_GfxFontSelection      ; 19
         .word Opt_GfxEmpty              ; 20
-        .word Opt_GfxTilesetSelection   ; 21
-        .word Opt_GfxEmpty              ; 22
-        .word Opt_GfxAnimatedTiles      ; 23
-        .word Opt_GfxEmpty              ; 24
-        .word Opt_GfxBottom             ; 25
+        .word Opt_GfxTilesetSelection1  ; 21
+        .word Opt_GfxTilesetSelection2  ; 22
+        .word Opt_GfxEmpty              ; 23
+        .word Opt_GfxAnimatedTiles      ; 24
+        .word Opt_GfxEmpty              ; 25
+        .word Opt_GfxBottom             ; 26
 Opt_GfxTableEnd:
 
 Opt_QueueRowGfx:
-        pha
-        ldx #Opt_GfxAddr        ; mult index by 32
-        ldy #5
-        jsr MultByPow2
-        lda Opt_GfxAddrLo
-        clc
-        adc #$01
-        sta Opt_GfxAddrLo
-        lda Opt_GfxAddrHi
-        adc #$20
-        sta Opt_GfxAddrHi
-Opt_AddrRangeChk:
-        cmp #$23
-        bcc Opt_FetchRowGfx     ; addr in range
-        bne Opt_SubFromAddr     ; addr outside range
-        lda Opt_GfxAddrLo
-        cmp #$c0
-        bcc Opt_FetchRowGfx     ; addr in range
-Opt_SubFromAddr:
-        lda Opt_GfxAddrLo       ; keep addr in range
-        sbc #$c0
-        sta Opt_GfxAddrLo
-        lda Opt_GfxAddrHi
-        sbc #$03
-        sta Opt_GfxAddrHi
-        bne Opt_AddrRangeChk
-Opt_FetchRowGfx:
-        pla
+        sta $00
+        jsr Opt_CalcGfxAddr
+        lda $00
         asl                     ; get gfx pointer
         tax
         lda Opt_GfxTable,x
@@ -601,11 +597,116 @@ Opt_WriteBuffer:
         dex
         dey
         bpl Opt_WriteBuffer
+
+        ; may need to write option text
+        ldx #(Opt_SelTableEnd-Opt_SelTable-1)/2
+Opt_ChkForSelRow:
+        txa                     ; mult by 2
+        asl
+        tay
+        lda Opt_SelTable,y      ; get struct ptr
+        sta Opt_SelStructLo
+        lda Opt_SelTable+1,y
+        sta Opt_SelStructHi
+        ldy #Opt_TextRowOffset
+        lda $00                 ; compare printed row number
+        cmp (Opt_SelStruct),y   ; match with cursor row?
+        beq Opt_GetTextAddr     ; yes, more work to do
+        dex
+        bpl Opt_ChkForSelRow
+        rts
+
+Opt_QueueText:
+        asl
+        tay
+        lda Opt_SelTable,y      ; get struct ptr
+        sta Opt_SelStructLo
+        lda Opt_SelTable+1,y
+        sta Opt_SelStructHi
+        ldy #Opt_TextRowOffset
+        lda (Opt_SelStruct),y
+        jsr Opt_CalcGfxAddr
+Opt_GetTextAddr:
+        ldx VRAM_Buffer_Offset  ; load buffer offset
+        ldy #Opt_TextLengthOffset
+        lda (Opt_SelStruct),y   ; get text length
+        sta VRAM_Buffer+2,x
+        lda #28                 ; set ppu addr lo
+        sec
+        sbc VRAM_Buffer+2,x
+        clc
+        adc Opt_GfxAddrLo
+        sta VRAM_Buffer+1,x
+        lda Opt_GfxAddrHi       ; set ppu addr hi
+        sta VRAM_Buffer,x
+        txa                     ; adjust buffer offset
+        clc
+        adc VRAM_Buffer+2,x
+        adc #3
+        sta VRAM_Buffer_Offset
+        ldy #Opt_MemoryAddrOffset ; get pointer to memory addr
+        lda (Opt_SelStruct),y
+        sta Opt_SelMemoryLo
+        iny
+        lda (Opt_SelStruct),y
+        sta Opt_SelMemoryHi
+        ldy #0                  ; fetch correct text pointer
+        lda (Opt_SelMemory),y
+        asl
+        clc
+        adc #Opt_TextAddrOffset
+        tay
+        lda (Opt_SelStruct),y
+        sta Opt_GfxAddrLo
+        iny
+        lda (Opt_SelStruct),y
+        sta Opt_GfxAddrHi
+        lda VRAM_Buffer+2,x     ; prep for loop
+        tay
+        ldx VRAM_Buffer_Offset
+        dex
+        dey
+Opt_WriteText:
+        lda (Opt_GfxAddr),y     ; write option text
+        sta VRAM_Buffer,x
+        dex
+        dey
+        bpl Opt_WriteText
+        rts
+
+Opt_CalcGfxAddr:
+        ldx #Opt_GfxAddr        ; mult index by 32
+        ldy #5
+        jsr MultByPow2
+        lda Opt_GfxAddrLo
+        clc
+        adc #$01
+        sta Opt_GfxAddrLo
+        lda Opt_GfxAddrHi
+        adc #$20
+        sta Opt_GfxAddrHi
+Opt_AddrRangeChk:
+        cmp #$23
+        bcc Opt_ReturnGfxAddr   ; addr in range
+        bne Opt_SubFromAddr     ; addr outside range
+        lda Opt_GfxAddrLo
+        cmp #$c0
+        bcc Opt_ReturnGfxAddr   ; addr in range
+Opt_SubFromAddr:
+        lda Opt_GfxAddrLo       ; keep addr in range
+        sbc #$c0
+        sta Opt_GfxAddrLo
+        lda Opt_GfxAddrHi
+        sbc #$03
+        sta Opt_GfxAddrHi
+        bne Opt_AddrRangeChk
+Opt_ReturnGfxAddr:
         rts
 
 Opt_Init:
-        lda #0                  ; init opt index
-        sta Opt_RowIndex
+        lda #0
+        sta Opt_RowIndex        ; init opt index
+        sta Opt_SelIndex        ; init sel index
         inc DisableScreenFlag   ; disable rendering
         inc OperMode_Task       ; next task
         rts
@@ -618,18 +719,24 @@ Opt_ClearScreen:
 
 Opt_Prep:
         lda Opt_RowIndex
-        cmp #18
+        cmp #Opt_VisibleRows
         bcs Opt_Prep_Done
-        jsr Opt_QueueRowGfx             ; draw three rows
+        jsr Opt_QueueRowGfx             ; draw one row
         inc Opt_RowIndex
-        lda Opt_RowIndex
-        jsr Opt_QueueRowGfx
-        inc Opt_RowIndex
-        lda Opt_RowIndex
-        jsr Opt_QueueRowGfx
-        inc Opt_RowIndex
+        lda Opt_RowIndex                ; bail if all possible rows drawn
+        cmp #Opt_GfxTableEnd-Opt_GfxTable
+        bcs Opt_Prep_Done
         rts
 Opt_Prep_Done:
+        ldx #1                          ; draw text box
+        ldy #Opt_VisibleRows
+        lda #28
+        sta $00
+        lda #26-Opt_VisibleRows
+        sta $01
+        lda #1
+        sta $06
+        jsr DrawArbitraryTextbox
         lda #0
         sta Opt_TopRow                  ; set top row
         sta Opt_TargetRow               ; set target row
@@ -637,56 +744,279 @@ Opt_Prep_Done:
         sta Mirror_PPU_SCROLL2
         sta DisableScreenFlag           ; enable rendering
         sta Opt_ScrollType              ; disable scrolling
+        lda #$00                        ; set irq select
+        sta IRQSelect
+        lda #$e0                        ;set irq timer value
+        sta IRQTimer_Low
+        lda #$4f
+        sta IRQTimer_High
+        inc IRQUpdateFlag
         lda #$1f
         sta Opt_CursorY                 ; set cursor Y position
         inc OperMode_Task               ; next task
         rts
 
 Opt_SelTable:
-        .byte 4         ; difficulty
-        .byte 6         ; mario palette
-        .byte 8         ; luigi palette
-        .byte 10        ; luigi physics
-        .byte 12        ; spiny egg behavior
-        .byte 15        ; warp zone scroll
-        .byte 17        ; timer speed
-        .byte 19        ; font selection
-        .byte 21        ; tileset selection
-        .byte 23        ; animated tiles
+        .word Opt_SelDifficulty         ; difficulty
+        .word Opt_SelMarioPalette       ; mario palette
+        .word Opt_SelLuigiPalette       ; luigi palette
+        .word Opt_SelLuigiPhysics       ; luigi physics
+        .word Opt_SelSpinyEggBehavior   ; spiny egg behavior
+        .word Opt_SelWarpZoneScroll     ; warp zone scroll
+        .word Opt_SelTimerSpeed         ; timer speed
+        .word Opt_SelFontSelection      ; font selection
+        .word Opt_SelTilesetSelection   ; tileset selection
+        .word Opt_SelAnimatedTiles      ; animated tiles
 Opt_SelTableEnd:
 
+Opt_CursorRowOffset = 0
+Opt_MemoryAddrOffset = 1
+Opt_TextRowOffset = 3
+Opt_TextLengthOffset = 4
+Opt_OptionCountOffset = 5
+Opt_TextAddrOffset = 6
+
+Opt_SelDifficulty:
+        .byte 4                         ; cursor row
+        .word DifficultyFlag            ; memory addr
+        .byte 4                         ; text row
+        .byte 6                         ; text length
+        .byte 3                         ; option count
+        .word Opt_TxtDifficulty0        ; text addr #0
+        .word Opt_TxtDifficulty1        ; text addr #1
+        .word Opt_TxtDifficulty2        ; text addr #2
+Opt_TxtDifficulty0:
+        .byte "..EASY"
+Opt_TxtDifficulty1:
+        .byte "NORMAL"
+Opt_TxtDifficulty2:
+        .byte "..HARD"
+
+Opt_SelMarioPalette:
+        .byte 6                         ; cursor row
+        .word MarioPalette              ; memory addr
+        .byte 6                         ; text row
+        .byte 11                        ; text length
+        .byte 3                         ; option count
+        .word Opt_TxtMarioPalette0      ; text addr #0
+        .word Opt_TxtMarioPalette1      ; text addr #1
+        .word Opt_TxtMarioPalette2      ; text addr #2
+Opt_TxtMarioPalette0:
+        .byte "...ORIGINAL"
+Opt_TxtMarioPalette1:
+        .byte "EARLY PROTO"
+Opt_TxtMarioPalette2:
+        .byte ".LATE PROTO"
+
+Opt_SelLuigiPalette:
+        .byte 8                         ; cursor row
+        .word LuigiPalette              ; memory addr
+        .byte 8                         ; text row
+        .byte 11                        ; text length
+        .byte 4                         ; option count
+        .word Opt_TxtLuigiPalette0      ; text addr #0
+        .word Opt_TxtLuigiPalette1      ; text addr #1
+        .word Opt_TxtLuigiPalette2      ; text addr #2
+        .word Opt_TxtLuigiPalette3      ; text addr #3
+Opt_TxtLuigiPalette0:
+        .byte "...ORIGINAL"
+Opt_TxtLuigiPalette1:
+        .byte "DISK WRITER"
+Opt_TxtLuigiPalette2:
+        .byte ".SMB DELUXE"
+Opt_TxtLuigiPalette3:
+        .byte ".......SMM2"
+
+Opt_SelLuigiPhysics:
+        .byte 10                        ; cursor row
+        .word LuigiPhysics              ; memory addr
+        .byte 10                        ; text row
+        .byte 9                         ; text length
+        .byte 2                         ; option count
+        .word Opt_TxtLuigiPhysics0      ; text addr #0
+        .word Opt_TxtLuigiPhysics1      ; text addr #1
+Opt_TxtLuigiPhysics0:
+        .byte ".ORIGINAL"
+Opt_TxtLuigiPhysics1:
+        .byte "ALL-STARS"
+
+Opt_SelSpinyEggBehavior:
+        .byte 12                        ; cursor row
+        .word SpinyEggBehavior          ; memory addr
+        .byte 13                        ; text row
+        .byte 8                         ; text length
+        .byte 2                         ; option count
+        .word Opt_TxtSpinyEggBehavior0  ; text addr #0
+        .word Opt_TxtSpinyEggBehavior1  ; text addr #1
+Opt_TxtSpinyEggBehavior0:
+        .byte "ORIGINAL"
+Opt_TxtSpinyEggBehavior1:
+        .byte "RESTORED"
+
+Opt_SelWarpZoneScroll:
+        .byte 15                        ; cursor row
+        .word WarpZoneScroll            ; memory addr
+        .byte 15                        ; text row
+        .byte 8                         ; text length
+        .byte 2                         ; option count
+        .word Opt_TxtWarpZoneScroll0    ; text addr #0
+        .word Opt_TxtWarpZoneScroll1    ; text addr #1
+Opt_TxtWarpZoneScroll0:
+        .byte "ORIGINAL"
+Opt_TxtWarpZoneScroll1:
+        .byte "RESTORED"
+
+Opt_SelTimerSpeed:
+        .byte 17                        ; cursor row
+        .word CountdownSpeed            ; memory addr
+        .byte 17                        ; text row
+        .byte 8                         ; text length
+        .byte 2                         ; option count
+        .word Opt_TxtTimerSpeed0        ; text addr #0
+        .word Opt_TxtTimerSpeed1        ; text addr #1
+Opt_TxtTimerSpeed0:
+        .byte "ORIGINAL"
+Opt_TxtTimerSpeed1:
+        .byte "....FAST"
+
+Opt_SelFontSelection:
+        .byte 19                        ; cursor row
+        .word FontSelection             ; memory addr
+        .byte 19                        ; text row
+        .byte 8                         ; text length
+        .byte 3                         ; option count
+        .word Opt_TxtFontSelection0     ; text addr #0
+        .word Opt_TxtFontSelection1     ; text addr #1
+        .word Opt_TxtFontSelection2     ; text addr #2
+Opt_TxtFontSelection0:
+        .byte "PER GAME"
+Opt_TxtFontSelection1:
+        .byte ".MARIO 1"
+Opt_TxtFontSelection2:
+        .byte ".MARIO 2"
+
+Opt_SelTilesetSelection:
+        .byte 21                        ; cursor row
+        .word TilesetSelection          ; memory addr
+        .byte 22                        ; text row
+        .byte 8                         ; text length
+        .byte 3                         ; option count
+        .word Opt_TxtTilesetSelection0  ; text addr #0
+        .word Opt_TxtTilesetSelection1  ; text addr #1
+        .word Opt_TxtTilesetSelection2  ; text addr #2
+Opt_TxtTilesetSelection0:
+        .byte "PER GAME"
+Opt_TxtTilesetSelection1:
+        .byte ".MARIO 1"
+Opt_TxtTilesetSelection2:
+        .byte ".MARIO 2"
+
+Opt_SelAnimatedTiles:
+        .byte 24                        ; cursor row
+        .word AnimatedTiles             ; memory addr
+        .byte 24                        ; text row
+        .byte 3                         ; text length
+        .byte 2                         ; option count
+        .word Opt_TxtAnimatedTiles0     ; text addr #0
+        .word Opt_TxtAnimatedTiles1     ; text addr #1
+Opt_TxtAnimatedTiles0:
+        .byte "OFF"
+Opt_TxtAnimatedTiles1:
+        .byte ".ON"
+
 Opt_Run:
+        ; cursor movement
+        ldy Opt_ScrollType      ; prevent cursor movement if scrolling
+        beq Opt_MoveCursor
+        jmp Opt_ChkScroll
+
+Opt_MoveCursor:
         lda #<Opt_SelIndex      ; change selection
         sta $00
         lda #>Opt_SelIndex
         sta $01
-        lda #Opt_SelTableEnd-Opt_SelTable-1
+        lda #(Opt_SelTableEnd-Opt_SelTable-1)/2
         jsr MenuSelectionLogic
-        ldy Opt_SelIndex        ; update target row
+        
+        ; cursor rendering
+        lda Opt_SelIndex        ; update target row
+        asl
+        tay
         lda Opt_SelTable,y
+        sta Opt_SelStructLo
+        lda Opt_SelTable+1,y
+        sta Opt_SelStructHi
+        ldy #Opt_CursorRowOffset
+        lda (Opt_SelStruct),y
         sta Opt_TargetRow
         sec
-        sbc Opt_TopRow
-        ldy Opt_ScrollType      ; hide cursor if scrolling
-        beq DrawCursor
-        lda #$f8
-        bne CursorOffscreen
-DrawCursor:
+        sbc Opt_TopRow          ; set cursor Y position
         asl
         asl
         asl
         sec
         sbc #1
-CursorOffscreen:
         sta Sprite_Data
-        lda #$04
-        sta Sprite_Data+1        ;and X position in sprite OAM data
+        lda #$04                ; set other cursor data
+        sta Sprite_Data+1
         lda #$02
         sta Sprite_Data+2
         lda #$0f
         sta Sprite_Data+3
 
-        lda Opt_ScrollType       ; check scroll type
+        ; change option if necessary
+        txa                             ; if moved up/down menu, handle scrolling
+        bne Opt_ChkScroll
+        bit PressedJoypadBits
+        bvs Opt_ExitMenu                ; if B pressed, exit menu
+        ldy #Opt_MemoryAddrOffset       ; get memory addr
+        lda (Opt_SelStruct),y
+        sta Opt_SelMemoryLo
+        iny
+        lda (Opt_SelStruct),y
+        sta Opt_SelMemoryHi
+        ldy #Opt_OptionCountOffset      ; get option count
+        lda (Opt_SelStruct),y
+        sta Opt_OptionCount
+        ldx #0
+        lda (Opt_SelMemory,x)
+        tax
+        lda PressedJoypadBits           ; check for left or right press
+        tay
+        and #Right_Dir
+        bne NextOption
+        tya
+        and #Left_Dir
+        beq Opt_ChkScroll
+        dex                             ; previous option
+        bpl Opt_UpdateMemory
+        ldx Opt_OptionCount
+        dex
+        bpl Opt_UpdateMemory
+NextOption:
+        inx                             ; next option
+        cpx Opt_OptionCount
+        bcc Opt_UpdateMemory
+        ldx #0
+Opt_UpdateMemory:
+        txa
+        ldx #0
+        sta (Opt_SelMemory,x)
+        lda Opt_SelIndex                ; redraw option text
+        jmp Opt_QueueText
+Opt_ExitMenu:
+        lda #0
+        sta OperMode
+        sta OperMode_Task
+        sta IRQUpdateFlag
+        sta ScreenEdge_PageLoc
+        sta ContinueMenuSelect
+        inc DisableScreenFlag
+        rts
+
+Opt_ChkScroll:
+        ; camera movement
+        lda Opt_ScrollType      ; check scroll type
         beq Opt_CheckDist
         bpl Opt_ScrollUp
         lda Mirror_PPU_SCROLL2  ; scroll 2 pixels downwards
@@ -714,7 +1044,7 @@ Opt_CheckDist:
         lda Opt_TargetRow       ; get dist from target to top
         sec
         sbc Opt_TopRow
-        cmp #8                  ; scroll up if less than 8 rows or past top
+        cmp #9                  ; scroll up if less than 9 rows or past top
         bmi CloseDist
         cmp #13                 ; scroll down if greater than 12 rows
         bcs FarDist
@@ -734,7 +1064,7 @@ CloseDist:
         jmp Opt_QueueRowGfx
 FarDist:
         lda Opt_TopRow           ; can't scroll if hit bottom row
-        cmp #((Opt_GfxTableEnd-Opt_GfxTable)/2)-18
+        cmp #((Opt_GfxTableEnd-Opt_GfxTable)/2)-Opt_VisibleRows
         bcs Opt_DisableScroll
         lda #255
         sta Opt_ScrollType
@@ -742,7 +1072,7 @@ FarDist:
         sta Sprite_Data
         lda Opt_TopRow
         clc
-        adc #18
+        adc #Opt_VisibleRows
         inc Opt_TopRow
         jmp Opt_QueueRowGfx
 
@@ -810,10 +1140,15 @@ BaseTextbox:
         .byte $20,$21,$40,$cb ; bottom border
         .byte $20,$21,$01,$ce ; bottom right corner
 
+NametableAddrHi:
+        .byte $20
+        .byte $24
+
 ; X = top left corner X location
 ; Y = top left corner Y location
 ; $00 = internal width
 ; $01 = internal height
+; $06 = nametable
 DrawArbitraryTextbox:
         ; get base NT location in $02-$03
         txa
@@ -823,101 +1158,107 @@ DrawArbitraryTextbox:
         ldy #5
         jsr MultByPow2
         pla
+        ldy $06
         clc
         adc $02
         sta $02
-        lda #$20
+        lda NametableAddrHi,y
         adc $03
         sta $03
         ; write base textbox packet to VRAM buffer
         ldy #0
         ldx VRAM_Buffer_Offset
-:       lda BaseTextbox,x
-        sta VRAM_Buffer,y
+        txa
+        pha
+:       lda BaseTextbox,y
+        sta VRAM_Buffer,x
         inx
         iny
         cpy #32
         bcc :-
-        lda #$00
-        sta VRAM_Buffer,x
-        txa
         stx VRAM_Buffer_Offset
+        pla
+        tax
         ; set border lengths
         lda $00
         clc
         adc #$40
-        sta VRAM_Buffer+6
-        sta VRAM_Buffer+26
+        sta VRAM_Buffer+6,x
+        sta VRAM_Buffer+26,x
         lda $01
         clc
         adc #$c0
-        sta VRAM_Buffer+14
-        sta VRAM_Buffer+18
+        sta VRAM_Buffer+14,x
+        sta VRAM_Buffer+18,x
         ; adjust width/height for later math
         inc $00
         inc $01
+        txa
+        pha
         ldx #$04
         lda $01
         ldy #5
         jsr MultByPow2
+        pla
+        tax
         ; set top left corner and top border
         lda $02
-        sta VRAM_Buffer+1
+        sta VRAM_Buffer+1,x
         clc
         adc #$01
-        sta VRAM_Buffer+5
+        sta VRAM_Buffer+5,x
         lda $03
-        sta VRAM_Buffer
+        sta VRAM_Buffer,x
         adc #$00
-        sta VRAM_Buffer+4
+        sta VRAM_Buffer+4,x
         ; set top right corner
         lda $02
         clc
         adc $00
-        sta VRAM_Buffer+9
+        sta VRAM_Buffer+9,x
         lda $03
         adc #$00
-        sta VRAM_Buffer+8
+        sta VRAM_Buffer+8,x
         ; set left border
         lda $02
         clc
         adc #$20
-        sta VRAM_Buffer+13
+        sta VRAM_Buffer+13,x
         lda $03
         adc #$00
-        sta VRAM_Buffer+12
+        sta VRAM_Buffer+12,x
         ; set right border
-        lda VRAM_Buffer+9
+        lda VRAM_Buffer+9,x
         clc
         adc #$20
-        sta VRAM_Buffer+17
-        lda VRAM_Buffer+8
+        sta VRAM_Buffer+17,x
+        lda VRAM_Buffer+8,x
         adc #$00
-        sta VRAM_Buffer+16
+        sta VRAM_Buffer+16,x
         ; set bottom left corner
-        lda VRAM_Buffer+1
+        lda VRAM_Buffer+1,x
         clc
         adc $04
-        sta VRAM_Buffer+21
-        lda VRAM_Buffer
+        sta VRAM_Buffer+21,x
+        lda VRAM_Buffer,x
         adc $05
-        sta VRAM_Buffer+20
+        sta VRAM_Buffer+20,x
         ; set bottom border
-        lda VRAM_Buffer+5
+        lda VRAM_Buffer+5,x
         clc
         adc $04
-        sta VRAM_Buffer+25
-        lda VRAM_Buffer+4
+        sta VRAM_Buffer+25,x
+        lda VRAM_Buffer+4,x
         adc $05
-        sta VRAM_Buffer+24
+        sta VRAM_Buffer+24,x
         ; set bottom right corner
-        lda VRAM_Buffer+9
+        lda VRAM_Buffer+9,x
         clc
         adc $04
-        sta VRAM_Buffer+29
-        lda VRAM_Buffer+8
+        sta VRAM_Buffer+29,x
+        lda VRAM_Buffer+8,x
         adc $05
-        sta VRAM_Buffer+28
+        sta VRAM_Buffer+28,x
         rts
 
 ;-------------------------------------------------------------------------------------
