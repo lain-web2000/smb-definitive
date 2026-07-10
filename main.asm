@@ -9001,9 +9001,6 @@ ExBalP: rts
 
 CheckBalPlatform:
        tay                         ;save offset from state as Y
-       lda Enemy_ID,y
-       cmp #$24                    ;check to see if other object is balance platform
-       bne ExBalP                  ;if not, branch to leave
        lda PlatformCollisionFlag,x ;get collision flag of platform
        sta $00                     ;store here
        lda Enemy_MovingDir,x       ;get moving direction
@@ -9211,8 +9208,10 @@ PlatformFall:
       jsr MoveFallingPlatform     ;make current platform fall
       pla
       tax                         ;pull offset from stack and save to X
+	  lda Enemy_State,x
+	  bpl :+                      ;platform inheritence bugfix
       jsr MoveFallingPlatform     ;make other platform fall
-      ldx ObjectOffset
+:     ldx ObjectOffset
       lda PlatformCollisionFlag,x ;if player not standing on either platform,
       bmi ExPF                    ;skip this part
       tax                         ;transfer collision flag offset as offset to X
