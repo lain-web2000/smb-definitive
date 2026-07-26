@@ -2145,7 +2145,7 @@ ClrMTBuf: sta MetatileBuffer,x       ;clear out metatile buffer
           beq RendFore               ;if not, skip to check the foreground
           lda CurrentPageLoc         ;otherwise check for every third page
 ThirdP:   cmp #$03
-          bmi RendBack               ;if less than three we're there
+          bcc RendBack               ;if less than three we're there
           sec
           sbc #$03                   ;if 3 or more, subtract 3 and
           bpl ThirdP                 ;do an unconditional branch
@@ -13685,7 +13685,7 @@ SaveProgress:
             lda AreaNumber
             sta ContinueArea,x
             lda CompletedWorlds
-            sta SavedCompletedWorlds
+            sta SavedCompletedWorlds,x
             rts
 			
 ContinueOrRetry:
@@ -15117,10 +15117,17 @@ NoMenuAction:
         rts
 CloseMenu:
         sec
+SavePointerHi:
         rts
 
 ;-------------------------------------------------------------------------------------
 
+SavePointerLo:
+		.byte <(File_A),  <(File_B), <(File_C)
+
+SavePointerLo_End:
+		.byte <(File_A_End),  <(File_B_End), <(File_C_End)
+		
 SaveHeader:
         .byte $4D, $41, $52, $49, $4F, $20, $43, $4F, $4D, $50, $4C, $45, $54, $45, $00, $00
 
@@ -15138,14 +15145,32 @@ InitializeSaveData:
 ClrSLp: lda #$00
         sta SaveData,x
         dex
-        bpl ClrSLp
+		cpx #$ff
+        bne ClrSLp
         ldx #$0f
 SaveLp: lda SaveHeader,x        ;write save data header
         sta SaveDataHeader,x
         dex
         bpl SaveLp              ;loop back if we're not done
+		lda #$01
+		sta DifficultyFlag
+		sta AnimatedTiles
         rts                     ;otherwise we have reset save data, leave
 
+EraseSaveFile:
+		lda SavePointerHi
+		sta $01
+		ldx CurrentFile
+		lda SavePointerLo_End,x
+		sta $00
+		ldy #(File_A_End-File_A)
+DoErase:		
+		lda #$00
+		sta ($00),y
+		dey
+		bpl DoErase
+		rts
+		
 ;-------------------------------------------------------------------------------------
 BGTiles:
       .byte $09,$01

@@ -4,51 +4,49 @@ SaveDataHeader:
 	.byte "MARIO COMPLETE", $00, $00
 
 SaveData:
+File_A:
 GamesBeatenCount:
-	.byte $00
-	.byte $00
-	.byte $00
+	.res 3, $00
 
 ContinueWorld:
-	.byte $00
-	.byte $00
-	.byte $00
+	.res 3, $00
 	
-ContinueLevel: ;only for easy mode
-	.byte $00
-	.byte $00
-	.byte $00
+ContinueLevel:
+	.res 3, $00
 
-ContinueArea: ;only for easy mode
-	.byte $00
-	.byte $00
-	.byte $00
+ContinueArea:
+	.res 3, $00
 	
 SavedLevelSet:
 	.byte $00
 
 SavedCompletedWorlds:
-	.byte $00
-	.byte $00
-	.byte $00
-	
-DifficultyFlag:
-	.byte $00
+	.res 3, $00
 	
 ContinuePlayerStatus:
-	.byte $00
-	.byte $00
-	.byte $00
+	.res 3, $00
 
 ContinuePlayerSize:
-	.byte $00
-	.byte $00
-	.byte $00
+	.res 3, $00
 
 SavedTopScore:
     .res 6, $00
 	.res 6, $00
 	.res 6, $00
+File_A_End:
+
+File_B:
+	.res (File_A_End-File_A), $00
+File_B_End:
+
+File_C:
+	.res (File_A_End-File_A), $00
+File_C_End:	
+
+GlobalSettings:
+
+DifficultyFlag:
+	.byte $00
 	
 ;$00 - Standard SMB1 Palette
 ;$01 - Protoype #1 Palette
@@ -85,9 +83,12 @@ TilesetSelection:
 
 AnimatedTiles:
 	.byte $00
-	
+GlobalSettings_End:
 SaveData_End:
 
+CurrentFile:
+	.byte $00
+	
 CurrentGame:
 	.byte $00
 
