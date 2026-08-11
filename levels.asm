@@ -378,7 +378,8 @@ E_GroundArea8_:
 ;level 2-1
 E_GroundArea9_:
       .incbin "levels/smb1/E_2-1.bin"
-;end of data terminator here is also used by pipe intro area
+
+;pipe intro area
 E_GroundArea10_:
       .byte $ff
 
@@ -630,140 +631,95 @@ L_WaterArea6_:
 
 ;level 1-4
 E_CastleArea1:
-  .byte $35, $9d, $55, $9b, $c9, $1b, $59, $9d, $45, $9b, $c5, $1b, $26, $80, $45, $1b
-  .byte $b9, $1d, $f0, $15, $59, $9d, $0f, $08, $78, $2d, $96, $28, $90, $b5, $ff
+  .incbin "levels/smb2/E_1-4.bin"
 
 ;level 2-4
 E_CastleArea2:
-  .byte $74, $80, $f0, $38, $a0, $bb, $40, $bc, $8c, $1d, $c9, $9d, $05, $9b, $1c, $0c
-  .byte $59, $1b, $b5, $1d, $2c, $8c, $40, $15, $7c, $1b, $dc, $1d, $6c, $8c, $bc, $0c
-  .byte $78, $ad, $a5, $28, $90, $b5, $ff
+  .incbin "levels/smb2/E_2-4.bin"
 
 ;level 3-4
 E_CastleArea3:
-  .byte $0f, $04, $9c, $0c, $0f, $07, $c5, $1b, $65, $9d, $49, $9d, $5c, $8c, $78, $2d
-  .byte $90, $b5, $ff
+  .incbin "levels/smb2/E_3-4.bin"
 
 ;level 4-4
 E_CastleArea4:
-  .byte $49, $9f, $67, $03, $79, $9d, $a0, $3a, $57, $9f, $bb, $1d, $d5, $25, $0f, $05
-  .byte $18, $1d, $74, $00, $84, $00, $94, $00, $c6, $29, $49, $9d, $db, $05, $0f, $08
-  .byte $05, $9b, $09, $1d, $b0, $38, $80, $95, $c0, $3c, $ec, $a8, $cc, $8c, $4a, $9b
-  .byte $78, $2d, $90, $b5, $ff
+  .incbin "levels/smb2/E_4-4.bin"
 
 ;level 5-4
 E_CastleArea5:
-  .byte $2a, $a9, $6b, $0c, $cb, $0c, $15, $9c, $89, $1c, $cc, $1d, $09, $9d, $f5, $1c
-  .byte $6b, $a9, $ab, $0c, $db, $29, $48, $9d, $9b, $0c, $5b, $8c, $a5, $1c, $49, $9d
-  .byte $79, $1d, $09, $9d, $6b, $0c, $c9, $1f, $3b, $8c, $88, $95, $b9, $1c, $19, $9d
-  .byte $30, $cc, $78, $2d, $a6, $28, $90, $b5, $ff
+  .incbin "levels/smb2/E_5-4.bin"
 
 ;level 6-4
 E_CastleArea6:
-  .byte $0f, $02, $09, $1f, $8b, $85, $2b, $8c, $e9, $1b, $25, $9d, $0f, $07, $09, $1d
-  .byte $6d, $28, $99, $1b, $b5, $2c, $4b, $8c, $09, $9f, $fb, $15, $9d, $a8, $0f, $0c
-  .byte $2b, $0c, $78, $2d, $90, $b5, $ff
+  .incbin "levels/smb2/E_6-4.bin"
 
 ;level 7-4
 E_CastleArea7:
-  .byte $05, $9d, $0d, $a8, $dd, $1d, $07, $ac, $54, $2c, $a2, $2c, $f4, $2c, $42, $ac
-  .byte $26, $9d, $d4, $03, $24, $83, $64, $03, $2b, $82, $4b, $02, $7b, $02, $9b, $02
-  .byte $5b, $82, $7b, $02, $0b, $82, $2b, $02, $c6, $1b, $28, $82, $48, $02, $a6, $1b
-  .byte $7b, $95, $85, $0c, $9d, $9b, $0f, $0e, $78, $2d, $7a, $1d, $90, $b5, $ff
+  .incbin "levels/smb2/E_7-4.bin"
 
 ;level 8-4
 E_CastleArea8:
-  .byte $19, $9b, $99, $1b, $2c, $8c, $59, $1b, $c5, $0f, $0e, $83, $e0, $0f, $06, $2e
-  .byte $67, $e7, $0f, $08, $9b, $07, $0e, $83, $e0, $39, $0e, $87, $10, $bd, $28, $59
-  .byte $9f, $0f, $0f, $34, $0f, $77, $10, $9e, $67, $f1, $0f, $12, $0e, $67, $e3, $78
-  .byte $2d, $0f, $15, $3b, $29, $57, $82, $0f, $18, $55, $1d, $78, $2d, $90, $b5, $ff
+  .incbin "levels/smb2/E_8-4.bin"
 
 ;level 9-3
 E_CastleArea9:
-    .byte $1f, $01, $0e, $69, $00, $1f, $0b, $78, $2d, $ff
+  .incbin "levels/smb2/E_9-3.bin"
 
 ;cloud level used in level 9-3
 E_CastleArea10:
-    .byte $1f, $01, $1e, $68, $06, $ff
+  .incbin "levels/smb2/E_9-3CLOUD.bin"
 
 ;level A-4
 E_CastleArea11:
-  .byte $2a, $9e, $6b, $0c, $8d, $1c, $ea, $1f, $1b, $8c, $e6, $1c, $8c, $9c, $bb, $0c
-  .byte $f3, $83, $9b, $8c, $db, $0c, $1b, $8c, $6b, $0c, $bb, $0c, $0f, $09, $40, $15
-  .byte $78, $ad, $90, $b5, $ff
+  .incbin "levels/smb2/E_A-4.bin"
 
 ;level B-4
 E_CastleArea12:
-  .byte $0f, $02, $38, $1d, $d9, $1b, $6e, $e1, $21, $3a, $a8, $18, $9d, $0f, $07, $18
-  .byte $1d, $0f, $09, $18, $1d, $0f, $0b, $18, $1d, $7b, $15, $8e, $21, $2e, $b9, $9d
-  .byte $0f, $0e, $78, $2d, $90, $b5, $ff
+  .incbin "levels/smb2/E_B-4.bin"
 
 ;level C-4
 E_CastleArea13:
-  .byte $05, $9d, $65, $1d, $0d, $a8, $dd, $1d, $07, $ac, $54, $2c, $a2, $2c, $f4, $2c
-  .byte $42, $ac, $26, $9d, $d4, $03, $24, $83, $64, $03, $2b, $82, $4b, $02, $7b, $02
-  .byte $9b, $02, $5b, $82, $7b, $02, $0b, $82, $2b, $02, $c6, $1b, $28, $82, $48, $02
-  .byte $a6, $1b, $7b, $95, $85, $0c, $9d, $9b, $0f, $0e, $78, $2d, $7a, $1d, $90, $b5
-  .byte $ff
+  .incbin "levels/smb2/E_C-4.bin"
 
 ;level D-4
 E_CastleArea14:
-  .byte $19, $9f, $99, $1b, $2c, $8c, $59, $1b, $c5, $0f, $0f, $04, $09, $29, $bd, $1d
-  .byte $0f, $06, $6e, $2a, $61, $0f, $09, $48, $2d, $46, $87, $79, $07, $8e, $63, $60
-  .byte $a5, $07, $b8, $85, $57, $a5, $8c, $8c, $76, $9d, $78, $2d, $90, $b5, $ff
+  .incbin "levels/smb2/E_D-4.bin"
 
 ;level 1-1
 E_GroundArea1:
-  .byte $07, $8e, $47, $03, $0f, $03, $10, $38, $1b, $80, $53, $06, $77, $0e, $83, $83
-  .byte $a0, $3d, $90, $3b, $90, $b7, $60, $bc, $b7, $0e, $ee, $42, $00, $f7, $80, $6b
-  .byte $83, $1b, $83, $ab, $06, $ff
+  .incbin "levels/smb2/E_1-1.bin"
 
 ;level 1-3
 E_GroundArea2:
-  .byte $96, $a4, $f9, $24, $d3, $83, $3a, $83, $5a, $03, $95, $07, $f4, $0f, $69, $a8
-  .byte $33, $87, $86, $24, $c9, $24, $4b, $83, $67, $83, $17, $83, $56, $28, $95, $24
-  .byte $0a, $a4, $ff
+  .incbin "levels/smb2/E_1-3.bin"
 
 ;level 2-1
 E_GroundArea3:
-  .byte $0f, $02, $47, $0e, $87, $0e, $c7, $0e, $f7, $0e, $27, $8e, $ee, $42, $25, $0f
-  .byte $06, $ac, $28, $8c, $a8, $4e, $b3, $20, $8b, $8e, $f7, $90, $36, $90, $e5, $8e
-  .byte $32, $8e, $c2, $06, $d2, $06, $e2, $06, $ff
+  .incbin "levels/smb2/E_2-1.bin"
 
 ;level 2-2
 E_GroundArea4:
-  .byte $15, $8e, $9b, $06, $e0, $37, $80, $bc, $0f, $04, $2b, $3b, $ab, $0e, $eb, $0e
-  .byte $0f, $06, $f0, $37, $4b, $8e, $6b, $80, $bb, $3c, $4b, $bb, $ee, $42, $20, $1b
-  .byte $bc, $cb, $00, $ab, $83, $eb, $bb, $0f, $0e, $1b, $03, $9b, $37, $d4, $0e, $a3
-  .byte $86, $b3, $06, $c3, $06, $ff
+  .incbin "levels/smb2/E_2-2.bin"
 
 ;level 2-3
 E_GroundArea5:
-  .byte $c0, $be, $0f, $03, $38, $0e, $15, $8f, $aa, $83, $f8, $07, $0f, $07, $96, $10
-  .byte $0f, $09, $48, $10, $ba, $03, $ff
+  .incbin "levels/smb2/E_2-3.bin"
 
 ;level 3-1
 E_GroundArea6:
-  .byte $87, $85, $a3, $05, $db, $83, $fb, $03, $93, $8f, $bb, $03, $ce, $42, $42, $9b
-  .byte $83, $ae, $b3, $40, $db, $00, $f4, $0f, $33, $8f, $74, $0f, $10, $bc, $f5, $0f
-  .byte $2e, $c2, $45, $b7, $03, $f7, $03, $c8, $90, $ff
+  .incbin "levels/smb2/E_3-1.bin"
 
 ;level 3-3
 E_GroundArea7:
-  .byte $80, $be, $83, $03, $92, $10, $4b, $80, $b0, $3c, $07, $80, $b7, $24, $0c, $a4
-  .byte $96, $a9, $1b, $83, $7b, $24, $b7, $24, $97, $83, $e2, $0f, $a9, $a9, $38, $a9
-  .byte $0f, $0b, $74, $8f, $ff
+  .incbin "levels/smb2/E_3-3.bin"
 
 ;level 4-1
 E_GroundArea8:
-  .byte $e2, $91, $0f, $03, $42, $11, $0f, $06, $72, $11, $0f, $08, $ee, $02, $60, $02
-  .byte $91, $ee, $b3, $60, $d3, $86, $ff
+  .incbin "levels/smb2/E_4-1.bin"
 
 ;level 4-2
 E_GroundArea9:
-  .byte $0f, $02, $9b, $02, $ab, $02, $0f, $04, $13, $03, $92, $11, $60, $b7, $00, $bc
-  .byte $00, $bb, $0b, $83, $cb, $03, $7b, $85, $9e, $c2, $60, $e6, $05, $0f, $0c, $62
-  .byte $10
+  .incbin "levels/smb2/E_4-2.bin"
 
 ;enemy data used by pipe intro area, warp zone area and exit area
 E_GroundArea10:
@@ -773,208 +729,159 @@ E_GroundArea28:
 
 ;level 4-3
 E_GroundArea11:
-  .byte $e6, $a9, $57, $a8, $b5, $24, $19, $a4, $76, $28, $a2, $0f, $95, $8f, $9d, $a8
-  .byte $0f, $07, $09, $29, $55, $24, $8b, $17, $a9, $24, $db, $83, $04, $a9, $24, $8f
-  .byte $65, $0f, $ff
+  .incbin "levels/smb2/E_4-3.bin"
 
 ;level 5-1
 E_GroundArea12:
-  .byte $1b, $82, $4b, $02, $7b, $02, $ab, $02, $0f, $03, $f9, $0e, $d0, $be, $8e, $c4
-  .byte $86, $f8, $0e, $c0, $ba, $0f, $0d, $3a, $0e, $bb, $02, $30, $b7, $80, $bc, $c0
-  .byte $bc, $0f, $12, $24, $0f, $54, $0f, $ce, $3c, $80, $d3, $0f, $cb, $8e, $f9, $0e
-  .byte $ff
+  .incbin "levels/smb2/E_5-1.bin"
 
 ;level 5-3
 E_GroundArea13:
-  .byte $0a, $aa, $15, $8f, $44, $0f, $4e, $44, $80, $d8, $07, $57, $90, $0f, $06, $67
-  .byte $24, $8b, $17, $b9, $24, $ab, $97, $16, $87, $2a, $28, $84, $0f, $57, $a9, $a5
-  .byte $29, $f5, $29, $a7, $a4, $0a, $a4, $ff
+  .incbin "levels/smb2/E_5-3.bin"
 
 ;level 6-1
 E_GroundArea14:
-  .byte $07, $82, $67, $0e, $40, $bd, $e0, $38, $d0, $bc, $6e, $84, $a0, $9b, $05, $0f
-  .byte $06, $bb, $05, $0f, $08, $0b, $0e, $4b, $0e, $0f, $0a, $05, $29, $85, $29, $0f
-  .byte $0c, $dd, $28, $ff
+  .incbin "levels/smb2/E_6-1.bin"
 
 ;level 6-3
 E_GroundArea15:
-  .byte $0f, $02, $28, $10, $e6, $03, $d8, $90, $0f, $05, $85, $0f, $78, $83, $c8, $10
-  .byte $18, $83, $58, $83, $f7, $90, $0f, $0c, $43, $0f, $73, $8f, $ff
+  .incbin "levels/smb2/E_6-3.bin"
 
 ;level 7-1
 E_GroundArea16:
-  .byte $a7, $83, $d7, $03, $0f, $03, $6b, $00, $0f, $06, $e3, $0f, $14, $8f, $3e, $44
-  .byte $c3, $0b, $80, $87, $05, $ab, $05, $db, $83, $0f, $0b, $07, $05, $13, $0e, $2b
-  .byte $02, $4b, $02, $0f, $10, $0b, $0e, $b0, $37, $90, $bc, $80, $bc, $ae, $44, $c0
-  .byte $ff
+  .incbin "levels/smb2/E_7-1.bin"
 
 ;level 7-2
 E_GroundArea17:
-  .byte $0a, $aa, $d5, $8f, $03, $8f, $3e, $44, $c6, $d8, $83, $0f, $06, $a6, $11, $b9
-  .byte $0e, $39, $9d, $79, $1b, $a6, $11, $e8, $03, $87, $83, $16, $90, $a6, $11, $b9
-  .byte $1d, $05, $8f, $38, $29, $89, $29, $26, $8f, $46, $29, $ff
+  .incbin "levels/smb2/E_7-2.bin"
 
 ;level 7-3
 E_GroundArea18:
-  .byte $0f, $04, $a3, $10, $0f, $09, $e3, $29, $0f, $0d, $55, $24, $a9, $24, $0f, $11
-  .byte $59, $1d, $a9, $1b, $23, $8f, $15, $9b, $ff
+  .incbin "levels/smb2/E_7-3.bin"
 
 ;level 8-1
 E_GroundArea19:
-  .byte $0f, $01, $db, $02, $30, $b7, $80, $3b, $1b, $8e, $4a, $0e, $eb, $03, $3b, $82
-  .byte $5b, $02, $e5, $0f, $14, $8f, $44, $0f, $5b, $82, $0c, $85, $35, $8f, $06, $85
-  .byte $e3, $05, $db, $83, $3e, $84, $e0, $ff
+  .incbin "levels/smb2/E_8-1.bin"
 
 ;cloud level used in levels 2-1, 3-1 and 4-1
 E_GroundArea20:
-  .byte $0a, $aa, $1e, $22, $29, $1e, $25, $49, $2e, $27, $66, $ff
+  .incbin "levels/smb2/E_CLOUD1.bin"
 
 ;level 8-2
 E_GroundArea22:
-  .byte $0f, $02, $0a, $29, $f7, $02, $80, $bc, $6b, $82, $7b, $02, $9b, $02, $ab, $02
-  .byte $39, $8e, $0f, $07, $ce, $35, $ec, $f5, $0f, $fb, $85, $fb, $85, $3e, $c4, $e3
-  .byte $a7, $02, $ff
+  .incbin "levels/smb2/E_8-2.bin"
 
 ;level 8-3
 E_GroundArea23:
-  .byte $09, $a9, $86, $11, $d5, $10, $a3, $8f, $d5, $29, $86, $91, $2b, $83, $58, $03
-  .byte $5b, $85, $eb, $05, $3e, $bc, $e0, $0f, $09, $43, $0f, $74, $0f, $6b, $85, $db
-  .byte $05, $c6, $a4, $19, $a4, $12, $8f
+  .incbin "levels/smb2/E_8-3.bin"
+
 ;another unused area
 E_GroundArea24:
   .byte $ff
 
 ;level 9-1 starting area
 E_GroundArea25:
-    .byte $1e, $05, $00, $ff
+  .incbin "levels/smb2/E_9-1GROUND.bin"
 
-;cloud level used with level 5-1
+;cloud level used with levels 5-1 and 8-3
 E_GroundArea29:
-  .byte $0a, $aa, $2e, $2b, $98, $2e, $36, $e7, $ff
+  .incbin "levels/smb2/E_CLOUD2.bin"
 
 ;level A-1
 E_GroundArea30:
-  .byte $07, $83, $37, $03, $6b, $0e, $e0, $3d, $20, $be, $6e, $2b, $00, $a7, $85, $d3
-  .byte $05, $e7, $83, $24, $83, $27, $03, $49, $00, $59, $00, $10, $bb, $b0, $3b, $6e
-  .byte $c1, $00, $17, $85, $53, $05, $36, $8e, $76, $0e, $b6, $0e, $e7, $83, $63, $83
-  .byte $68, $03, $29, $83, $57, $03, $85, $03, $b5, $29, $ff
+  .incbin "levels/smb2/E_A-1.bin"
 
 ;level A-3
 E_GroundArea31:
-  .byte $0f, $04, $66, $07, $0f, $06, $86, $10, $0f, $08, $55, $0f, $e5, $8f, $ff
+  .incbin "levels/smb2/E_A-3.bin"
 
 ;level B-1
 E_GroundArea32:
-  .byte $70, $b7, $ca, $00, $66, $80, $0f, $04, $79, $0e, $ab, $0e, $ee, $2b, $20, $eb
-  .byte $80, $40, $bb, $fb, $00, $40, $b7, $cb, $0e, $0f, $09, $4b, $00, $76, $00, $d8
-  .byte $00, $6b, $8e, $73, $06, $83, $06, $c7, $0e, $36, $90, $c5, $06, $ff
+  .incbin "levels/smb2/E_B-1.bin"
 
 ;level B-3
 E_GroundArea33:
-  .byte $84, $8f, $a7, $24, $d3, $0f, $ea, $24, $45, $a9, $d5, $28, $45, $a9, $84, $25
-  .byte $b4, $8f, $09, $90, $b5, $a8, $5b, $97, $cd, $28, $b5, $a4, $09, $a4, $65, $28
-  .byte $92, $90, $e3, $83, $ff
+  .incbin "levels/smb2/E_B-3.bin"
 
 ;level C-1
 E_GroundArea34:
-  .byte $3a, $8e, $5b, $0e, $c3, $8e, $ca, $8e, $0b, $8e, $4a, $0e, $de, $c1, $44, $0f
-  .byte $08, $49, $0e, $eb, $0e, $8a, $90, $ab, $85, $0f, $0c, $03, $0f, $2e, $2b, $40
-  .byte $67, $86, $ff
+  .incbin "levels/smb2/E_C-1.bin"
 
 ;level C-2
 E_GroundArea35:
-  .byte $15, $8f, $54, $07, $aa, $83, $f8, $07, $0f, $04, $14, $07, $96, $10, $0f, $07
-  .byte $95, $0f, $9d, $a8, $0b, $97, $09, $a9, $55, $24, $a9, $24, $bb, $17, $ff
+  .incbin "levels/smb2/E_C-2.bin"
 
 ;level C-3
 E_GroundArea36:
-  .byte $0f, $03, $a6, $11, $a3, $90, $a6, $91, $0f, $08, $a6, $11, $e3, $a9, $0f, $0d
-  .byte $55, $24, $a9, $24, $0f, $11, $59, $1d, $a9, $1b, $23, $8f, $15, $9b, $ff
+  .incbin "levels/smb2/E_C-3.bin"
 
 ;level D-1
 E_GroundArea37:
-  .byte $87, $85, $9b, $05, $18, $90, $a4, $8f, $6e, $c1, $60, $9b, $02, $d0, $3b, $80
-  .byte $b8, $03, $8e, $1b, $02, $3b, $02, $0f, $08, $03, $10, $f7, $05, $6b, $85, $ff
+  .incbin "levels/smb2/E_D-1.bin"
 
 ;level D-2
 E_GroundArea38:
-  .byte $db, $82, $f3, $03, $10, $b7, $80, $37, $1a, $8e, $4b, $0e, $7a, $0e, $ab, $0e
-  .byte $0f, $05, $f9, $0e, $d0, $be, $2e, $c1, $62, $d4, $8f, $64, $8f, $7e, $2b, $60
-  .byte $ff
+  .incbin "levels/smb2/E_D-2.bin"
 
 ;level D-3
 E_GroundArea39:
-  .byte $0f, $03, $ab, $05, $1b, $85, $a3, $85, $d7, $05, $0f, $08, $33, $03, $0b, $85
-  .byte $fb, $85, $8b, $85, $3a, $8e, $ff
+  .incbin "levels/smb2/E_D-3.bin"
 
 ;ground level area used with level D-4
 E_GroundArea40:
-  .byte $0f, $02, $09, $05, $3e, $41, $64, $2b, $8e, $58, $0e, $ca, $07, $34, $87, $ff
+  .incbin "levels/smb2/E_D-4GROUND.bin"
 
 ;cloud level used with levels A-1, B-1 and D-2
 E_GroundArea41:
-  .byte $0a, $aa, $1e, $20, $03, $1e, $22, $27, $2e, $24, $48, $2e, $28, $67, $ff
+  .incbin "levels/smb2/E_CLOUD3.bin"
 
 ;level 1-2
 E_UndergroundArea1:
-  .byte $0a, $8e, $de, $b4, $00, $e0, $37, $5b, $82, $2b, $a9, $aa, $29, $29, $a9, $a8
-  .byte $29, $0f, $08, $f0, $3c, $79, $a9, $c5, $26, $cd, $26, $ee, $3b, $01, $67, $b4
-  .byte $0f, $0c, $2e, $c1, $00, $ff
+  .incbin "levels/smb2/E_1-2.bin"
 
 ;warp zone area used by level 1-2
 E_UndergroundArea2:
-  .byte $09, $a9, $19, $a9, $de, $42, $02, $7b, $83, $ff
+  .incbin "levels/smb2/E_1-2WARP.bin"
 
 ;underground bonus rooms used in many levels
 E_UndergroundArea3:
-  .byte $1e, $a0, $0a, $1e, $23, $2b, $1e, $28, $6b, $0f, $03, $1e, $40, $08, $1e, $25
-  .byte $4e, $0f, $06, $1e, $22, $25, $1e, $25, $45, $ff
+  .incbin "levels/smb2/E_BONUS1.bin"
 
 ;level 5-2
 E_UndergroundArea4:
-  .byte $0b, $83, $b7, $03, $d7, $03, $0f, $05, $67, $03, $7b, $02, $9b, $02, $80, $b9
-  .byte $3b, $83, $4e, $b4, $80, $86, $2b, $c9, $2c, $16, $ac, $67, $b4, $de, $3b, $81
-  .byte $ff
+  .incbin "levels/smb2/E_5-2.bin"
 
 ;underground bonus rooms used with worlds 5-8
 E_UndergroundArea5:
-  .byte $1e, $af, $ca, $1e, $2c, $85, $0f, $04, $1e, $2d, $a7, $1e, $2f, $ce, $1e, $35
-  .byte $e5, $0f, $07, $1e, $2b, $87, $1e, $30, $c5, $ff
+  .incbin "levels/smb2/E_BONUS2.bin"
 
 ;level A-2
 E_UndergroundArea6:
-  .byte $bb, $a9, $1b, $a9, $69, $29, $b8, $29, $59, $a9, $8d, $a8, $0f, $07, $15, $29
-  .byte $55, $ac, $6b, $85, $0e, $ad, $01, $67, $34, $ff
+  .incbin "levels/smb2/E_A-2.bin"
 
 ;underground bonus rooms used with worlds A-D
 E_UndergroundArea7:
-  .byte $1e, $a0, $09, $1e, $27, $67, $0f, $03, $1e, $28, $68, $0f, $05, $1e, $24, $48
-  .byte $1e, $63, $68, $ff
+  .incbin "levels/smb2/E_BONUS3.bin"
 
 ;level 3-2
 E_WaterArea1:
-  .byte $0f, $01, $2a, $07, $2e, $3b, $41, $e9, $07, $0f, $03, $6b, $07, $f9, $07, $b8
-  .byte $80, $2a, $87, $4a, $87, $b3, $0f, $84, $87, $47, $83, $87, $07, $0a, $87, $42
-  .byte $87, $1b, $87, $6b, $03, $ff
+  .incbin "levels/smb2/E_3-2.bin"
 
 ;level 6-2
 E_WaterArea2:
-  .byte $0f, $01, $2e, $3b, $a1, $5b, $07, $ab, $07, $69, $87, $ba, $07, $fb, $87, $65
-  .byte $a7, $6a, $27, $a6, $a7, $ac, $27, $1b, $87, $88, $07, $2b, $83, $7b, $07, $a7
-  .byte $90, $e5, $83, $14, $a7, $19, $27, $77, $07, $f8, $07, $47, $8f, $b9, $07, $ff
+  .incbin "levels/smb2/E_6-2.bin"
 
 ;water area used by level 4-1
 E_WaterArea3:
-  .byte $1e, $a7, $6a, $5b, $82, $74, $07, $d8, $07, $e8, $02, $0f, $04, $26, $07, $ff
+  .incbin "levels/smb2/E_WATER1.bin"
 
 ;water area used in level 8-4
 E_WaterArea4:
-  .byte $07, $9b, $0a, $07, $b9, $1b, $66, $9b, $78, $07, $ae, $67, $e5, $ff
+  .incbin "levels/smb2/E_8-4WATER.bin"
 
 ;water area used in level 6-1
 E_WaterArea5:
-  .byte $97, $87, $cb, $00, $ee, $2b, $f8, $fe, $2d, $ad, $75, $87, $d3, $27, $d9, $27
-  .byte $0f, $04, $56, $0f, $ff
+  .incbin "levels/smb2/E_WATER2.bin"
 
 ;two unused levels that have the same enemy data address as a used level
 E_GroundArea26:
@@ -982,24 +889,19 @@ E_GroundArea27:
 
 ;level 9-1 water area
 E_WaterArea6:
-    .byte $26, $8f, $05, $ac, $46, $0f, $1f, $04, $e8, $10, $38, $90, $66, $11, $fb, $3c
-    .byte $9b, $b7, $cb, $85, $29, $87, $95, $07, $eb, $02, $0b, $82, $96, $0e, $c3, $0e
-    .byte $ff
+  .incbin "levels/smb2/E_9-1.bin"
 
 ;level 9-2
 E_WaterArea7:
-    .byte $1f, $01, $e6, $11, $ff
+  .incbin "levels/smb2/E_9-2.bin"
 
 ;level 9-4
 E_WaterArea8:
-    .byte $3b, $86, $7b, $00, $bb, $02, $2b, $8e, $7a, $05, $57, $87, $27, $8f, $9a, $0c
-    .byte $ff
+  .incbin "levels/smb2/E_9-4.bin"
 
 ;level B-2
 E_WaterArea9:
-  .byte $ee, $ad, $21, $26, $87, $f3, $0e, $66, $87, $cb, $00, $65, $87, $0f, $06, $06
-  .byte $0e, $97, $07, $cb, $00, $75, $87, $d3, $27, $d9, $27, $0f, $09, $77, $1f, $46
-  .byte $87, $b1, $0f, $ff
+  .incbin "levels/smb2/E_B-2.bin"
 
 ;level 1-4
 L_CastleArea1:
