@@ -26,6 +26,8 @@ JOYPAD_PORT           = $4016
 JOYPAD_PORT1          = $4016
 JOYPAD_PORT2          = $4017
 
+; GAME SPECIFIC DEFINES
+
 .segment "MAIN_ZP" : zeropage
     .res 8 ; $00-$07
 
@@ -69,10 +71,11 @@ Misc_State:
 PlayerFacingDir:
     .res 1 ; $33
 DestinationPageLoc:
+FirebarSpinDirection:
     .res 1 ; $34
 VictoryWalkControl:
     .res 1 ; $35
-    .res 3 ; $36-$38 (unused)
+    .res 3 ; $36-$38
 
 PowerUpType:
     .res 1 ; $39
@@ -81,8 +84,8 @@ FireballBouncingFlag:
     .res 2 ; $3a-$3b
 
 HammerBroJumpTimer:
-    .res 6 ; $3c-$41
-    .res 3 ; $42-$44 (unused)
+    .res 5 ; $3c-$40
+    .res 4 ; $41-$44 (unused)
 
 Player_MovingDir:
     .res 1 ; $45
@@ -320,7 +323,227 @@ BridgeCollapseOffset:
 BowserGfxFlag:
     .res 1 ; $036a
 
-; GAME SPECIFIC DEFINES
+    .res 29 ; $036b-$0387 (unused)
+
+FirebarSpinSpeed:
+    .res 5 ; $0388-$038c
+
+    .res 11 ; $038d-$0397 (unused)
+
+VineFlagOffset:
+    .res 1 ; $0398
+VineHeight:
+    .res 1 ; $0399
+VineObjOffset:
+    .res 2 ; $039a-$039b
+    .res 1 ; $039c (unused)
+VineStart_Y_Position:
+    .res 1 ; $039d
+
+    .res 2 ; $039e-$039f (unused)
+
+BalPlatformAlignment:
+    .res 1 ; $03a0
+Platform_X_Scroll:
+    .res 1 ; $03a1
+PlatformCollisionFlag:
+    .res 5 ; $03a2-$03a6
+
+    .res 6 ; $03a7-$03ac (unused)
+
+SprObject_Rel_XPos:
+Player_Rel_XPos:
+    .res 1 ; $03ad
+Enemy_Rel_XPos:
+    .res 1 ; $03ae
+Fireball_Rel_XPos:
+    .res 1 ; $03af
+Bubble_Rel_XPos:
+    .res 1 ; $03b0
+Block_Rel_XPos:
+    .res 1 ; $03b1
+    .res 1 ; $03b2
+Misc_Rel_XPos:
+    .res 1 ; $03b3
+
+    .res 4 ; $03b4-$03b7 (unused)
+
+SprObject_Rel_YPos:
+Player_Rel_YPos:
+    .res 1 ; $03b8
+Enemy_Rel_YPos:
+    .res 1 ; $03b9
+Fireball_Rel_YPos:
+    .res 1 ; $03ba
+Bubble_Rel_YPos:
+    .res 1 ; $03bb
+Block_Rel_YPos:
+    .res 1 ; $03bc
+    .res 1 ; $03bd
+Misc_Rel_YPos:
+    .res 1 ; $03be
+
+    .res 5 ; $03bf-$03c3 (unused)
+
+SprObject_SprAttrib:
+Player_SprAttrib:
+    .res 1 ; $03c4
+Enemy_SprAttrib:
+    .res 6 ; $03c5-$03ca
+
+    .res 5 ; $03cb-$03cf (unused)
+
+SprObject_OffscrBits:
+Player_OffscreenBits:
+    .res 1 ; $03d0
+Enemy_OffscreenBits:
+    .res 1 ; $03d1
+FBall_OffscreenBits:
+    .res 1 ; $03d2
+Bubble_OffscreenBits:
+    .res 1 ; $03d3
+Block_OffscreenBits:
+    .res 1 ; $03d4
+    .res 1 ; $03d5
+Misc_OffscreenBits:
+    .res 1 ; $03d6
+    .res 1 ; $03d7 (unused)
+EnemyOffscrBitsMasked:
+    .res 6 ; $03d8-$03dd
+
+    .res 6 ; $03de-$03e3 (unused)
+
+Block_Orig_YPos:
+    .res 2 ; $03e4-$03e5
+Block_BBuf_Low:
+    .res 2 ; $03e6-$03e7
+Block_Metatile:
+    .res 2 ; $03e8-$03e9
+Block_PageLoc2:
+    .res 2 ; $03ea-$03eb
+Block_RepFlag:
+    .res 2 ; $03ec-$03ed
+SprDataOffset_Ctrl:
+    .res 1 ; $03ee
+    .res 1 ; $03ef (unused)
+Block_ResidualCounter:
+    .res 1 ; $03f0
+Block_Orig_XPos:
+    .res 2 ; $03f1-$03f2
+
+    .res 6 ; $03f3-$03f8 (unused)
+
+AttributeBuffer:
+    .res 7 ; $03f9-$03ff
+
+SprObject_X_MoveForce:
+    .res 1 ; $0400
+Enemy_X_MoveForce:
+    .res 6 ; $0401-$0406
+    .res 2 ; $0407-$0408 (fireballs)
+    .res 2 ; $0409-$040a (blocks)
+    .res 2 ; $040b-$040c (blocks)
+    .res 9 ; $040d-$0415 (misc)
+
+SprObject_YMF_Dummy:
+Player_YMF_Dummy:
+    .res 1 ; $0416
+Enemy_YMF_Dummy:
+    .res 6 ; $0417-$041c
+    .res 2 ; $041d-$041e (fireballs)
+    .res 2 ; $041f-$0420 (blocks)
+    .res 2 ; $0421-$0422 (blocks)
+    .res 9 ; $0423-$042b (misc)
+Bubble_YMF_Dummy:
+    .res 3 ; $042c-$042e
+
+    .res 4 ; $042f-$0432 (unused)
+
+SprObject_Y_MoveForce:
+Player_Y_MoveForce:
+    .res 1 ; $0433
+Enemy_Y_MoveForce:
+    .res 6 ; $0434-$0439
+    .res 2 ; $043a-$043b (fireballs)
+Block_Y_MoveForce:
+    .res 2 ; $043c-$043d
+    .res 2 ; $043e-$043f
+    .res 9 ; $0440-$0448 (misc)
+
+    .res 7 ; $0449-$044f (unused)
+
+MaximumLeftSpeed:
+    .res 1 ; $0450
+    .res 5 ; $0451-$0455 (unused)
+MaximumRightSpeed:
+    .res 1 ; $0456
+
+    .res 19 ; $0457-$0469 (unused)
+
+Cannon_Offset:
+Whirlpool_Offset:
+    .res 1 ; $046a
+Cannon_PageLoc:
+Whirlpool_PageLoc:
+    .res 6 ; $046b-$0470
+Cannon_X_Position:
+Whirlpool_LeftExtent:
+    .res 6 ; $0471-$0476
+Cannon_Y_Position:
+Whirlpool_Length:
+    .res 6 ; $0477-$047c
+Cannon_Timer:
+Whirlpool_Flag:
+    .res 6 ; $047d-$0482
+
+BowserHitPoints:
+    .res 1 ; $0483
+
+StompChainCounter:
+    .res 1 ; $0484
+
+    .res 11 ; $0485-$048f (unused)
+
+Player_CollisionBits:
+    .res 1 ; $0490
+Enemy_CollisionBits:
+    .res 6 ; $0491-$0496
+
+    .res 2 ; $0497-$0498 (unused)
+
+SprObj_BoundBoxCtrl:
+Player_BoundBoxCtrl:
+    .res 1 ; $0499
+Enemy_BoundBoxCtrl:
+    .res 6 ; $049a-$049f
+Fireball_BoundBoxCtrl:
+    .res 2 ; $04a0-$04a1
+Misc_BoundBoxCtrl:
+    .res 9 ; $04a2-$04aa
+
+    .res 1 ; $04ab (unused)
+
+BoundingBox_UL_XPos:
+BoundingBox_UL_Corner:
+    .res 1 ; $04ac
+BoundingBox_UL_YPos:
+    .res 1 ; $04ad
+BoundingBox_DR_XPos:
+BoundingBox_LR_Corner:
+    .res 1 ; $04ae
+BoundingBox_DR_YPos:
+    .res 1 ; $04af
+EnemyBoundingBoxCoord:
+    .res 6*4 ; $04b0-$04c7
+    .res 2*4 ; $04c8-$04cf (fireballs)
+    .res 9*4 ; $04d0-$04f3 (misc)
+
+    .res 12 ; $04f4-$04ff (unused)
+
+Block_Buffer_1:
+    .res 208 ; $0500-$05cf
+Block_Buffer_2:
+    .res 208 ; $05d0-$069f
 
 SavedJoypadBits       = $06fc
 SavedJoypad1Bits      = $06fc
@@ -333,8 +556,8 @@ PressedJoypad1Bits    = $074c
 PressedJoypad2Bits    = $074d
 JoypadOverride        = $0758
 
-IRQAckFlag			  = $077b
-IRQUpdateFlag		  = $0722
+IRQAckFlag            = $077b
+IRQUpdateFlag         = $0722
 NMIAckFlag            = $077c
 
 Mirror_PPU_CTRL       = $0778
@@ -431,7 +654,6 @@ MetatileBuffer        = $06a1
 BlockBufferColumnPos  = $06a0
 CurrentNTAddr_Low     = $0721
 CurrentNTAddr_High    = $0720
-AttributeBuffer       = $03f9
 
 LoopCommand           = $0745
 
@@ -443,7 +665,6 @@ GameTimerDisplay      = $07ec
 CoinDisplay           = $07e7
 
 FlagpoleCollisionYPos = $070f
-StompChainCounter     = $0484
 FlagpoleMusicFlag     = $07f6
 
 VRAM_Buffer_AddrCtrl  = $0773
@@ -497,9 +718,6 @@ AreaNumber            = $0760 ;internal number used to find areas
 
 CoinTallyFor1Ups      = $0748
 
-BalPlatformAlignment  = $03a0
-Platform_X_Scroll     = $03a1
-PlatformCollisionFlag = $03a2
 YPlatformTopYPos      = $0401
 
 BrickCoinTimerFlag    = $06bc
@@ -518,53 +736,11 @@ Alt_SprDataOffset     = $06ec
 Bubble_SprDataOffset  = $06ee
 FBall_SprDataOffset   = $06f1
 Misc_SprDataOffset    = $06f3
-SprDataOffset_Ctrl    = $03ee
 
 JumpspringAnimCtrl    = $070e
 JumpspringForce       = $06db
 
-SprObject_Rel_XPos    = $03ad
-Player_Rel_XPos       = $03ad
-Enemy_Rel_XPos        = $03ae
-Fireball_Rel_XPos     = $03af
-Bubble_Rel_XPos       = $03b0
-Block_Rel_XPos        = $03b1
-Misc_Rel_XPos         = $03b3
-
-SprObject_Rel_YPos    = $03b8
-Player_Rel_YPos       = $03b8
-Enemy_Rel_YPos        = $03b9
-Fireball_Rel_YPos     = $03ba
-Bubble_Rel_YPos       = $03bb
-Block_Rel_YPos        = $03bc
-Misc_Rel_YPos         = $03be
-
-SprObject_SprAttrib   = $03c4
-Player_SprAttrib      = $03c4
-Enemy_SprAttrib       = $03c5
-
-SprObject_X_MoveForce = $0400
-Enemy_X_MoveForce     = $0401
-
-SprObject_YMF_Dummy   = $0416
-Player_YMF_Dummy      = $0416
-Enemy_YMF_Dummy       = $0417
-Bubble_YMF_Dummy      = $042c
-
-SprObject_Y_MoveForce = $0433
-Player_Y_MoveForce    = $0433
-Enemy_Y_MoveForce     = $0434
-Block_Y_MoveForce     = $043c
-
 DisableCollisionDet   = $0716
-Player_CollisionBits  = $0490
-Enemy_CollisionBits   = $0491
-
-SprObj_BoundBoxCtrl   = $0499
-Player_BoundBoxCtrl   = $0499
-Enemy_BoundBoxCtrl    = $049a
-Fireball_BoundBoxCtrl = $04a0
-Misc_BoundBoxCtrl     = $04a2
 
 EnemyFrenzyBuffer     = $06cb
 EnemyFrenzyQueue      = $06cd
@@ -588,61 +764,14 @@ PlayerAnimCtrl        = $070d
 DeathMusicLoaded      = $0712
 FlagpoleSoundQueue    = $0713
 CrouchingFlag         = $0714
-MaximumLeftSpeed      = $0450
-MaximumRightSpeed     = $0456
 
 WindFlag              = $07f9
-
-SprObject_OffscrBits  = $03d0
-Player_OffscreenBits  = $03d0
-Enemy_OffscreenBits   = $03d1
-FBall_OffscreenBits   = $03d2
-Bubble_OffscreenBits  = $03d3
-Block_OffscreenBits   = $03d4
-Misc_OffscreenBits    = $03d6
-EnemyOffscrBitsMasked = $03d8
-
-Cannon_Offset         = $046a
-Cannon_PageLoc        = $046b
-Cannon_X_Position     = $0471
-Cannon_Y_Position     = $0477
-Cannon_Timer          = $047d
-
-Whirlpool_Offset      = $046a
-Whirlpool_PageLoc     = $046b
-Whirlpool_LeftExtent  = $0471
-Whirlpool_Length      = $0477
-Whirlpool_Flag        = $047d
-
-VineFlagOffset        = $0398
-VineHeight            = $0399
-VineObjOffset         = $039a
-VineStart_Y_Position  = $039d
-
-Block_Orig_YPos       = $03e4
-Block_BBuf_Low        = $03e6
-Block_Metatile        = $03e8
-Block_PageLoc2        = $03ea
-Block_RepFlag         = $03ec
-Block_ResidualCounter = $03f0
-Block_Orig_XPos       = $03f1
-
-BoundingBox_UL_XPos   = $04ac
-BoundingBox_UL_YPos   = $04ad
-BoundingBox_DR_XPos   = $04ae
-BoundingBox_DR_YPos   = $04af
-BoundingBox_UL_Corner = $04ac
-BoundingBox_LR_Corner = $04ae
-EnemyBoundingBoxCoord = $04b0
 
 FireballCounter       = $06ce
 FireballThrowingTimer = $0711
 
 HammerEnemyOffset     = $06ae
 JumpCoinMiscOffset    = $06b7
-
-Block_Buffer_1        = $0500
-Block_Buffer_2        = $05d0
 
 HammerThrowingTimer   = $03a2
 Misc_Collision_Flag   = $06be
@@ -654,13 +783,9 @@ BitMFilter            = $06dd
 
 LakituReappearTimer   = $06d1
 
-FirebarSpinSpeed      = $0388
-FirebarSpinDirection  = $34
-
 DuplicateObj_Offset   = $06cf
 NumberofGroupEnemies  = $06d3
 
-BowserHitPoints       = $0483
 MaxRangeFromOrigin    = $06dc
 
 BowserFlamePRandomOfs = $0417
@@ -748,7 +873,7 @@ VictoryMusic          = %00000100
 GameOverMusic         = %00000010
 DeathMusic            = %00000001
 
-;enemy object constants 
+;enemy object constants
 GreenKoopa            = $00
 BuzzyBeetle           = $02
 RedKoopa              = $03

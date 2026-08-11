@@ -2229,6 +2229,8 @@ TerrBChk: lda Bitmasks,y             ;load bitmask, then perform AND on contents
 NextTBit: inx                        ;continue until end of buffer
           cpx #$0d
           beq RendBBuf               ;if we're at the end, break out of this loop
+          lda CloudTypeOverride      ;skip if cloud type override is set
+          bne EndUChk
           lda AreaType               ;check world type for ground or underground area
           beq EndUChk
           cmp #$03
@@ -3456,7 +3458,7 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr SimulateWind           ;simulate wind where needed
               lda AnimatedTiles
               beq NoWAnim
-              lda WaterAnimTimer		 
+              lda WaterAnimTimer
 			  bne NoWAnim
 			  ldy AreaType
 			  lda WaterAnimIntervals,y
@@ -4859,7 +4861,7 @@ PosJSpr:   lda Jumpspring_FixedYPos,x  ;get permanent vertical position
            bne SetJSF
 :          ldy DifficultyFlag
            cpy #$02
-           beq SetJSF 
+           beq SetJSF
 GreenJS:   lda #$e0
 SetJSF:    sta JumpspringForce         ;otherwise write new jumpspring force here
            pla
@@ -13687,7 +13689,7 @@ SaveProgress:
             lda CompletedWorlds
             sta SavedCompletedWorlds,x
             rts
-			
+
 ContinueOrRetry:
   lda ContinueMenuSelect       ;if player selected "continue"
   beq Continue                 ;then branch to continue, do not save
@@ -13731,8 +13733,8 @@ GameMenuRoutine:
               lda SavedJoypadBits         ;was A being held when B was pressed?
               and #A_Button
               beq ExitGame                ;no, return to game selection menu
-              jmp ClearTopScore           ;yes, clear top score and reload menu        
-ProcGameMenu: 
+              jmp ClearTopScore           ;yes, clear top score and reload menu
+ProcGameMenu:
               lda PressedJoypadBits       ;check to see if the player pressed start
               and #Start_Button
               beq ChkSelect               ;if not, branch to check other buttons
@@ -15127,7 +15129,7 @@ SavePointerLo:
 
 SavePointerLo_End:
 		.byte <(File_A_End),  <(File_B_End), <(File_C_End)
-		
+
 SaveHeader:
         .byte $4D, $41, $52, $49, $4F, $20, $43, $4F, $4D, $50, $4C, $45, $54, $45, $00, $00
 
@@ -15164,13 +15166,13 @@ EraseSaveFile:
 		lda SavePointerLo_End,x
 		sta $00
 		ldy #(File_A_End-File_A)
-DoErase:		
+DoErase:
 		lda #$00
 		sta ($00),y
 		dey
 		bpl DoErase
 		rts
-		
+
 ;-------------------------------------------------------------------------------------
 BGTiles:
       .byte $09,$01
@@ -15178,7 +15180,7 @@ SprTiles:
       .byte $0a,$04
 FontTiles:
       .byte $08,$00
-	  
+
 LoadGameTileset:
       ; load tileset based on menu selection
       ; if per-game, tilset depends on levels played
@@ -15378,7 +15380,7 @@ NMIHandler:
       lda #$81
       sta FME7Parameter         ;enable it
       inc IRQAckFlag            ;reset flag to wait for next IRQ
-SkipIRQ:            
+SkipIRQ:
       lda Mirror_PPU_CTRL       ;alter name table address to be $2000
       and #%01111100
       sta Mirror_PPU_CTRL
@@ -15522,7 +15524,7 @@ ReturnToLoader:
       lda #$00
       sta FME7Parameter
       ldx #$07                    ;set up CHR bank registers
-CHRBankLoop:        
+CHRBankLoop:
       stx FME7Command
       stx FME7Parameter
       dex
@@ -15591,7 +15593,7 @@ IRQHandler_SplitXY:
         .word NMIHandler
         .word RESETHandler
         .word IRQHandler
-		
+
 .segment "CHRROM"
 
 ;SMB2 FONT
