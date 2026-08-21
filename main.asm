@@ -3457,9 +3457,9 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
               jsr ColorRotation          ;cycle one of the background colors
               jsr SimulateWind           ;simulate wind where needed
               lda AnimatedTiles
-              beq NoWAnim
-              lda WaterAnimTimer
-			  bne NoWAnim
+              beq DebugPUP
+              lda WaterAnimTimer		 
+			  bne DebugPUP
 			  ldy AreaType
 			  lda WaterAnimIntervals,y
 			  sta WaterAnimTimer
@@ -3472,6 +3472,25 @@ ProcELoop:    stx ObjectOffset           ;put incremented offset in X as enemy o
 			  sta FME7Command
 			  lda WaterAnimBanks,y
 			  sta FME7Parameter
+DebugPUP:	  lda PressedJoypad2Bits
+			  and #Select_Button
+			  beq NoWAnim
+ 			  lda PlayerSize
+			  beq :+
+			  lda #$00
+			  sta PlayerSize
+			  beq :++
+:			  lda PlayerStatus
+			  cmp #$01
+			  beq :+
+			  inc PlayerSize
+:			  lda PlayerStatus
+			  cmp #$02
+			  bne :+
+			  lda #$00
+			  sta PlayerStatus
+			  beq NoWAnim
+:			  inc PlayerStatus
 NoWAnim:      lda Player_Y_HighPos
               cmp #$02                   ;if player is below the screen, don't bother with the music
               bpl NoChgMus
