@@ -1394,11 +1394,18 @@ CopyFireLuigiPalette:
 
 
 LuigiFrictionData_SNES:
+.ifdef PAL
+      .byte $c0, $00, $80                     ;PAL diff: Faster acceleration to compensate FPS difference
+.else
       .byte $e4, $98, $d0
+.endif
 
 LuigiFrictionData_FDS:
+.ifdef PAL
+      .byte $00, $00, $00                     ;PAL diff: Faster acceleration to compensate FPS difference
+.else
       .byte $b4, $68, $a0
-
+.endif
 
 MarioPaletteOffsets:
       .byte $03, $07, $0B      ;note that offsets point to last byte
@@ -1448,7 +1455,11 @@ DemoActionData_SMB2:
       .byte $00, $00, $00, $00, $00
 
 DemoTimingData_SMB2:
+.ifdef PAL
+      .byte $90, $10, $10, $10, $18, $10, $1c, $05 ;PAL diff: Demo timing decreased to compensate FPS difference
+.else
       .byte $b0, $10, $10, $10, $28, $10, $28, $06
+.endif
       .byte $10, $10, $0c, $80, $10, $28, $08, $90
       .byte $ff, $00, $00, $00, $00, $00
   

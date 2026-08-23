@@ -340,7 +340,11 @@ ContinueCGrabTTick:
         lda Squ2_SfxLenCounter  ;check for time to play second tone yet
         cmp #$30                ;timer tick sound also executes this, not sure why
         bne N2Tone
+.ifdef PAL
+        lda #$4e                ;PAL diff: Play different sound
+.else
         lda #$54                ;if so, load the tone directly into the reg
+.endif
         sta SND_SQUARE2_REG+2
 N2Tone: bne DecrementSfx2Length
 
@@ -1093,7 +1097,12 @@ SettingsMusHdr:        .byte $18, <SettingsMusData, >SettingsMusData, $3c, $17, 
 TimeRunningOutHdr:     .byte $08, <TimeRunOutMusData, >TimeRunOutMusData, $27, $18
 Star_CloudHdr:         .byte $20, <Star_CloudMData, >Star_CloudMData, $2e, $1a, $40
 EndOfLevelMusHdr:      .byte $20, <WinLevelMusData, >WinLevelMusData, $3d, $21
-ResidualHeaderData:    .byte $20, $fb, $dc, $3f, $1d
+ResidualHeaderData:
+.ifdef PAL
+	.byte $20, $fc, $dc, $3f, $1d ;PAL diff: Different data  
+.else	
+	.byte $20, $fb, $dc, $3f, $1d
+.endif
 UndergroundMusHdr:     .byte $18, <UndergroundMusData, >UndergroundMusData, $00, $00
 SilenceHdr:            .byte $08, <SilenceData, >SilenceData, $00
 CastleMusHdr:          .byte $00, <CastleMusData, >CastleMusData, $93, $62
@@ -1479,7 +1488,32 @@ VictoryM_P2DData:
     .byte $1e, $1e, $1e, $86, $1e
 ;noise of part 2D
     .byte $11, $11, $d0, $d0, $d0, $11, $00
+.ifdef PAL
+FreqRegLookupTbl: ;PAL diff: Different frequencies to accomodate clock speed differences
+      .byte $00, $88, $00, $2b, $00, $00
+      .byte $02, $72, $02, $4f, $02, $2e, $02, $0e
+      .byte $01, $f1, $01, $ba, $01, $a1, $01, $8a
+      .byte $01, $74, $01, $5F, $01, $4B, $01, $39
+      .byte $01, $27, $01, $17, $01, $07, $00, $F8
+      .byte $00, $EA, $00, $DD, $00, $D1, $00, $C5
+      .byte $00, $BA, $00, $AF, $00, $A5, $00, $9C
+      .byte $00, $94, $00, $8B, $00, $83, $00, $7C
+      .byte $00, $6E, $00, $74, $00, $68, $00, $4E
+      .byte $00, $5C, $00, $58, $00, $52, $00, $4A
+      .byte $00, $42, $00, $3E, $00, $36, $00, $31
+      .byte $00, $27, $00, $20, $04, $1D, $03, $15
+      .byte $02, $BE, $02, $98, $01, $D5, $00, $62
 
+MusicLengthLookupTbl: ;PAL diff: Different lengths to accomodate speed differences
+      .byte $04, $08, $10, $20, $40, $18, $30, $0C
+      .byte $03, $06, $0C, $18, $30, $12, $24, $08
+      .byte $03, $06, $0C, $18, $30, $12, $24, $08
+      .byte $24, $02, $06, $04, $0C, $12, $18, $08
+      .byte $1B, $01, $05, $03, $09, $0D, $12, $06
+      .byte $12, $01, $03, $02, $06, $09, $0C, $04
+      .byte $24, $12, $0d, $09, $1b, $28, $36, $12 ;these two used in victory music only
+      .byte $24, $12, $0d, $09, $1b, $28, $36, $6c
+.else
 FreqRegLookupTbl:
       .byte $00, $88, $00, $2f, $00, $00
       .byte $02, $a6, $02, $80, $02, $5c, $02, $3a
@@ -1504,6 +1538,7 @@ MusicLengthLookupTbl:
       .byte $12, $01, $03, $02, $06, $09, $0c, $04
       .byte $24, $12, $0d, $09, $1b, $28, $36, $12 ;these two used in victory music only
       .byte $24, $12, $0d, $09, $1b, $28, $36, $6c
+.endif
 
 VictoryMusEnvData:
       .byte $97, $98, $9a, $9b, $9b, $9a, $9a, $99

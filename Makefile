@@ -1,6 +1,9 @@
 AS = ca65
 CC = cc65
 LD = ld65
+ifdef PAL
+AFLAGS += -DPAL
+endif
 
 INCS = inc/wram.inc
 
@@ -8,7 +11,7 @@ INCS = inc/wram.inc
 build: smb-complete.nes
 
 %.o: %.asm
-	$(AS) --create-dep "$@.dep" --listing $@.lst -g --debug-info $< -o $@
+	$(AS) $(AFLAGS) --create-dep "$@.dep" --listing $@.lst -g --debug-info $< -o $@
 
 inc/wram.inc: wram.asm wram.map
 	python scripts/genram.py wram.map inc/wram.inc
