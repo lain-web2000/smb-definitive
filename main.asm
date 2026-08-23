@@ -56,12 +56,21 @@ Start:      ldx #$00                    ;disable NMIs and rendering
             jsr MoveAllSpritesOffscreen ;reset OAM and nametable memory
             jsr InitializeNameTables
             inc DisableScreenFlag       ;tell NMI to keep rendering disabled
+.ifdef PAL
+            lda #$40                    ;set IRQ select for scroll split
+            sta IRQSelect
+            lda #$3d                    ;set IRQ timer value for scroll split
+            sta IRQTimer_Low
+            lda #$2a
+            sta IRQTimer_High
+.else
             lda #$40                    ;set IRQ select for scroll split
             sta IRQSelect
             lda #$eb                    ;set IRQ timer value for scroll split
             sta IRQTimer_Low
             lda #$16
             sta IRQTimer_High
+.endif
             lda #1
             sta SoundEngineSet          ;hack
             lda #%10001000              ;set up pattern table arrangment
