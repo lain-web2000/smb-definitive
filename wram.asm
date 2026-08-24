@@ -74,6 +74,9 @@ WarpZoneScroll:
 
 CountdownSpeed:
 	.byte $00
+	
+CoinBonusSetting:
+	.byte $00
 
 FontSelection:
     .byte $00
@@ -83,6 +86,7 @@ TilesetSelection:
 
 AnimatedTiles:
 	.byte $00
+
 GlobalSettings_End:
 SaveData_End:
 
@@ -113,6 +117,9 @@ LeavesYPosCopy:
 LuigiFrictionData:
 	.byte $b4, $68, $a0
 
+CoinBonusTotal:
+	.byte $00
+	
 DemoActionData:
       .byte $01, $80, $02, $81, $41, $80, $01
       .byte $42, $c2, $02, $80, $41, $c1, $41, $c1

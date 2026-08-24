@@ -517,6 +517,11 @@ Opt_GfxTimerSpeed:
         .byte "TIMER SPEED"
         .byte "..............."
         .byte $24, $cd
+Opt_GfxCoinBonus:
+        .byte $cd, $24
+        .byte "COIN BONUS."
+        .byte "..............."
+        .byte $24, $cd
 Opt_GfxFontSelection:
         .byte $cd, $24
         .byte "FONT SELECTION"
@@ -559,14 +564,16 @@ Opt_GfxTable:
         .word Opt_GfxEmpty              ; 16
         .word Opt_GfxTimerSpeed         ; 17
         .word Opt_GfxEmpty              ; 18
-        .word Opt_GfxFontSelection      ; 19
+        .word Opt_GfxCoinBonus          ; 19
         .word Opt_GfxEmpty              ; 20
-        .word Opt_GfxTilesetSelection1  ; 21
-        .word Opt_GfxTilesetSelection2  ; 22
-        .word Opt_GfxEmpty              ; 23
-        .word Opt_GfxAnimatedTiles      ; 24
+        .word Opt_GfxFontSelection      ; 21
+        .word Opt_GfxEmpty              ; 22
+        .word Opt_GfxTilesetSelection1  ; 23
+        .word Opt_GfxTilesetSelection2  ; 24
         .word Opt_GfxEmpty              ; 25
-        .word Opt_GfxBottom             ; 26
+        .word Opt_GfxAnimatedTiles      ; 26
+        .word Opt_GfxEmpty              ; 27
+        .word Opt_GfxBottom             ; 28
 Opt_GfxTableEnd:
 
 Opt_QueueRowGfx:
@@ -764,6 +771,7 @@ Opt_SelTable:
         .word Opt_SelSpinyEggBehavior   ; spiny egg behavior
         .word Opt_SelWarpZoneScroll     ; warp zone scroll
         .word Opt_SelTimerSpeed         ; timer speed
+        .word Opt_SelCoinBonusSetting   ; coin bonus
         .word Opt_SelFontSelection      ; font selection
         .word Opt_SelTilesetSelection   ; tileset selection
         .word Opt_SelAnimatedTiles      ; animated tiles
@@ -881,11 +889,30 @@ Opt_TxtTimerSpeed1:
         .byte ".VS.SLOW"
 Opt_TxtTimerSpeed2:
         .byte ".VS.FAST"
+
+Opt_SelCoinBonusSetting:
+        .byte 19                        ; cursor row
+        .word CoinBonusSetting          ; memory addr
+        .byte 19                        ; text row
+        .byte 9                         ; text length
+        .byte 4                         ; option count
+        .word Opt_SelCoinBonusSetting0  ; text addr #0
+        .word Opt_SelCoinBonusSetting1  ; text addr #1
+        .word Opt_SelCoinBonusSetting2  ; text addr #2
+        .word Opt_SelCoinBonusSetting3  ; text addr #3
+Opt_SelCoinBonusSetting0:
+        .byte "100 COINS"
+Opt_SelCoinBonusSetting1:
+        .byte "150 COINS"
+Opt_SelCoinBonusSetting2:
+        .byte "200 COINS"
+Opt_SelCoinBonusSetting3:
+        .byte "250 COINS"
 		
 Opt_SelFontSelection:
-        .byte 19                        ; cursor row
+        .byte 21                        ; cursor row
         .word FontSelection             ; memory addr
-        .byte 19                        ; text row
+        .byte 21                        ; text row
         .byte 8                         ; text length
         .byte 3                         ; option count
         .word Opt_TxtFontSelection0     ; text addr #0
@@ -899,9 +926,9 @@ Opt_TxtFontSelection2:
         .byte ".MARIO 2"
 
 Opt_SelTilesetSelection:
-        .byte 21                        ; cursor row
+        .byte 23                        ; cursor row
         .word TilesetSelection          ; memory addr
-        .byte 22                        ; text row
+        .byte 24                        ; text row
         .byte 8                         ; text length
         .byte 3                         ; option count
         .word Opt_TxtTilesetSelection0  ; text addr #0
@@ -915,9 +942,9 @@ Opt_TxtTilesetSelection2:
         .byte ".MARIO 2"
 
 Opt_SelAnimatedTiles:
-        .byte 24                        ; cursor row
+        .byte 26                        ; cursor row
         .word AnimatedTiles             ; memory addr
-        .byte 24                        ; text row
+        .byte 26                        ; text row
         .byte 3                         ; text length
         .byte 2                         ; option count
         .word Opt_TxtAnimatedTiles0     ; text addr #0
@@ -1271,6 +1298,7 @@ LoadIntoGame:
         sta CurrentGame
         jsr LoadFontTileset
         jsr CopyFrictionData
+		jsr CopyTotalCoinBonus
         jsr CopyPaletteData
         jsr CopyDemoData
         jsr CopyTopScoreDisplay
@@ -1392,7 +1420,15 @@ CopyFireLuigiPalette:
         bpl CopyFireLuigiPalette
         rts
 
+CopyTotalCoinBonus:
+		ldx CoinBonusSetting
+		lda CoinBonusAmount,x
+		sta CoinBonusTotal
+		rts
 
+CoinBonusAmount:
+      .byte 100, 150, 200, 250
+	  
 LuigiFrictionData_SNES:
 .ifdef PAL
       .byte $c0, $00, $80                     ;PAL diff: Faster acceleration to compensate FPS difference
@@ -1463,16 +1499,15 @@ DemoTimingData_SMB2:
       .byte $10, $10, $0c, $80, $10, $28, $08, $90
       .byte $ff, $00, $00, $00, $00, $00
   
-DifficultyPresets:
-      
+DifficultyPresets:  
 EasyPreset:
-      .byte $00, $00, $00, $01, $00, $00, $00, $00, $00, $01
+      .byte $00, $00, $00, $01, $00, $00, $00, $00, $00, $00, $01
 NormalPreset:
-      .byte $01, $00, $00, $01, $00, $00, $00, $00, $00, $01
+      .byte $01, $00, $00, $01, $00, $00, $00, $00, $00, $00, $01
 HardPreset:
-      .byte $02, $00, $00, $00, $00, $00, $01, $00, $00, $01
+      .byte $02, $00, $00, $00, $00, $00, $01, $02, $00, $00, $01
 ExpertPreset:
-      .byte $02, $00, $00, $00, $01, $01, $01, $00, $00, $01
+      .byte $02, $00, $00, $00, $01, $01, $02, $03, $00, $00, $01
 
 .include "famistudio_ca65.s"
 .include "music/menu.s"

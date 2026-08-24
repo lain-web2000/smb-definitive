@@ -1564,7 +1564,7 @@ MushroomRetainerMsg:
 StatusBarData:
       .byte $22, $ef, $06 ; top score display on title screen
       .byte $20, $62, $06 ; player score
-      .byte $20, $6d, $02 ; coin tally
+      .byte $20, $6d, $03 ; coin tally
       .byte $20, $7a, $03 ; game timer
       .byte $23, $0f, $06 ; top score display on title screen (complete mode)
 
@@ -5479,10 +5479,13 @@ GiveOneCoin:
       jsr DigitsMathRoutine  ;update the coin tally
       inc CoinTally          ;increment onscreen player's coin amount
       lda CoinTally
-      cmp #100               ;does player have 100 coins yet?
+      cmp CoinBonusTotal     ;does player have 100-250 coins yet?
       bne CoinPoints         ;if not, skip all of this
       lda #$00
       sta CoinTally          ;otherwise, reinitialize coin amount
+	  sta CoinDisplay-1
+	  sta CoinDisplay
+	  sta CoinDisplay+1
       jsr GiveExtraLife      ;award an extra life
 CoinPoints:
       lda #$02               ;set digit modifier to award
@@ -5498,7 +5501,7 @@ AddToScore:
       .byte $2c              ;BIT instruction opcode
 
 WriteScoreAndCoinTally:
-        lda #$12             ;print player's score and coin tally
+        lda #$12                  ;print player's score and coin tally
 WriteDigits:
         jsr PrintStatusBarNumbers ;print status bar numbers
         ldy VRAM_Buffer_Offset

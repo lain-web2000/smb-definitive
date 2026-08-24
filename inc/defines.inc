@@ -661,8 +661,8 @@ DisplayDigits         = $07d7
 TopScoreDisplay       = $07d7
 ScoreAndCoinDisplay   = $07dd
 PlayerScoreDisplay    = $07dd
-GameTimerDisplay      = $07ec
 CoinDisplay           = $07e7
+GameTimerDisplay      = $07ec
 
 FlagpoleCollisionYPos = $070f
 FlagpoleMusicFlag     = $07f6
