@@ -208,7 +208,7 @@ World5Areas: .byte $2a, $31, $26, $62
 World6Areas: .byte $2e, $23, $2d, $60
 World7Areas: .byte $33, $29, $01, $27, $64
 World8Areas: .byte $30, $32, $21, $65
-World9Areas: .byte $03, $04, $05, $43
+World9Areas: .byte $03, $04, $43, $ff
 
 ;bonus area data offsets, included here for comparison purposes
 ;underground bonus area  - c2
@@ -443,9 +443,9 @@ E_UndergroundArea2_:
 E_UndergroundArea3_:
       .incbin "levels/smb1/enemies/E_BONUS.bin"
 
-;level 9-4
+;level 9-3
 E_UndergroundArea4_:
-      .incbin "levels/smb1/enemies/E_9-4.bin"
+      .incbin "levels/smb1/enemies/E_9-3.bin"
 
 ;water area used in levels 5-2 and 6-2
 E_WaterArea1_:
@@ -469,7 +469,7 @@ E_WaterArea5_:
 
 ;level 9-3
 E_WaterArea6_:
-      .incbin "levels/smb1/enemies/E_9-3.bin"
+      .byte $ff
 
 ;AREA OBJECT DATA
 
@@ -597,9 +597,9 @@ L_UndergroundArea2_:
 L_UndergroundArea3_:
       .incbin "levels/smb1/levels/L_BONUS.bin"
 
-;level 9-4
+;level 9-3
 L_UndergroundArea4_:
-      .incbin "levels/smb1/levels/L_9-4.bin"
+      .incbin "levels/smb1/levels/L_9-3.bin"
 
 ;water area used in levels 5-2 and 6-2
 L_WaterArea1_:
@@ -623,7 +623,7 @@ L_WaterArea5_:
 
 ;level 9-3
 L_WaterArea6_:
-      .incbin "levels/smb1/levels/L_9-3.bin"
+      .byte $fd
 
 ;-------------------------------------------------------------------------------------
 
