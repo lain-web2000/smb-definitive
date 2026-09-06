@@ -11,7 +11,11 @@
   .byte 2                                         ;  CHR
   .byte $52                                       ;  mirroring type and mapper number lower nibble
   .byte $48                                       ;  mapper number upper nibble
+.ifdef PAL
+  .byte $00,$00,$70,$00,$01,$00,$00,$01
+.else
   .byte $00,$00,$70,$00,$00,$00,$00,$01
+.endif
 
 .segment "UNUSEDPRG"
 .org $8000
@@ -1548,6 +1552,16 @@ LuigiThankYouMsg:
   .byte "THANK YOU LUIGI!"
   .byte $00
 
+MarioThankYouMsgEnd:
+  .byte $25, $28, 15
+  .byte "THANK YOU MARIO"
+  .byte $00
+
+LuigiThankYouMsgEnd:
+  .byte $25, $28, 15
+  .byte "THANK YOU LUIGI"
+  .byte $00
+  
 MushroomRetainerMsg:
   .byte $25, $c5, 22
   .byte "BUT OUR PRINCESS IS IN"
@@ -14666,7 +14680,7 @@ PrintVictoryMsgsForWorldD:
          cpy #$03                   ;if not at 3 yet, branch to increment
          bcc IncVMC
          dey                        ;otherwise decrement and use as message counter
-         cpy #$08                   ;if message counter gone past a certain
+         cpy #$09                   ;if message counter gone past a certain
          bcs EndVictoryMessages     ;point, branch to set timer and stop printing messages
          cpy #$02                   ;wait for specific message to start music
          bne @ChkL
@@ -14676,13 +14690,13 @@ PrintVictoryMsgsForWorldD:
          beq PrintVM                ;if mario, use standard message offset
          cpy #$01                   ;are we thanking the player?
          bne @ChkL2
-         ldy #$08                   ;if so, use alt offset for luigi
+         ldy #$09                   ;if so, use alt offset for luigi
 @ChkL2:  cpy #$02                   ;are we thanking the player?
          bne @ChkL3
-         ldy #$09                   ;if so, use alt offset for luigi
-@ChkL3:  cpy #$05                   ;are we printing the hurrah message?
-         bne PrintVM
          ldy #$0a                   ;if so, use alt offset for luigi
+@ChkL3:  cpy #$06                   ;are we printing the hurrah message?
+         bne PrintVM
+         ldy #$0b                   ;if so, use alt offset for luigi
 PrintVM: tya
          clc
          adc #VRAM_NT_PEACH_2ND     ;get appropriate range for victory messages
@@ -14985,8 +14999,18 @@ LuigiThankYouMsgFinal:
     .byte $27, $c8, $48, $05
     .byte $00
 
+ForRestoringPeace:
+    .byte $25, $86, 19
+    .byte "FOR RESTORING PEACE"
+    .byte $00
+
+ToOurKingdom:
+    .byte $25, $c6, 15
+    .byte "TO OUR KINGDOM."
+    .byte $00
+	
 HurrahToOurHeroMsg:
-    .byte $26, $07, 19
+    .byte $26, $06, 19
     .byte "HURRAH TO OUR HERO,"
     .byte $00
 
@@ -15011,12 +15035,12 @@ OurOnlyHeroMsg:
     ;.byte $00
 
 MarioHurrahMsg:
-    .byte $26, $4d, 6
+    .byte $26, $46, 6
     .byte "MARIO!"
     .byte $00
 
 LuigiHurrahMsg:
-    .byte $26, $4d, 6
+    .byte $26, $46, 6
     .byte "LUIGI!"
     .byte $00
 
@@ -15635,14 +15659,15 @@ VRAM_AddrTable:
    ;end-of-castle messages for 2nd princess
    .word FinalRoomPalette
    .word MarioThankYouMsgFinal
-   .word MarioThankYouMsg
-   .word TheKingdomIsSavedMsg
+   .word MarioThankYouMsgEnd
+   .word ForRestoringPeace
+   .word ToOurKingdom
    .word HurrahToOurHeroMsg
    .word MarioHurrahMsg
    .word PointsAddedMsg
    .word ForEachPlayerLeftMsg
    .word LuigiThankYouMsgFinal
-   .word LuigiThankYouMsg
+   .word LuigiThankYouMsgEnd
    .word LuigiHurrahMsg
 
    ; final ending screen

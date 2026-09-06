@@ -985,5 +985,5 @@ VRAM_NT_SMB2          = 10
 VRAM_NT_TOAD          = 11
 VRAM_NT_PEACH_1ST     = 14
 VRAM_NT_PEACH_2ND     = 18
-VRAM_NT_CREDITS       = 29
-VRAM_PAL_MENU         = 30
+VRAM_NT_CREDITS       = 30
+VRAM_PAL_MENU         = 31

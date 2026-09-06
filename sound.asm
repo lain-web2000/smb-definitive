@@ -1544,12 +1544,7 @@ VictoryMusEnvData:
       .byte $97, $98, $9a, $9b, $9b, $9a, $9a, $99
       .byte $99, $98, $98, $97, $97, $96, $96, $95
       .byte $02 ;needed to produce correct sound
-
-SMB1_VictoryMusEnvData:
-      .byte $96, $96, $96, $96, $96, $96, $96, $96
-      .byte $96, $96, $96, $96, $95, $95, $94, $93
-      .byte $12
-
+	  
 EndOfCastleMusicEnvData:
       .byte $98, $99, $9a, $9b
 
@@ -1560,6 +1555,7 @@ WaterEventMusEnvData:
       .byte $90, $91, $92, $92, $93, $93, $93, $94
       .byte $94, $94, $94, $94, $94, $95, $95, $95
       .byte $95, $95, $95, $96, $96, $96, $96, $96
+SMB1_VictoryMusEnvData:
       .byte $96, $96, $96, $96, $96, $96, $96, $96
       .byte $96, $96, $96, $96, $95, $95, $94, $93
 
