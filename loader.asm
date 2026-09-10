@@ -144,10 +144,17 @@ PrepMenu:
         jsr DrawMainMenuCursor
         lda #$40                    ;set IRQ select for scroll split
         sta IRQSelect
+.ifdef PAL
+        lda #$82                    ;set IRQ timer value for scroll split
+        sta IRQTimer_Low
+        lda #$44
+        sta IRQTimer_High
+.else
         lda #$e7                    ;set IRQ timer value for scroll split
         sta IRQTimer_Low
         lda #$32
         sta IRQTimer_High
+.endif
         inc IRQUpdateFlag
         lda #$00                    ;set scroll position before split
         sta Mirror_PPU_SCROLL1
@@ -753,10 +760,17 @@ Opt_Prep_Done:
         sta Opt_ScrollType              ; disable scrolling
         lda #$00                        ; set irq select
         sta IRQSelect
+.ifdef PAL
+        lda #$af                        ;set irq timer value
+        sta IRQTimer_Low
+        lda #$5f
+        sta IRQTimer_High
+.else
         lda #$e0                        ;set irq timer value
         sta IRQTimer_Low
         lda #$4f
         sta IRQTimer_High
+.endif
         inc IRQUpdateFlag
         lda #$1f
         sta Opt_CursorY                 ; set cursor Y position
